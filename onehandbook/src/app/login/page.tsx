@@ -214,7 +214,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-sm text-zinc-400">
-          24시간 피드백 가능한 개인 AI 편집자
+          24시간 피드백 가능한 개인 AI 에이전트
         </p>
         <Link
           href="/"

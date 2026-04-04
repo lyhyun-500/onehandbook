@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Noto_Sans_KR } from "next/font/google";
 import { LandingCoverDrift } from "@/components/LandingCoverDrift";
 import { SITE_NAME } from "@/config/site";
-import { getLandingCoverRows } from "@/lib/landing-covers";
+import { getLandingCoverBackdrop } from "@/lib/landing-covers";
 
 const notoSansKr = Noto_Sans_KR({
   subsets: ["latin"],
@@ -18,7 +18,7 @@ const genreCards = [
 ] as const;
 
 export default async function HomePage() {
-  const coverRows = await getLandingCoverRows();
+  const coverBackdrop = await getLandingCoverBackdrop();
 
   return (
     <div
@@ -43,8 +43,8 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <section className="relative isolate min-h-[calc(100svh-4.75rem)] w-full flex-1 overflow-hidden md:min-h-[calc(100svh-5rem)]">
-        <LandingCoverDrift rows={coverRows} />
+      <section className="relative isolate h-[calc(100svh-4.75rem)] w-full flex-1 overflow-hidden md:h-[calc(100svh-5rem)]">
+        <LandingCoverDrift data={coverBackdrop} />
         <div
           className="pointer-events-none absolute -right-32 top-1/4 z-[2] h-[480px] w-[480px] rounded-full bg-cyan-500/[0.06] blur-[120px]"
           aria-hidden
@@ -54,15 +54,21 @@ export default async function HomePage() {
           aria-hidden
         />
 
-        <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-14 px-6 py-16 lg:flex-row lg:items-center lg:gap-16 lg:py-24 xl:gap-24">
-          <div className="flex-1 lg:max-w-xl xl:max-w-2xl">
+        <div
+          className="pointer-events-none absolute inset-0 z-[6] bg-gradient-to-b from-black/75 via-black/55 to-black/75"
+          aria-hidden
+        />
+
+        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-center px-6 py-10 md:py-14">
+          <div className="pointer-events-auto mx-auto flex w-full max-w-7xl flex-col gap-12 lg:flex-row lg:items-center lg:gap-16 xl:gap-24">
+            <div className="flex-1 lg:max-w-xl xl:max-w-2xl">
             <h1 className="text-[clamp(1.875rem,5vw,3.5rem)] font-black leading-[1.12] tracking-[-0.03em] text-white">
               당신의 원고,
               <br />
               흥행작이 될 수 있습니다.
             </h1>
             <p className="mt-8 text-lg font-semibold leading-relaxed text-zinc-400 md:text-xl md:leading-relaxed">
-              네이버 시리즈·카카오페이지·문피아 맞춤 AI 편집자
+              네이버 시리즈·카카오페이지·문피아 맞춤 AI 에이전트
             </p>
             <div className="mt-10">
               <Link
@@ -72,9 +78,9 @@ export default async function HomePage() {
                 지금 시작하기
               </Link>
             </div>
-          </div>
+            </div>
 
-          <div className="flex-1 lg:max-w-md xl:max-w-lg">
+            <div className="flex-1 lg:max-w-md xl:max-w-lg">
             <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
               장르별 최근 분석 점수
             </p>
@@ -99,6 +105,7 @@ export default async function HomePage() {
                   </p>
                 </div>
               ))}
+            </div>
             </div>
           </div>
         </div>

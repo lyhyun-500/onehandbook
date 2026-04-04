@@ -5,23 +5,31 @@ export type LandingCoverItem =
   | { src: string; alt: string }
   | { src: null; alt: string };
 
-export type LandingCoverRows = {
-  top: LandingCoverItem[];
-  bottom: LandingCoverItem[];
+export type LandingCoverBackdropData = {
+  /** 모바일 1줄 */
+  single: LandingCoverItem[];
+  /** 태블릿·데스크톱 2줄 */
+  twoRow: { top: LandingCoverItem[]; bottom: LandingCoverItem[] };
+  /** 4K 3줄 */
+  threeRow: { top: LandingCoverItem[]; middle: LandingCoverItem[]; bottom: LandingCoverItem[] };
 };
 
 const COVER_EXT = /\.(jpe?g|png|webp|gif|avif)$/i;
 const MIN_PER_ROW = 6;
 
-function placeholderRows(): LandingCoverRows {
-  const ph = () => ({ src: null, alt: "" } as LandingCoverItem);
+function ph(): LandingCoverItem {
+  return { src: null, alt: "" };
+}
+
+function placeholderBackdrop(): LandingCoverBackdropData {
+  const row = Array.from({ length: MIN_PER_ROW }, ph);
   return {
-    top: Array.from({ length: MIN_PER_ROW }, ph),
-    bottom: Array.from({ length: MIN_PER_ROW }, ph),
+    single: [...row],
+    twoRow: { top: [...row], bottom: [...row] },
+    threeRow: { top: [...row], middle: [...row], bottom: [...row] },
   };
 }
 
-/** 한 줄이 너무 짧으면 같은 줄 안에서 순환해 채움 */
 function padRow(row: LandingCoverItem[], min: number): LandingCoverItem[] {
   if (row.length === 0) return row;
   const out = [...row];
@@ -33,7 +41,10 @@ function padRow(row: LandingCoverItem[], min: number): LandingCoverItem[] {
   return out;
 }
 
-function splitIntoTwoRows(pool: LandingCoverItem[]): LandingCoverRows {
+function splitIntoTwoRows(pool: LandingCoverItem[]): {
+  top: LandingCoverItem[];
+  bottom: LandingCoverItem[];
+} {
   const top: LandingCoverItem[] = [];
   const bottom: LandingCoverItem[] = [];
   pool.forEach((item, i) => {
@@ -73,11 +84,43 @@ function splitIntoTwoRows(pool: LandingCoverItem[]): LandingCoverRows {
   };
 }
 
+function splitIntoThreeRows(pool: LandingCoverItem[]): {
+  top: LandingCoverItem[];
+  middle: LandingCoverItem[];
+  bottom: LandingCoverItem[];
+} {
+  const top: LandingCoverItem[] = [];
+  const middle: LandingCoverItem[] = [];
+  const bottom: LandingCoverItem[] = [];
+  pool.forEach((item, i) => {
+    const r = i % 3;
+    if (r === 0) top.push(item);
+    else if (r === 1) middle.push(item);
+    else bottom.push(item);
+  });
+
+  const fill = (row: LandingCoverItem[]) =>
+    padRow(row.length > 0 ? row : pool, MIN_PER_ROW);
+
+  if (top.length === 0 && middle.length === 0 && bottom.length === 0) {
+    return {
+      top: padRow(pool, MIN_PER_ROW),
+      middle: padRow(pool, MIN_PER_ROW),
+      bottom: padRow(pool, MIN_PER_ROW),
+    };
+  }
+
+  return {
+    top: fill(top),
+    middle: fill(middle),
+    bottom: fill(bottom),
+  };
+}
+
 /**
  * 메인 히어로 배경 — `public/images/covers/` 이미지.
- * 상·하 두 줄로 나눔(짝수 인덱스 위, 홀수 아래). 없으면 플레이스홀더.
  */
-export async function getLandingCoverRows(): Promise<LandingCoverRows> {
+export async function getLandingCoverBackdrop(): Promise<LandingCoverBackdropData> {
   const dir = path.join(process.cwd(), "public", "images", "covers");
   let names: string[] = [];
 
@@ -95,11 +138,11 @@ export async function getLandingCoverRows(): Promise<LandingCoverRows> {
     if (code !== "ENOENT" && process.env.NODE_ENV === "development") {
       console.warn("[landing-covers] public/images/covers 읽기 실패:", e);
     }
-    return placeholderRows();
+    return placeholderBackdrop();
   }
 
   if (names.length === 0) {
-    return placeholderRows();
+    return placeholderBackdrop();
   }
 
   const pool: LandingCoverItem[] = names.map((name) => ({
@@ -107,5 +150,10 @@ export async function getLandingCoverRows(): Promise<LandingCoverRows> {
     alt: "",
   }));
 
-  return splitIntoTwoRows(pool);
+  return {
+    single: padRow(pool, MIN_PER_ROW),
+    twoRow: splitIntoTwoRows(pool),
+    threeRow: splitIntoThreeRows(pool),
+  };
 }
+
