@@ -55,7 +55,7 @@ function CoverThumb({
           src={item.src}
           alt=""
           fill
-          className="object-cover"
+          className="object-cover brightness-[1.08] contrast-[1.03]"
           sizes="(max-width: 768px) 72px, (max-width: 1024px) 96px, 120px"
           loading="lazy"
         />
@@ -88,10 +88,14 @@ function MarqueeRow({
     direction === "left" ? "ohb-cover-row-marquee-left" : "ohb-cover-row-marquee-right";
   const fc = thumbClass(thumbSize);
   const hashOff =
-    rowKey.includes("top") ? 0 : rowKey.includes("middle") ? 31 : rowKey.includes("single") ? 7 : 19;
+    rowKey.includes("top") || rowKey.endsWith("-top")
+      ? 0
+      : rowKey.includes("middle") || rowKey.includes("mid")
+        ? 31
+        : 19;
 
   return (
-    <div className="flex h-full min-h-0 w-full items-stretch overflow-hidden">
+    <div className="flex h-full min-h-0 w-full items-center overflow-hidden">
       <div
         className={`flex w-max flex-row items-center ${gapClass} ${animClass}`}
         style={{ animationDuration: `${durationSec}s` }}
@@ -118,7 +122,7 @@ function Strip({
 }) {
   return (
     <div
-      className={`pointer-events-none w-full shrink-0 overflow-hidden opacity-[0.15] ${className ?? ""}`}
+      className={`pointer-events-none flex min-h-0 w-full flex-1 flex-col overflow-hidden opacity-[0.48] ${className ?? ""}`}
     >
       {children}
     </div>
@@ -126,27 +130,37 @@ function Strip({
 }
 
 export function LandingCoverDrift({ data }: Props) {
-  const { single, twoRow, threeRow } = data;
+  const { twoRow, threeRow } = data;
 
   return (
     <div className="pointer-events-none absolute inset-0 z-[1] bg-black" aria-hidden>
-      {/* 모바일(max-md): 1줄 · 상단 · 작은 썸네일 */}
-      <div className="absolute inset-x-0 top-0 z-[1] h-[20svh] md:hidden">
-        <Strip className="h-full">
+      {/* 모바일: 2줄 50/50 · 작은 썸네일 · 틈 없음 */}
+      <div className="absolute inset-0 z-[1] flex h-full flex-col gap-0 md:hidden">
+        <Strip>
           <MarqueeRow
-            items={single}
+            items={twoRow.top}
             direction="left"
-            durationSec={36}
-            rowKey="single"
+            durationSec={34}
+            rowKey="mob-top"
+            thumbSize="sm"
+            gapClass="gap-2.5 pr-3"
+          />
+        </Strip>
+        <Strip>
+          <MarqueeRow
+            items={twoRow.bottom}
+            direction="right"
+            durationSec={38}
+            rowKey="mob-bot"
             thumbSize="sm"
             gapClass="gap-2.5 pr-3"
           />
         </Strip>
       </div>
 
-      {/* 태블릿 768–1024px: 2줄 상·하 */}
-      <div className="absolute inset-0 z-[1] hidden flex-col justify-between md:flex min-[1025px]:hidden">
-        <Strip className="h-[26svh]">
+      {/* 태블릿 768–1024px */}
+      <div className="absolute inset-0 z-[1] hidden h-full flex-col gap-0 md:flex min-[1025px]:hidden">
+        <Strip>
           <MarqueeRow
             items={twoRow.top}
             direction="left"
@@ -156,7 +170,7 @@ export function LandingCoverDrift({ data }: Props) {
             gapClass="gap-3.5 pr-4"
           />
         </Strip>
-        <Strip className="h-[26svh]">
+        <Strip>
           <MarqueeRow
             items={twoRow.bottom}
             direction="right"
@@ -168,9 +182,9 @@ export function LandingCoverDrift({ data }: Props) {
         </Strip>
       </div>
 
-      {/* 데스크톱 1025–1919px: 2줄 더 큼 */}
-      <div className="absolute inset-0 z-[1] hidden flex-col justify-between min-[1025px]:flex min-[1920px]:hidden">
-        <Strip className="h-[32svh]">
+      {/* 데스크톱 1025–1919px */}
+      <div className="absolute inset-0 z-[1] hidden h-full flex-col gap-0 min-[1025px]:flex min-[1920px]:hidden">
+        <Strip>
           <MarqueeRow
             items={twoRow.top}
             direction="left"
@@ -180,7 +194,7 @@ export function LandingCoverDrift({ data }: Props) {
             gapClass="gap-4 pr-4 md:gap-5"
           />
         </Strip>
-        <Strip className="h-[32svh]">
+        <Strip>
           <MarqueeRow
             items={twoRow.bottom}
             direction="right"
@@ -192,9 +206,9 @@ export function LandingCoverDrift({ data }: Props) {
         </Strip>
       </div>
 
-      {/* 데스크톱 1920–2559px: 2줄, 뷰포트 기준 크게 */}
-      <div className="absolute inset-0 z-[1] hidden flex-col justify-between min-[1920px]:flex min-[2560px]:hidden">
-        <Strip className="h-[min(40svh,42vh)]">
+      {/* 데스크톱 1920–2559px */}
+      <div className="absolute inset-0 z-[1] hidden h-full flex-col gap-0 min-[1920px]:flex min-[2560px]:hidden">
+        <Strip>
           <MarqueeRow
             items={twoRow.top}
             direction="left"
@@ -204,7 +218,7 @@ export function LandingCoverDrift({ data }: Props) {
             gapClass="gap-5 pr-5"
           />
         </Strip>
-        <Strip className="h-[min(40svh,42vh)]">
+        <Strip>
           <MarqueeRow
             items={twoRow.bottom}
             direction="right"
@@ -216,9 +230,9 @@ export function LandingCoverDrift({ data }: Props) {
         </Strip>
       </div>
 
-      {/* 4K ≥2560px: 3줄 */}
-      <div className="absolute inset-0 z-[1] hidden flex-col justify-between min-[2560px]:flex">
-        <Strip className="h-[28svh]">
+      {/* 4K ≥2560px: 3줄 균등 */}
+      <div className="absolute inset-0 z-[1] hidden h-full flex-col gap-0 min-[2560px]:flex">
+        <Strip>
           <MarqueeRow
             items={threeRow.top}
             direction="left"
@@ -228,7 +242,7 @@ export function LandingCoverDrift({ data }: Props) {
             gapClass="gap-5 pr-5"
           />
         </Strip>
-        <Strip className="h-[28svh]">
+        <Strip>
           <MarqueeRow
             items={threeRow.middle}
             direction="right"
@@ -238,7 +252,7 @@ export function LandingCoverDrift({ data }: Props) {
             gapClass="gap-5 pr-5"
           />
         </Strip>
-        <Strip className="h-[28svh]">
+        <Strip>
           <MarqueeRow
             items={threeRow.bottom}
             direction="left"

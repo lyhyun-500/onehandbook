@@ -6,9 +6,7 @@ export type LandingCoverItem =
   | { src: null; alt: string };
 
 export type LandingCoverBackdropData = {
-  /** 모바일 1줄 */
-  single: LandingCoverItem[];
-  /** 태블릿·데스크톱 2줄 */
+  /** 2줄 마퀴(모바일~와이드) */
   twoRow: { top: LandingCoverItem[]; bottom: LandingCoverItem[] };
   /** 4K 3줄 */
   threeRow: { top: LandingCoverItem[]; middle: LandingCoverItem[]; bottom: LandingCoverItem[] };
@@ -24,7 +22,6 @@ function ph(): LandingCoverItem {
 function placeholderBackdrop(): LandingCoverBackdropData {
   const row = Array.from({ length: MIN_PER_ROW }, ph);
   return {
-    single: [...row],
     twoRow: { top: [...row], bottom: [...row] },
     threeRow: { top: [...row], middle: [...row], bottom: [...row] },
   };
@@ -151,7 +148,6 @@ export async function getLandingCoverBackdrop(): Promise<LandingCoverBackdropDat
   }));
 
   return {
-    single: padRow(pool, MIN_PER_ROW),
     twoRow: splitIntoTwoRows(pool),
     threeRow: splitIntoThreeRows(pool),
   };

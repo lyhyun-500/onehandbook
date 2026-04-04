@@ -43,7 +43,7 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <section className="relative isolate h-[calc(100svh-4.75rem)] w-full flex-1 overflow-hidden md:h-[calc(100svh-5rem)]">
+      <section className="relative isolate h-[100vh] max-h-[100vh] min-h-0 w-full shrink-0 overflow-hidden">
         <LandingCoverDrift data={coverBackdrop} />
         <div
           className="pointer-events-none absolute -right-32 top-1/4 z-[2] h-[480px] w-[480px] rounded-full bg-cyan-500/[0.06] blur-[120px]"
@@ -55,7 +55,7 @@ export default async function HomePage() {
         />
 
         <div
-          className="pointer-events-none absolute inset-0 z-[6] bg-gradient-to-b from-black/75 via-black/55 to-black/75"
+          className="pointer-events-none absolute inset-0 z-[6] bg-gradient-to-b from-black/38 via-black/28 to-black/38"
           aria-hidden
         />
 
@@ -88,7 +88,7 @@ export default async function HomePage() {
               {genreCards.map(({ genre, score, hint }) => (
                 <div
                   key={genre}
-                  className="rounded-xl border border-white/[0.06] bg-[#141414] p-5 sm:p-6"
+                  className="rounded-xl border border-white/[0.08] bg-[#141414]/90 p-5 shadow-black/20 backdrop-blur-sm sm:p-6"
                 >
                   <p className="text-sm font-bold text-zinc-300">{genre}</p>
                   <p
