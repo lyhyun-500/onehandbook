@@ -1,0 +1,9 @@
+# Supabase CLI: `supabase link --project-ref <ref>` 후 `supabase db push` 로
+# supabase/migrations/*.sql 이 원격 DB에 적용됩니다.
+# 프로젝트 ref는 .env 의 NEXT_PUBLIC_SUPABASE_URL 호스트 앞부분과 동일합니다.
+
+[api]
+enabled = true
+
+[db]
+major_version = 15
