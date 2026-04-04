@@ -1,23 +1,41 @@
-import Image from "next/image";
 import Link from "next/link";
-import { CopyWithBreaks } from "@/components/CopyWithBreaks";
+import { Noto_Sans_KR } from "next/font/google";
+import { LandingCoverDrift } from "@/components/LandingCoverDrift";
 import { SITE_NAME } from "@/config/site";
+import { getLandingCoverRows } from "@/lib/landing-covers";
 
-export default function HomePage() {
+const notoSansKr = Noto_Sans_KR({
+  subsets: ["latin"],
+  weight: ["600", "700", "800", "900"],
+  display: "swap",
+});
+
+const genreCards = [
+  { genre: "로맨스", score: 86, hint: "최근 분석 평균" },
+  { genre: "판타지", score: 81, hint: "최근 분석 평균" },
+  { genre: "무협", score: 79, hint: "최근 분석 평균" },
+  { genre: "현대물", score: 84, hint: "최근 분석 평균" },
+] as const;
+
+export default async function HomePage() {
+  const coverRows = await getLandingCoverRows();
+
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100">
-      <header className="sticky top-0 z-30 shrink-0 border-b border-cyan-500/10 bg-zinc-950/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+    <div
+      className={`${notoSansKr.className} flex min-h-screen flex-col bg-[#000000] text-zinc-100`}
+    >
+      <header className="sticky top-0 z-30 shrink-0 border-b border-white/[0.06] bg-[#000000]/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <Link
             href="/"
-            className="text-lg font-bold tracking-tight text-zinc-100"
+            className="text-lg font-extrabold tracking-tight text-white"
           >
             {SITE_NAME}
           </Link>
-          <nav className="flex items-center gap-4 text-sm">
+          <nav className="flex items-center gap-3 text-sm">
             <Link
               href="/login"
-              className="rounded-lg border border-cyan-500/40 bg-cyan-950/40 px-4 py-2 text-cyan-100 transition-colors hover:border-cyan-400/60 hover:bg-cyan-950/70"
+              className="rounded-md border border-white/10 px-4 py-2 font-semibold text-zinc-200 transition-colors hover:border-white/20 hover:bg-white/[0.04] hover:text-white"
             >
               로그인
             </Link>
@@ -25,38 +43,63 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* 높이 = 100svh − 헤더(약 4.75rem) — 이미지가 네비에 가리지 않음 */}
-      <section className="relative isolate w-full min-h-[calc(100svh-4.75rem)] flex-1 md:min-h-[calc(100svh-5rem)]">
-        <Image
-          src="/images/novel-agent-hero.png"
-          alt="NOVEL AGENT — 웹소설 AI 분석"
-          fill
-          className="object-cover object-[center_18%] sm:object-[center_22%]"
-          sizes="100vw"
-          priority
-        />
+      <section className="relative isolate min-h-[calc(100svh-4.75rem)] w-full flex-1 overflow-hidden md:min-h-[calc(100svh-5rem)]">
+        <LandingCoverDrift rows={coverRows} />
         <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/30 to-zinc-950/50"
+          className="pointer-events-none absolute -right-32 top-1/4 z-[2] h-[480px] w-[480px] rounded-full bg-cyan-500/[0.06] blur-[120px]"
           aria-hidden
         />
-        <div className="absolute inset-x-0 bottom-0 z-10 mx-auto max-w-3xl px-6 pb-12 pt-24 text-center sm:pb-16 sm:pt-28">
-          <h1 className="mb-4 text-3xl font-bold leading-tight text-white drop-shadow-md sm:text-4xl">
-            내 원고에 맞춘 흥행 분석
-            <br />
-            개인 에이저트를 활용해보세요.
-          </h1>
-          <p className="mb-8 text-sm leading-relaxed text-zinc-200 sm:text-base">
-            <CopyWithBreaks as="span" className="block">
-              작가의 강점에 따라 카카오페이지·문피아·네이버 시리즈 관점과 장르·세계관 설정을 반영합니다.
-            </CopyWithBreaks>
-          </p>
-          <div className="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center sm:justify-center">
-            <Link
-              href="/login"
-              className="rounded-lg bg-cyan-500 px-8 py-3 text-center text-sm font-semibold text-zinc-950 shadow-lg shadow-cyan-500/20 transition-colors hover:bg-cyan-400"
-            >
-              로그인하고 시작하기
-            </Link>
+        <div
+          className="pointer-events-none absolute -left-24 bottom-0 z-[2] h-[360px] w-[360px] rounded-full bg-cyan-400/[0.04] blur-[100px]"
+          aria-hidden
+        />
+
+        <div className="relative z-10 mx-auto flex max-w-7xl flex-col gap-14 px-6 py-16 lg:flex-row lg:items-center lg:gap-16 lg:py-24 xl:gap-24">
+          <div className="flex-1 lg:max-w-xl xl:max-w-2xl">
+            <h1 className="text-[clamp(1.875rem,5vw,3.5rem)] font-black leading-[1.12] tracking-[-0.03em] text-white">
+              당신의 원고,
+              <br />
+              흥행작이 될 수 있습니다.
+            </h1>
+            <p className="mt-8 text-lg font-semibold leading-relaxed text-zinc-400 md:text-xl md:leading-relaxed">
+              네이버 시리즈·카카오페이지·문피아 맞춤 AI 편집자
+            </p>
+            <div className="mt-10">
+              <Link
+                href="/login"
+                className="inline-flex min-h-12 items-center justify-center rounded-md bg-cyan-400 px-10 py-3 text-base font-bold text-[#000000] shadow-[0_0_40px_-8px_rgba(34,211,238,0.55)] transition-[background-color,box-shadow] hover:bg-cyan-300 hover:shadow-[0_0_48px_-6px_rgba(34,211,238,0.65)]"
+              >
+                지금 시작하기
+              </Link>
+            </div>
+          </div>
+
+          <div className="flex-1 lg:max-w-md xl:max-w-lg">
+            <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
+              장르별 최근 분석 점수
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              {genreCards.map(({ genre, score, hint }) => (
+                <div
+                  key={genre}
+                  className="rounded-xl border border-white/[0.06] bg-[#141414] p-5 sm:p-6"
+                >
+                  <p className="text-sm font-bold text-zinc-300">{genre}</p>
+                  <p
+                    className="mt-3 font-black tabular-nums tracking-tight text-white"
+                    style={{ fontSize: "clamp(2rem, 4vw, 2.75rem)" }}
+                  >
+                    {score}
+                    <span className="ml-0.5 text-lg font-extrabold text-zinc-500">
+                      점
+                    </span>
+                  </p>
+                  <p className="mt-2 text-xs font-medium text-zinc-500">
+                    {hint}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>

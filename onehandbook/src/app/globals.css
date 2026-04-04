@@ -67,3 +67,45 @@ body {
     opacity: 0.2;
   }
 }
+
+/* 랜딩 히어로 — 표지 가로 무한 마퀴(트랙 2중 복제, -50% = 한 세트 길이) */
+.ohb-cover-row-marquee-left,
+.ohb-cover-row-marquee-right {
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+.ohb-cover-row-marquee-left {
+  animation-name: ohb-cover-marquee-left;
+}
+
+.ohb-cover-row-marquee-right {
+  animation-name: ohb-cover-marquee-right;
+}
+
+@keyframes ohb-cover-marquee-left {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes ohb-cover-marquee-right {
+  from {
+    transform: translate3d(-50%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ohb-cover-row-marquee-left,
+  .ohb-cover-row-marquee-right {
+    animation: none;
+    transform: translate3d(-12%, 0, 0);
+  }
+}
