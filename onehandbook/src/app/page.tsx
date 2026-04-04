@@ -22,9 +22,9 @@ export default async function HomePage() {
 
   return (
     <div
-      className={`${notoSansKr.className} flex min-h-screen flex-col bg-[#000000] text-zinc-100`}
+      className={`${notoSansKr.className} flex min-h-screen flex-col gap-0 bg-[#000000] text-zinc-100`}
     >
-      <header className="sticky top-0 z-30 shrink-0 border-b border-white/[0.06] bg-[#000000]/90 backdrop-blur-md">
+      <header className="sticky top-0 z-30 m-0 shrink-0 border-b border-white/[0.06] bg-[#000000]/90 p-0 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <Link
             href="/"
@@ -43,7 +43,7 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <section className="relative isolate h-[100vh] max-h-[100vh] min-h-0 w-full shrink-0 overflow-hidden">
+      <section className="relative isolate m-0 mt-0 h-[100vh] max-h-[100vh] min-h-0 w-full shrink-0 overflow-hidden p-0 pt-0">
         <LandingCoverDrift data={coverBackdrop} />
         <div
           className="pointer-events-none absolute -right-32 top-1/4 z-[2] h-[480px] w-[480px] rounded-full bg-cyan-500/[0.06] blur-[120px]"
@@ -59,8 +59,8 @@ export default async function HomePage() {
           aria-hidden
         />
 
-        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-center px-6 py-10 md:py-14">
-          <div className="pointer-events-auto mx-auto flex w-full max-w-7xl flex-col gap-12 lg:flex-row lg:items-center lg:gap-16 xl:gap-24">
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-6 py-0">
+          <div className="pointer-events-auto mx-auto flex w-full max-w-7xl flex-col gap-12 lg:flex-row lg:items-center lg:justify-center lg:gap-16 xl:gap-24">
             <div className="flex-1 lg:max-w-xl xl:max-w-2xl">
             <h1 className="text-[clamp(1.875rem,5vw,3.5rem)] font-black leading-[1.12] tracking-[-0.03em] text-white">
               당신의 원고,

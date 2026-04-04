@@ -6,10 +6,7 @@ export type LandingCoverItem =
   | { src: null; alt: string };
 
 export type LandingCoverBackdropData = {
-  /** 2줄 마퀴(모바일~와이드) */
   twoRow: { top: LandingCoverItem[]; bottom: LandingCoverItem[] };
-  /** 4K 3줄 */
-  threeRow: { top: LandingCoverItem[]; middle: LandingCoverItem[]; bottom: LandingCoverItem[] };
 };
 
 const COVER_EXT = /\.(jpe?g|png|webp|gif|avif)$/i;
@@ -23,7 +20,6 @@ function placeholderBackdrop(): LandingCoverBackdropData {
   const row = Array.from({ length: MIN_PER_ROW }, ph);
   return {
     twoRow: { top: [...row], bottom: [...row] },
-    threeRow: { top: [...row], middle: [...row], bottom: [...row] },
   };
 }
 
@@ -81,39 +77,6 @@ function splitIntoTwoRows(pool: LandingCoverItem[]): {
   };
 }
 
-function splitIntoThreeRows(pool: LandingCoverItem[]): {
-  top: LandingCoverItem[];
-  middle: LandingCoverItem[];
-  bottom: LandingCoverItem[];
-} {
-  const top: LandingCoverItem[] = [];
-  const middle: LandingCoverItem[] = [];
-  const bottom: LandingCoverItem[] = [];
-  pool.forEach((item, i) => {
-    const r = i % 3;
-    if (r === 0) top.push(item);
-    else if (r === 1) middle.push(item);
-    else bottom.push(item);
-  });
-
-  const fill = (row: LandingCoverItem[]) =>
-    padRow(row.length > 0 ? row : pool, MIN_PER_ROW);
-
-  if (top.length === 0 && middle.length === 0 && bottom.length === 0) {
-    return {
-      top: padRow(pool, MIN_PER_ROW),
-      middle: padRow(pool, MIN_PER_ROW),
-      bottom: padRow(pool, MIN_PER_ROW),
-    };
-  }
-
-  return {
-    top: fill(top),
-    middle: fill(middle),
-    bottom: fill(bottom),
-  };
-}
-
 /**
  * 메인 히어로 배경 — `public/images/covers/` 이미지.
  */
@@ -149,7 +112,5 @@ export async function getLandingCoverBackdrop(): Promise<LandingCoverBackdropDat
 
   return {
     twoRow: splitIntoTwoRows(pool),
-    threeRow: splitIntoThreeRows(pool),
   };
 }
-

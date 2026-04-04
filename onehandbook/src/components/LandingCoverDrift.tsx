@@ -88,11 +88,7 @@ function MarqueeRow({
     direction === "left" ? "ohb-cover-row-marquee-left" : "ohb-cover-row-marquee-right";
   const fc = thumbClass(thumbSize);
   const hashOff =
-    rowKey.includes("top") || rowKey.endsWith("-top")
-      ? 0
-      : rowKey.includes("middle") || rowKey.includes("mid")
-        ? 31
-        : 19;
+    rowKey.includes("top") || rowKey.endsWith("-top") ? 0 : 19;
 
   return (
     <div className="flex h-full min-h-0 w-full items-center overflow-hidden">
@@ -113,155 +109,114 @@ function MarqueeRow({
   );
 }
 
-function Strip({
+/** 상단(top:0) / 하단(bottom:0) 고정, 높이 50% — 히어로 안에서만 overflow */
+function EdgeStrip({
   children,
+  edge,
   className,
 }: {
   children: ReactNode;
+  edge: "top" | "bottom";
   className?: string;
 }) {
+  const pos =
+    edge === "top"
+      ? "top-0 left-0 right-0"
+      : "bottom-0 left-0 right-0";
   return (
     <div
-      className={`pointer-events-none flex min-h-0 w-full flex-1 flex-col overflow-hidden opacity-[0.48] ${className ?? ""}`}
+      className={`pointer-events-none absolute z-[1] h-1/2 min-h-0 overflow-hidden opacity-[0.48] ${pos} ${className ?? ""}`}
     >
       {children}
     </div>
   );
 }
 
+function TwoRowBackdrop({
+  thumbSize,
+  gapClass,
+  topKey,
+  botKey,
+  twoRow,
+}: {
+  thumbSize: ThumbSize;
+  gapClass: string;
+  topKey: string;
+  botKey: string;
+  twoRow: LandingCoverBackdropData["twoRow"];
+}) {
+  return (
+    <>
+      <EdgeStrip edge="top">
+        <MarqueeRow
+          items={twoRow.top}
+          direction="left"
+          durationSec={34}
+          rowKey={topKey}
+          thumbSize={thumbSize}
+          gapClass={gapClass}
+        />
+      </EdgeStrip>
+      <EdgeStrip edge="bottom">
+        <MarqueeRow
+          items={twoRow.bottom}
+          direction="right"
+          durationSec={38}
+          rowKey={botKey}
+          thumbSize={thumbSize}
+          gapClass={gapClass}
+        />
+      </EdgeStrip>
+    </>
+  );
+}
+
 export function LandingCoverDrift({ data }: Props) {
-  const { twoRow, threeRow } = data;
+  const { twoRow } = data;
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-[1] bg-black" aria-hidden>
-      {/* 모바일: 2줄 50/50 · 작은 썸네일 · 틈 없음 */}
-      <div className="absolute inset-0 z-[1] flex h-full flex-col gap-0 md:hidden">
-        <Strip>
-          <MarqueeRow
-            items={twoRow.top}
-            direction="left"
-            durationSec={34}
-            rowKey="mob-top"
-            thumbSize="sm"
-            gapClass="gap-2.5 pr-3"
-          />
-        </Strip>
-        <Strip>
-          <MarqueeRow
-            items={twoRow.bottom}
-            direction="right"
-            durationSec={38}
-            rowKey="mob-bot"
-            thumbSize="sm"
-            gapClass="gap-2.5 pr-3"
-          />
-        </Strip>
+    <div
+      className="pointer-events-none absolute inset-0 z-[1] overflow-hidden bg-black"
+      aria-hidden
+    >
+      <div className="absolute inset-0 overflow-hidden md:hidden">
+        <TwoRowBackdrop
+          twoRow={twoRow}
+          thumbSize="sm"
+          gapClass="gap-2.5 pr-3"
+          topKey="mob-top"
+          botKey="mob-bot"
+        />
       </div>
 
-      {/* 태블릿 768–1024px */}
-      <div className="absolute inset-0 z-[1] hidden h-full flex-col gap-0 md:flex min-[1025px]:hidden">
-        <Strip>
-          <MarqueeRow
-            items={twoRow.top}
-            direction="left"
-            durationSec={34}
-            rowKey="tab-top"
-            thumbSize="md"
-            gapClass="gap-3.5 pr-4"
-          />
-        </Strip>
-        <Strip>
-          <MarqueeRow
-            items={twoRow.bottom}
-            direction="right"
-            durationSec={38}
-            rowKey="tab-bot"
-            thumbSize="md"
-            gapClass="gap-3.5 pr-4"
-          />
-        </Strip>
+      <div className="absolute inset-0 hidden overflow-hidden md:block min-[1025px]:hidden">
+        <TwoRowBackdrop
+          twoRow={twoRow}
+          thumbSize="md"
+          gapClass="gap-3.5 pr-4"
+          topKey="tab-top"
+          botKey="tab-bot"
+        />
       </div>
 
-      {/* 데스크톱 1025–1919px */}
-      <div className="absolute inset-0 z-[1] hidden h-full flex-col gap-0 min-[1025px]:flex min-[1920px]:hidden">
-        <Strip>
-          <MarqueeRow
-            items={twoRow.top}
-            direction="left"
-            durationSec={34}
-            rowKey="desk-top"
-            thumbSize="lg"
-            gapClass="gap-4 pr-4 md:gap-5"
-          />
-        </Strip>
-        <Strip>
-          <MarqueeRow
-            items={twoRow.bottom}
-            direction="right"
-            durationSec={38}
-            rowKey="desk-bot"
-            thumbSize="lg"
-            gapClass="gap-4 pr-4 md:gap-5"
-          />
-        </Strip>
+      <div className="absolute inset-0 hidden overflow-hidden min-[1025px]:block min-[1920px]:hidden">
+        <TwoRowBackdrop
+          twoRow={twoRow}
+          thumbSize="lg"
+          gapClass="gap-4 pr-4 md:gap-5"
+          topKey="desk-top"
+          botKey="desk-bot"
+        />
       </div>
 
-      {/* 데스크톱 1920–2559px */}
-      <div className="absolute inset-0 z-[1] hidden h-full flex-col gap-0 min-[1920px]:flex min-[2560px]:hidden">
-        <Strip>
-          <MarqueeRow
-            items={twoRow.top}
-            direction="left"
-            durationSec={34}
-            rowKey="wide-top"
-            thumbSize="xl"
-            gapClass="gap-5 pr-5"
-          />
-        </Strip>
-        <Strip>
-          <MarqueeRow
-            items={twoRow.bottom}
-            direction="right"
-            durationSec={38}
-            rowKey="wide-bot"
-            thumbSize="xl"
-            gapClass="gap-5 pr-5"
-          />
-        </Strip>
-      </div>
-
-      {/* 4K ≥2560px: 3줄 균등 */}
-      <div className="absolute inset-0 z-[1] hidden h-full flex-col gap-0 min-[2560px]:flex">
-        <Strip>
-          <MarqueeRow
-            items={threeRow.top}
-            direction="left"
-            durationSec={34}
-            rowKey="4k-top"
-            thumbSize="xl"
-            gapClass="gap-5 pr-5"
-          />
-        </Strip>
-        <Strip>
-          <MarqueeRow
-            items={threeRow.middle}
-            direction="right"
-            durationSec={36}
-            rowKey="4k-mid"
-            thumbSize="xl"
-            gapClass="gap-5 pr-5"
-          />
-        </Strip>
-        <Strip>
-          <MarqueeRow
-            items={threeRow.bottom}
-            direction="left"
-            durationSec={38}
-            rowKey="4k-bot"
-            thumbSize="xl"
-            gapClass="gap-5 pr-5"
-          />
-        </Strip>
+      <div className="absolute inset-0 hidden overflow-hidden min-[1920px]:block">
+        <TwoRowBackdrop
+          twoRow={twoRow}
+          thumbSize="xl"
+          gapClass="gap-5 pr-5"
+          topKey="wide-top"
+          botKey="wide-bot"
+        />
       </div>
     </div>
   );
