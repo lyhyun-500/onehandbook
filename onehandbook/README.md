@@ -31,4 +31,5 @@ cp .env.local.example .env.local
 
 AI 분석(`POST /api/analyze`)은 **NAT**를 소모합니다. 상위 폴더의 **`supabase-migration-nat.sql`** 을 Supabase SQL Editor에서 실행한 뒤 사용하세요 (`users.nat_balance`, `consume_nat` 함수 등). 소모 규칙은 `src/lib/nat.ts`와 루트 `README.md`를 참고합니다. 충전 UI는 `/billing`(결제 연동 전 placeholder).
 
-분석 엔진은 **Claude** 단일 모델이며, 문피아·카카오페이지·네이버 시리즈·범용은 **프롬프트만** 다릅니다. 환경 변수는 **`ANTHROPIC_API_KEY`** 가 필요합니다. 제품·요구사항 요약은 상위 **`docs/PRD.md`** 를 참고하세요.
+분석 엔진은 **Claude** 단일 모델이며, 문피아·카카오페이지·네이버 시리즈·범용은 **프롬프트만** 다릅니다. 환경 변수는 **`ANTHROPIC_API_KEY`** 가 필요합니다. **네이버 로그인**은 서버 전용 **`NAVER_CLIENT_ID`**, **`NAVER_CLIENT_SECRET`** (로컬 `.env.local` + **Vercel** 동시 설정). 끄려면 `NAVER_LOGIN_ENABLED=false` 또는 `NEXT_PUBLIC_NAVER_LOGIN_ENABLED=false` — 예시는 `.env.local.example` 참고.  
+제품·요구사항·백로그는 상위 **`docs/PRD.md`**, **`docs/BACKLOG.md`** 를 참고하세요.

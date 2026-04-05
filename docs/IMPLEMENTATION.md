@@ -33,12 +33,15 @@
 ## 인증
 
 - Supabase Auth: **이메일·비밀번호**, **Google·Kakao OAuth** (`/login`). Supabase 대시보드 **Authentication → Providers** 에서 Google·Kakao 활성화, **URL Configuration → Redirect URLs** 에 `{배포URL}/auth/callback`(로컬은 `http://localhost:3000/auth/callback`) 추가.
+- **네이버 OAuth (선택):** `GET /api/auth/naver/start` → 네이버 동의 → `GET /auth/callback/naver`. 서버 env **`NAVER_CLIENT_ID`**, **`NAVER_CLIENT_SECRET`** 필수(프로덕션은 **Vercel**에도 동일 키). 없을 때는 JSON으로 “설정되지 않았습니다” 응답. 비노출은 `NAVER_LOGIN_ENABLED=false` 또는 `NEXT_PUBLIC_NAVER_LOGIN_ENABLED=false` (`src/lib/config/naverLogin.ts`).
+- **OAuth `redirectTo` (로컬):** `src/lib/oauthCallbackOrigin.ts` — 요청 Host가 localhost·127.0.0.1 등이면 **`NEXT_PUBLIC_SITE_URL`을 쓰지 않고** 현재 origin으로 콜백 URL을 만듦(로컬에서 프로덕션 URL로 잘못 돌아가는 문제 완화).
 - **휴대폰 인증 (CoolSMS / SOLAPI)**: 마이그레이션 `supabase-migration-phone-auth.sql` — `users.phone_e164`, `phone_verified_at`, `phone_verification_bonus_granted_at`, 테이블 `sms_otp_challenges`. 서버 env: `COOLSMS_API_KEY`, `COOLSMS_API_SECRET`, `COOLSMS_FROM`, **`SMS_OTP_SECRET`**(32자 이상 권장, OTP 해시용). 로컬만 `COOLSMS_MOCK=1` 이면 문자 미발송·콘솔 로그. API: `POST /api/auth/sms/send`, `POST /api/auth/sms/verify`. **최초 인증 성공 시 NAT +30** 1회(`phone_verification_bonus_granted_at`). **인증 완료된 번호**는 DB unique로 **번호당 계정 1개**만.
 - `AppUser.phone_verified` — 미인증 시 `POST /api/analyze` **403** `PHONE_NOT_VERIFIED`, 분석 UI 비활성화.
 - 로그인 성공 시 기본 `/dashboard`. OAuth 이메일 없음 시 `users.email`에 `{provider}_{authId}@oauth.novelagent.local` 형태로 저장.
 - 미로그인 시 `/dashboard`, `/works/*`, **`/billing`**, **`/verify-phone`** → `/login` (middleware)
 - `/`, `/login`, `/terms` 는 비로그인 접근 가능. **`/explore` 및 하위 경로는 `/`로 리다이렉트** (1차 개인용 툴)
 - `POST /auth/signout`, `GET /auth/callback`
+- **회원 탈퇴:** 헤더 사이드 메뉴 → 모달에서 확인 문구 입력 → **`POST /api/account/withdraw`**. 서버에서 작품·연쇄 데이터 정리, Supabase Auth 사용자 삭제, `public.users`는 **`deleted_at` 등으로 소프트 삭제**(닉네임 등 비식별 처리). **`SUPABASE_SERVICE_ROLE_KEY`** 필요. 스키마: `supabase-migration-users-deleted-at.sql` 또는 `supabase/migrations/20260405143000_users_deleted_at_withdrawal.sql`. 탈퇴·로그아웃 후 쿠키 정리는 `src/lib/supabase/authPersistence.ts` 등과 연동.
 
 ---
 
@@ -76,7 +79,7 @@
 
 | 경로 | 접근 | 설명 |
 |------|------|------|
-| `/` | 전체 | 랜딩(히어로) |
+| `/` | 전체 | 랜딩(히어로), 카피는 `src/app/page.tsx`(운영·검수 일정에 맞춰 조정) |
 | `/explore/*` | — | **1차 비활성** — 미들웨어가 `/`로 리다이렉트(코드는 남김) |
 | `/login` | 공개 | 로그인·회원가입 |
 | `/dashboard` | 로그인 | 내 작품만 |
@@ -99,7 +102,8 @@
 
 ## 환경 변수
 
-`onehandbook/.env.local` — `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, 분석용 **`ANTHROPIC_API_KEY`** (필수). `GOOGLE_GENERATIVE_AI_API_KEY`는 선택(레거시·확장 코드 경로용).
+`onehandbook/.env.local` — `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, 분석용 **`ANTHROPIC_API_KEY`** (필수). `GOOGLE_GENERATIVE_AI_API_KEY`는 선택(레거시·확장 코드 경로용).  
+**네이버 로그인:** `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`. **회원 탈퇴·서비스 롤 작업:** `SUPABASE_SERVICE_ROLE_KEY` (클라이언트에 노출 금지). 배포 시 `docs/VERCEL-ENV.md` 참고.
 
 ---
 

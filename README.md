@@ -134,6 +134,8 @@ DB: `users.nat_balance`, 차감은 RPC `consume_nat`로 처리합니다. 적용 
 **MVP**
 
 - [x] 기본 업로드/분석 기능 (회차·AI 분석·NAT 연동)
+- [x] 회원 탈퇴(확인 문구·데이터 정리·`users` 소프트 삭제) — 마이그레이션 `supabase/migrations/20260405143000_users_deleted_at_withdrawal.sql` 등
+- [x] Google·Kakao·(선택) 네이버 OAuth — 프로덕션은 Vercel에 `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` 필요
 - [ ] NAT 유료 충전·패키지 결제
 - [ ] 장르별 에이전트 고도화
 - [ ] 흥행작 학습 데이터 확충
@@ -161,7 +163,10 @@ npm run dev
 비동기 이 화 분석(`analysis_jobs`)은 **`supabase-migration-analysis-jobs.sql`** 또는 **`supabase/migrations/`** + **`supabase db push`** 로 적용할 수 있습니다. (`supabase/README.md` 참고)  
 **NAT 사용 시** 반드시 `supabase-migration-nat.sql`을 실행해 `users.nat_balance`, `consume_nat` RPC, `analysis_runs` 확장 컬럼을 추가합니다.  
 분석 캐시·재분석 비교 UI를 쓰려면 **`supabase-migration-analysis-results.sql`** 로 `analysis_results` 테이블을 추가하세요(또는 `supabase-migration-RUN-ALL.sql` 후반부).  
-결제·NAT 원장(`payments`, `nat_ledger`)과 확장된 `consume_nat`은 **`supabase-migration-payments-nat-ledger.sql`** (또는 `RUN-ALL` 11번 구간)을 실행하세요.
+결제·NAT 원장(`payments`, `nat_ledger`)과 확장된 `consume_nat`은 **`supabase-migration-payments-nat-ledger.sql`** (또는 `RUN-ALL` 11번 구간)을 실행하세요.  
+**회원 탈퇴**를 쓰려면 **`supabase-migration-users-deleted-at.sql`** (또는 동일 내용의 `supabase/migrations/20260405143000_users_deleted_at_withdrawal.sql`)로 `users.deleted_at` 등을 적용하고, 서버에 **`SUPABASE_SERVICE_ROLE_KEY`** 가 있어야 합니다.
+
+**Vercel 배포:** `.env.local`은 자동 반영되지 않습니다. `docs/VERCEL-ENV.md`·`docs/vercel-env-template.env`를 보고 Production(필요 시 Preview)에 변수를 넣은 뒤 재배포하세요. 네이버 로그인은 **`NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET`** 가 없으면 `/api/auth/naver/start`가 실패합니다.
 
 접속: `/` 랜딩, 공개 탐색 `/explore`. 작가: `/login` → `/dashboard`, 분석·NAT 잔액·충전 안내 `/billing`.
 
