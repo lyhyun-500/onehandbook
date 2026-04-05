@@ -107,6 +107,24 @@ export async function syncAppUser(
   return null;
 }
 
+/** 소셜 로그인 콜백에서 `users.login_provider` 기록 */
+export async function setUserLoginProvider(
+  supabase: SupabaseClient,
+  provider: "google" | "naver"
+): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  const { error } = await supabase
+    .from("users")
+    .update({ login_provider: provider })
+    .eq("auth_id", user.id);
+  if (error) {
+    console.error("setUserLoginProvider:", error.message);
+  }
+}
+
 /** 서버 컴포넌트에서 사용 — 동기화 실패 시 로그인으로 */
 export async function requireAppUser(supabase: SupabaseClient): Promise<AppUser> {
   const appUser = await syncAppUser(supabase);

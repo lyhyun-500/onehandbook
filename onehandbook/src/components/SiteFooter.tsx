@@ -21,6 +21,12 @@ export function SiteFooter() {
           이용약관
         </Link>
         <Link
+          href="/privacy"
+          className="text-zinc-400 underline-offset-2 transition-colors hover:text-cyan-300 hover:underline"
+        >
+          개인정보처리방침
+        </Link>
+        <Link
           href="/terms#inquiry"
           className="text-zinc-400 underline-offset-2 transition-colors hover:text-cyan-300 hover:underline"
         >

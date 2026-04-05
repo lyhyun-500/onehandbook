@@ -1,5 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  adjustAuthCookiesForPersistence,
+  isPersistentAuthFromCookieValue,
+  OHB_AUTH_PERSISTENT_COOKIE,
+} from "@/lib/supabase/authPersistence";
 
 /**
  * Supabase SSR: `setAll`에 `options`까지 넘겨야 세션 갱신 쿠키가 브라우저에 반영됩니다.
@@ -17,6 +22,10 @@ export async function middleware(request: NextRequest) {
     request: { headers: request.headers },
   });
 
+  const persistent = isPersistentAuthFromCookieValue(
+    request.cookies.get(OHB_AUTH_PERSISTENT_COOKIE)?.value
+  );
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -26,10 +35,18 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
+          const adjusted = adjustAuthCookiesForPersistence(
+            cookiesToSet,
+            persistent
+          );
+          adjusted.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options ?? {});
           });
         },
+      },
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
       },
     }
   );
