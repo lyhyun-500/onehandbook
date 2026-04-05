@@ -10,29 +10,39 @@ function falsyEnv(raw: string | undefined | null): boolean {
   return t === "false" || t === "0" || t === "no" || t === "off";
 }
 
-function hasNaverClientId(): boolean {
-  const id = process.env.NAVER_CLIENT_ID;
-  return typeof id === "string" && id.trim() !== "";
+function envProvided(raw: string | undefined | null): boolean {
+  return raw != null && String(raw).trim() !== "";
 }
 
 /**
- * 네이버 로그인 버튼 노출.
- * - `NAVER_LOGIN_ENABLED`가 비어 있지 않으면 그 값만 따름(명시 false면 숨김).
- * - 아니면 `NEXT_PUBLIC_NAVER_LOGIN_ENABLED=true`.
- * - 둘 다 없으면 `NAVER_CLIENT_ID`가 있으면 노출(Vercel에 공개 플래그 깜빡할 때 대비).
+ * 로그인 화면 네이버 버튼 노출.
+ *
+ * **기본값: 노출.** Vercel에 `NAVER_CLIENT_ID`만 넣고 공개 플래그를 빼먹어도 버튼이 보이게 함.
+ * 숨기려면 아래 중 하나를 **명시적으로 false** 로 두면 됨:
+ * - `NEXT_PUBLIC_NAVER_LOGIN_ENABLED=false`
+ * - `NAVER_LOGIN_ENABLED=false` (또는 0, no, off)
+ *
+ * 예전에 `NAVER_LOGIN_ENABLED`에 true/false가 아닌 값을 넣으면 “끔”으로 처리되던 버그도 제거함.
  */
 export function resolveNaverLoginEnabledForServer(): boolean {
-  const serverOnly = process.env.NAVER_LOGIN_ENABLED;
-  if (serverOnly != null && String(serverOnly).trim() !== "") {
-    if (falsyEnv(serverOnly)) return false;
-    return truthyEnv(serverOnly);
+  const pub = process.env.NEXT_PUBLIC_NAVER_LOGIN_ENABLED;
+  if (envProvided(pub) && falsyEnv(pub)) {
+    return false;
   }
-  if (truthyEnv(process.env.NEXT_PUBLIC_NAVER_LOGIN_ENABLED)) return true;
-  return hasNaverClientId();
+
+  const serverOnly = process.env.NAVER_LOGIN_ENABLED;
+  if (envProvided(serverOnly) && falsyEnv(serverOnly)) {
+    return false;
+  }
+
+  return true;
 }
 
-/** 클라이언트 전용 코드에서 쓸 때(빌드 시 인라인됨) */
+/** 클라이언트 번들에서 쓸 때 — 서버와 동일 규칙(명시 false만 숨김) */
 export function isNaverLoginEnabled(): boolean {
-  return truthyEnv(process.env.NEXT_PUBLIC_NAVER_LOGIN_ENABLED);
+  const pub = process.env.NEXT_PUBLIC_NAVER_LOGIN_ENABLED;
+  if (envProvided(pub) && falsyEnv(pub)) {
+    return false;
+  }
+  return true;
 }
-

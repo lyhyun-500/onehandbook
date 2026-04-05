@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { SITE_NAME } from "@/config/site";
 import { HeaderAnalysisBell } from "@/contexts/AnalysisJobsContext";
+import { WithdrawAccountModal } from "@/components/WithdrawAccountModal";
 
 /** 공지(클립보드 목록) 아이콘 */
 function NoticeIcon({ className }: { className?: string }) {
@@ -56,6 +57,7 @@ export function AppShellHeaderClient({
   natBalance,
 }: AppShellHeaderClientProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
   const panelId = useId();
 
   useEffect(() => {
@@ -188,7 +190,14 @@ export function AppShellHeaderClient({
                 </Link>
               </nav>
             </div>
-            <div className="border-t border-zinc-800 p-4">
+            <div className="border-t border-zinc-800 p-4 space-y-2">
+              <button
+                type="button"
+                onClick={() => setWithdrawOpen(true)}
+                className="w-full rounded-lg border border-red-600/70 bg-red-950/40 px-4 py-3 text-sm font-semibold text-red-200 transition-colors hover:border-red-500 hover:bg-red-950/60"
+              >
+                회원 탈퇴
+              </button>
               <form action="/auth/signout" method="post">
                 <button
                   type="submit"
@@ -201,6 +210,11 @@ export function AppShellHeaderClient({
           </div>
         </div>
       )}
+
+      <WithdrawAccountModal
+        open={withdrawOpen}
+        onClose={() => setWithdrawOpen(false)}
+      />
     </>
   );
 }

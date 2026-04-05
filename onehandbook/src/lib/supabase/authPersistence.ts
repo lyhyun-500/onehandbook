@@ -82,3 +82,14 @@ export function readPersistentFromDocumentCookie(): boolean {
   const parsed = parse(document.cookie);
   return isPersistentAuthFromCookieValue(parsed[OHB_AUTH_PERSISTENT_COOKIE]);
 }
+
+/** 탈퇴·로그아웃 후 미들웨어가 세션 쿠키 규칙을 잘못 쓰지 않도록 선호 쿠키 제거 */
+export function clearClientPersistencePreferenceCookie(): void {
+  if (typeof document === "undefined") return;
+  document.cookie = serialize(OHB_AUTH_PERSISTENT_COOKIE, "", {
+    path: "/",
+    maxAge: 0,
+    sameSite: "lax",
+    secure: window.location.protocol === "https:",
+  });
+}
