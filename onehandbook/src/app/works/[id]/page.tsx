@@ -9,6 +9,7 @@ import {
   type AnalysisRunRow,
 } from "@/lib/analysisSummary";
 import { EpisodeActions } from "./EpisodeActions";
+import { EpisodeRowAnalysisBadge } from "@/components/EpisodeRowAnalysisBadge";
 import { WorkAiOverview } from "./WorkAiOverview";
 
 export default async function WorkDetailPage({
@@ -119,11 +120,12 @@ export default async function WorkDetailPage({
                   key={ep.id}
                   className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3"
                 >
-                  <div>
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                     <span className="text-sm text-zinc-500">
                       {ep.episode_number}화
                     </span>
-                    <span className="ml-3 text-zinc-100">{ep.title}</span>
+                    <span className="text-zinc-100">{ep.title}</span>
+                    <EpisodeRowAnalysisBadge episodeId={ep.id} />
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-xs text-zinc-500">

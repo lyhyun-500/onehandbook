@@ -22,6 +22,8 @@ import {
   resolveAnalysisAgentVersion,
 } from "@/lib/nat";
 import { useAnalysisNavigationGuard } from "@/hooks/useAnalysisNavigationGuard";
+import { useAnalysisJobsOptional } from "@/contexts/AnalysisJobsContext";
+import { AnalysisStatusBadge } from "@/components/AnalysisStatusBadge";
 import {
   MANUSCRIPT_LOW_VOLUME_WARNING,
   MANUSCRIPT_TOO_SHORT_MESSAGE,
@@ -57,6 +59,8 @@ export function WorkAnalysisHub({
   phoneVerified: boolean;
 }) {
   const router = useRouter();
+  const analysisJobsCtx = useAnalysisJobsOptional();
+  const workIdNum = parseInt(workId, 10);
   const latest = useMemo(() => latestAnalysisPerEpisode(runs), [runs]);
 
   const defaultAgent = useMemo(
@@ -556,6 +560,7 @@ export function WorkAnalysisHub({
                     <tr className="border-b border-zinc-800 text-zinc-500">
                       <th className="pb-2 pr-4 font-medium">회차</th>
                       <th className="pb-2 pr-4 font-medium">제목</th>
+                      <th className="pb-2 pr-4 font-medium">분석</th>
                       <th className="pb-2 pr-4 font-medium">종합</th>
                       <th className="pb-2 pr-4 font-medium">플랫폼</th>
                       <th className="pb-2 font-medium">동작</th>
@@ -564,6 +569,8 @@ export function WorkAnalysisHub({
                   <tbody className="text-zinc-300">
                     {episodes.map((ep) => {
                       const run = latest.get(ep.id);
+                      const job =
+                        analysisJobsCtx?.getLatestJobForEpisode(ep.id) ?? null;
                       return (
                         <tr
                           key={ep.id}
@@ -579,6 +586,9 @@ export function WorkAnalysisHub({
                             >
                               {ep.title}
                             </Link>
+                          </td>
+                          <td className="py-2 pr-4 align-top">
+                            <AnalysisStatusBadge job={job} variant="episode" />
                           </td>
                           <td className="py-2 pr-4 align-top font-medium text-zinc-100">
                             {run ? run.result_json.overall_score : "—"}
@@ -614,7 +624,9 @@ export function WorkAnalysisHub({
             )}
           </section>
 
-          {panelEpisodeId != null && panelEpisode && (
+          {panelEpisodeId != null &&
+            panelEpisode &&
+            !Number.isNaN(workIdNum) && (
             <div id="ai-analysis-panel">
               <p className="mb-3 text-sm text-zinc-500">
                 대상:{" "}
@@ -624,6 +636,7 @@ export function WorkAnalysisHub({
               </p>
               <AnalyzePanel
                 key={panelEpisodeId}
+                workId={workIdNum}
                 episodeId={panelEpisodeId}
                 episodeLabel={`${panelEpisode.episode_number}화 · ${panelEpisode.title} · ${workTitle}`}
                 versions={versions}
@@ -905,6 +918,7 @@ export function WorkAnalysisHub({
                   <th className="w-10 pb-2 pr-2" />
                   <th className="pb-2 pr-4 font-medium">회차</th>
                   <th className="pb-2 pr-4 font-medium">제목</th>
+                  <th className="pb-2 pr-4 font-medium">분석</th>
                   <th className="pb-2 pr-4 font-medium">종합</th>
                   <th className="pb-2 pr-4 font-medium">플랫폼</th>
                   <th className="pb-2 font-medium">동작</th>
@@ -914,6 +928,8 @@ export function WorkAnalysisHub({
                 {episodes.map((ep) => {
                   const run = latest.get(ep.id);
                   const checked = selectedIds.has(ep.id);
+                  const job =
+                    analysisJobsCtx?.getLatestJobForEpisode(ep.id) ?? null;
                   return (
                     <tr
                       key={ep.id}
@@ -937,6 +953,9 @@ export function WorkAnalysisHub({
                         >
                           {ep.title}
                         </Link>
+                      </td>
+                      <td className="py-2 pr-4 align-top">
+                        <AnalysisStatusBadge job={job} variant="episode" />
                       </td>
                       <td className="py-2 pr-4 align-top font-medium text-zinc-100">
                         {run ? run.result_json.overall_score : "—"}

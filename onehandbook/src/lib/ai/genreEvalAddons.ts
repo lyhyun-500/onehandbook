@@ -57,6 +57,9 @@ function resolveGenreAxisBlocks(genre: string): string {
       block("현대물", ["공감도", "직업 고증", "트렌드 적합성"])
     );
   }
+  if (/스포츠|체육/.test(genre)) {
+    blocks.push(sportsBlock());
+  }
 
   if (blocks.length === 0) {
     return [
@@ -76,4 +79,33 @@ function resolveGenreAxisBlocks(genre: string): string {
 function block(title: string, items: string[]): string {
   const bullets = items.map((s) => `- ${s}`).join("\n");
   return [`### ${title}`, "", bullets].join("\n");
+}
+
+/** 로맨스/판타지 등 `block()`과 동일하게 ### 제목 + bullets, 플랫폼·금지는 가이드 문단으로 이어 붙임 */
+function sportsBlock(): string {
+  return [
+    "### 스포츠",
+    "",
+    "- 성장 서사: 주인공의 실력 향상 과정이 납득 가능한가",
+    "- 경기 묘사: 긴장감과 몰입감 있는 경기 장면 연출",
+    "- 팀 케미: 동료 캐릭터들의 매력과 관계성",
+    "- 라이벌 구도: 강력하고 매력적인 경쟁자 존재",
+    "- 사이다 구조: 열세 → 역전 타이밍이 적절한가",
+    "",
+    "#### 플랫폼별 특성",
+    "",
+    "- 문피아: 주인공 먼치킨 성장, 압도적 실력 차이로 제압",
+    "- 카카오페이지: 화려한 경기 장면, 매 화 절벽 엔딩",
+    "- 네이버 시리즈: 탄탄한 팀 스토리, 드라마화 가능한 구조",
+    "",
+    "위 플랫폼별 특성은 별도 dimensions 키가 아니라, 선택된 분석 프로필·`comparable_note`·종합 코멘트에 반영하세요.",
+    "",
+    "#### DO NOT",
+    "",
+    "- 주인공이 노력 없이 천재성만으로 이기는 전개",
+    "- 경기 결과가 너무 쉽게 예측되는 구조",
+    "- 스포츠 룰·용어 고증 오류",
+    "",
+    "DO NOT에 해당하면 해당 차원·종합 점수에 감점하고 `improvement_points`에 구체적으로 적으세요.",
+  ].join("\n");
 }

@@ -571,6 +571,20 @@ CREATE POLICY "analysis_jobs_update_own" ON public.analysis_jobs FOR UPDATE
 
 COMMENT ON TABLE public.analysis_jobs IS '이 화 분석 비동기 작업(큐); 완료 시 analysis_run_id 연결';
 
+-- ----- 13b) analysis_jobs → Realtime publication (supabase-migration-analysis-jobs-realtime.sql) -----
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'analysis_jobs'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.analysis_jobs;
+  END IF;
+END $$;
+
 -- =============================================================================
 -- 끝. 앱에서 NAT·분석 차감이 동작하는지 확인하세요.
 -- analysis_results 마이그레이션 후 POST /api/analyze 가 캐시 행을 씁니다.

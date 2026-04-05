@@ -42,3 +42,6 @@ CREATE POLICY "analysis_jobs_update_own" ON public.analysis_jobs FOR UPDATE
   );
 
 COMMENT ON TABLE public.analysis_jobs IS '이 화 분석 비동기 작업(큐); 완료 시 analysis_run_id 연결';
+
+-- Realtime(postgres_changes) 사용 시: 같은 폴더의 supabase-migration-analysis-jobs-realtime.sql 실행
+-- 또는 supabase/migrations/20260405000000_analysis_jobs_realtime.sql (supabase db push)

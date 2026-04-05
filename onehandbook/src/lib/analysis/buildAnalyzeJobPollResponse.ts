@@ -35,7 +35,7 @@ export async function buildAnalyzeJobPollResponse(
 
   const { data: job, error } = await supabase
     .from("analysis_jobs")
-    .select("id, status, error_message, analysis_run_id, episode_id")
+    .select("id, status, error_message, analysis_run_id, episode_id, app_user_id")
     .eq("id", jobId)
     .single();
 
@@ -54,6 +54,20 @@ export async function buildAnalyzeJobPollResponse(
 
   if (!job) {
     return null;
+  }
+
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+  if (authUser) {
+    const { data: row } = await supabase
+      .from("users")
+      .select("id")
+      .eq("auth_id", authUser.id)
+      .maybeSingle();
+    if (!row || row.id !== job.app_user_id) {
+      return null;
+    }
   }
 
   if (job.status === "pending" || job.status === "processing") {

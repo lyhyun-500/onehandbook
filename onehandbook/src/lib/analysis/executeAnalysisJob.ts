@@ -1,5 +1,6 @@
 import { createSupabaseWithAccessToken } from "@/lib/supabase/authedClient";
 import { syncAppUser } from "@/lib/supabase/appUser";
+import { notifySlackAnalysisComplete } from "@/lib/slack/notifyAnalysisComplete";
 import { AnalysisProviderExhaustedError } from "@/lib/analysis/analysisErrors";
 import {
   runEpisodeAnalysisPipeline,
@@ -125,6 +126,27 @@ export async function executeAnalysisJob(
         updated_at: new Date().toISOString(),
       })
       .eq("id", jobId);
+
+    void (async () => {
+      const { data: ep } = await supabase
+        .from("episodes")
+        .select("id, episode_number, title, work_id")
+        .eq("id", job.episode_id)
+        .maybeSingle();
+      const { data: wk } = await supabase
+        .from("works")
+        .select("title")
+        .eq("id", ep?.work_id ?? 0)
+        .maybeSingle();
+      if (ep && wk) {
+        await notifySlackAnalysisComplete({
+          workTitle: wk.title ?? "(제목 없음)",
+          episodeLabel: `${ep.episode_number}화 · ${ep.title ?? ""}`,
+          workId: ep.work_id,
+          episodeId: ep.id,
+        });
+      }
+    })();
 
     return { ok: true, result };
   } catch (e) {

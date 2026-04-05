@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { SITE_NAME } from "@/config/site";
+import { HeaderAnalysisBell } from "@/contexts/AnalysisJobsContext";
 
 /** 공지(클립보드 목록) 아이콘 */
 function NoticeIcon({ className }: { className?: string }) {
@@ -96,6 +97,7 @@ export function AppShellHeaderClient({
             >
               {natBalance.toLocaleString()} NAT
             </Link>
+            <HeaderAnalysisBell />
             <Link
               href="/notices"
               className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-800/80 hover:text-cyan-200"

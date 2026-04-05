@@ -3,6 +3,13 @@
 :root {
   --background: #0a0a0a;
   --foreground: #fafafa;
+  /* 랜딩 fixed 헤더 높이 — py-4 + 한 줄 타이틀 기준 */
+  --ohb-landing-header-h: 4.5rem;
+}
+
+html {
+  margin: 0;
+  padding: 0;
 }
 
 @theme inline {
@@ -13,6 +20,8 @@
 }
 
 body {
+  margin: 0;
+  padding: 0;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
@@ -73,7 +82,7 @@ body {
 .ohb-cover-row-marquee-right {
   animation-timing-function: linear;
   animation-iteration-count: infinite;
-  will-change: transform;
+  /* will-change 제거: 합성 레이어에서 썸네일이 겹쳐 보이는 현상 완화 */
 }
 
 .ohb-cover-row-marquee-left {

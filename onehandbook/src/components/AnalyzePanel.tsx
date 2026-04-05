@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { AnalysisResult } from "@/lib/ai/types";
@@ -20,7 +20,7 @@ import { NatSpendConfirmModal } from "@/components/NatSpendConfirmModal";
 import { ManuscriptLowVolumeModal } from "@/components/ManuscriptLowVolumeModal";
 import { ContentUnchangedModal } from "@/components/ContentUnchangedModal";
 import { CopyWithBreaks } from "@/components/CopyWithBreaks";
-import { useAnalysisNavigationGuard } from "@/hooks/useAnalysisNavigationGuard";
+import { useAnalysisJobs } from "@/contexts/AnalysisJobsContext";
 import { formatDimensionLabel } from "@/lib/analysis/dimensionLabel";
 import type { PreviousAnalysisResultPayload } from "@/lib/analysisResultCache";
 
@@ -39,6 +39,7 @@ export type AnalysisRow = {
 };
 
 export function AnalyzePanel({
+  workId,
   episodeId,
   episodeLabel,
   versions,
@@ -47,6 +48,7 @@ export function AnalyzePanel({
   charCount,
   phoneVerified,
 }: {
+  workId: number;
   episodeId: number;
   episodeLabel?: string;
   versions: VersionOption[];
@@ -56,6 +58,11 @@ export function AnalyzePanel({
   phoneVerified: boolean;
 }) {
   const router = useRouter();
+  const {
+    registerJobStarted,
+    notifyAnalysisStarted,
+    getLatestJobForEpisode,
+  } = useAnalysisJobs();
   const [includeLore, setIncludeLore] = useState(true);
   const [includePlatformOptimization, setIncludePlatformOptimization] =
     useState(true);
@@ -65,7 +72,7 @@ export function AnalyzePanel({
   const [lowVolumeOpen, setLowVolumeOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [unchangedOpen, setUnchangedOpen] = useState(false);
-  /** NAT 모달 닫은 뒤 API 진행 중 (배경 전체 로딩) */
+  /** 분석 API 요청 중 (모달·버튼 로딩용, 화면 전체는 막지 않음) */
   const [analyzing, setAnalyzing] = useState(false);
   const [pendingScrollToResult, setPendingScrollToResult] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,8 +93,6 @@ export function AnalyzePanel({
     [charCount]
   );
 
-  useAnalysisNavigationGuard(analyzing);
-
   useEffect(() => {
     setAnalyses(initialAnalyses);
     setRerunCompare(null);
@@ -100,6 +105,74 @@ export function AnalyzePanel({
       setAgentVersion(NAT_GENERIC_AGENT_ID);
     }
   }, [includePlatformOptimization]);
+
+  const latestJobForEp = getLatestJobForEpisode(episodeId);
+  const prevEpJobStatus = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    prevEpJobStatus.current = undefined;
+  }, [episodeId]);
+
+  useEffect(() => {
+    const st = latestJobForEp?.status;
+    const jid = latestJobForEp?.id;
+    const was = prevEpJobStatus.current;
+    prevEpJobStatus.current = st;
+
+    if (!jid || !st) return;
+
+    const applyCompleted = async () => {
+      const pr = await fetch(`/api/analyze/jobs/${jid}`);
+      const pj = await pr.json().catch(() => ({}));
+      if (!pr.ok) return;
+      if (pj.status === "completed" && pj.analysis) {
+        setAnalyses((prev) => {
+          const id = pj.analysis.id as number;
+          return [pj.analysis, ...prev.filter((a) => a.id !== id)];
+        });
+        setPendingScrollToResult(true);
+        const prev = pj.previousResult as
+          | PreviousAnalysisResultPayload
+          | undefined;
+        if (
+          prev &&
+          pj.analysis &&
+          typeof pj.analysis.result_json?.overall_score === "number"
+        ) {
+          setRerunCompare({
+            previous: prev,
+            currentScore: pj.analysis.result_json.overall_score,
+          });
+        } else {
+          setRerunCompare(null);
+        }
+        setJobFailedBanner(null);
+        router.refresh();
+      }
+    };
+
+    const applyFailed = async () => {
+      const pr = await fetch(`/api/analyze/jobs/${jid}`);
+      const pj = await pr.json().catch(() => ({}));
+      if (!pr.ok) return;
+      if (pj.status === "failed") {
+        setJobFailedBanner({
+          message:
+            typeof pj.error === "string" ? pj.error : "분석에 실패했습니다.",
+          retryable: pj.retryable !== false,
+          code: typeof pj.code === "string" ? pj.code : undefined,
+        });
+        router.refresh();
+      }
+    };
+
+    if (st === "completed" && (was === "pending" || was === "processing")) {
+      void applyCompleted();
+    }
+    if (st === "failed" && (was === "pending" || was === "processing")) {
+      void applyFailed();
+    }
+  }, [latestJobForEp?.id, latestJobForEp?.status, episodeId, router]);
 
   useEffect(() => {
     if (!analyzing && pendingScrollToResult && analyses[0]) {
@@ -201,58 +274,14 @@ export function AnalyzePanel({
 
       if (data.job_id && typeof data.job_id === "string") {
         const jobId = data.job_id;
-        const poll = async (): Promise<void> => {
-          const pr = await fetch(`/api/analyze/jobs/${jobId}`);
-          const pj = await pr.json().catch(() => ({}));
-          if (!pr.ok) {
-            throw new Error(
-              typeof pj.error === "string"
-                ? pj.error
-                : "분석 상태를 불러오지 못했습니다."
-            );
-          }
-          if (pj.status === "pending" || pj.status === "processing") {
-            await new Promise((r) => setTimeout(r, 2000));
-            return poll();
-          }
-          if (pj.status === "failed") {
-            setJobFailedBanner({
-              message:
-                typeof pj.error === "string"
-                  ? pj.error
-                  : "분석에 실패했습니다.",
-              retryable: pj.retryable !== false,
-              code: typeof pj.code === "string" ? pj.code : undefined,
-            });
-            return;
-          }
-          if (pj.status === "completed" && pj.analysis) {
-            setAnalyses((prev) => {
-              const id = pj.analysis.id as number;
-              return [pj.analysis, ...prev.filter((a) => a.id !== id)];
-            });
-            setPendingScrollToResult(true);
-            const prev = pj.previousResult as
-              | PreviousAnalysisResultPayload
-              | undefined;
-            if (
-              prev &&
-              pj.analysis &&
-              typeof pj.analysis.result_json?.overall_score === "number"
-            ) {
-              setRerunCompare({
-                previous: prev,
-                currentScore: pj.analysis.result_json.overall_score,
-              });
-            } else {
-              setRerunCompare(null);
-            }
-            router.refresh();
-            return;
-          }
-          throw new Error("알 수 없는 분석 응답입니다.");
-        };
-        await poll();
+        registerJobStarted({
+          id: jobId,
+          episode_id: episodeId,
+          work_id: workId,
+          status: "pending",
+          updated_at: new Date().toISOString(),
+        });
+        notifyAnalysisStarted();
         return;
       }
 
@@ -499,25 +528,6 @@ export function AnalyzePanel({
         onCancel={() => setUnchangedOpen(false)}
         onConfirm={onConfirmUnchangedAnalyze}
       />
-
-      {analyzing && (
-        <div
-          className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-5 bg-zinc-950/75 p-6 backdrop-blur-sm"
-          role="status"
-          aria-live="polite"
-          aria-busy="true"
-        >
-          <div
-            className="h-14 w-14 shrink-0 animate-spin rounded-full border-2 border-cyan-500/25 border-t-cyan-400"
-            aria-hidden
-          />
-          <p className="max-w-sm text-center text-sm font-medium leading-relaxed text-zinc-200">
-            <CopyWithBreaks as="span">
-              에이전트가 원고를 정밀 분석 중입니다...
-            </CopyWithBreaks>
-          </p>
-        </div>
-      )}
 
       {latest && (
         <div

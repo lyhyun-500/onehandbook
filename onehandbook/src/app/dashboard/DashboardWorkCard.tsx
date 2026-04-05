@@ -3,6 +3,7 @@
 import { CopyWithBreaks } from "@/components/CopyWithBreaks";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useAnalysisJobsOptional } from "@/contexts/AnalysisJobsContext";
 
 const SCAN_MS = 1500;
 
@@ -33,6 +34,8 @@ export function DashboardWorkCard({
   work: WorkRow;
   agentScore: number | null;
 }) {
+  const analysisJobs = useAnalysisJobsOptional();
+  const workAnalyzing = analysisJobs?.workHasAnalyzingEpisode(work.id) ?? false;
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
@@ -78,6 +81,15 @@ export function DashboardWorkCard({
           <span>{STATUS_LABEL[work.status] ?? work.status}</span>
           <span className="text-zinc-600">·</span>
           <span>{work.total_episodes}화</span>
+          {workAnalyzing && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/35 bg-sky-950/40 px-2 py-0.5 text-xs font-medium text-sky-200/95">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-sky-400" />
+              </span>
+              <span className="animate-pulse">분석 중</span>
+            </span>
+          )}
         </div>
       </div>
 

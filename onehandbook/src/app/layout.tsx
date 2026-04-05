@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/config/site";
 import { FloatingInquiryButton } from "@/components/FloatingInquiryButton";
 import { SiteFooter } from "@/components/SiteFooter";
+import { AnalysisJobsProvider } from "@/contexts/AnalysisJobsContext";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,11 +29,13 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} flex min-h-screen flex-col antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} m-0 flex min-h-screen flex-col p-0 antialiased`}
       >
-        <div className="flex-1">{children}</div>
-        <SiteFooter />
-        <FloatingInquiryButton />
+        <AnalysisJobsProvider>
+          <div className="flex-1">{children}</div>
+          <SiteFooter />
+          <FloatingInquiryButton />
+        </AnalysisJobsProvider>
       </body>
     </html>
   );
