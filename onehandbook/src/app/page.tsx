@@ -71,7 +71,7 @@ export default async function HomePage() {
                 흥행작이 될 수 있습니다.
               </h1>
               <p className="mt-8 text-lg font-semibold leading-relaxed text-zinc-400 md:text-xl md:leading-relaxed">
-                네이버 시리즈·카카오페이지·문피아 맞춤 AI 에이전트
+                장르·연재 맥락에 맞춘 AI 흥행 분석
               </p>
               <div className="mt-10">
                 <Link
