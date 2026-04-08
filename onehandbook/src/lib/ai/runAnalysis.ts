@@ -38,6 +38,16 @@ type TrendsContextPack = {
   references: TrendReferenceItem[];
 };
 
+function loopbackTrendsSearchBaseUrl(): string | null {
+  const explicit = process.env.TRENDS_RAG_SEARCH_BASE_URL?.trim().replace(/\/$/, "");
+  if (explicit) return explicit;
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  if (site) return site;
+  const vercel = process.env.VERCEL_URL?.trim();
+  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`;
+  return null;
+}
+
 async function fetchTrendsContextForAnalysisMaybe(
   genre: string,
   workTitle: string
@@ -48,8 +58,42 @@ async function fetchTrendsContextForAnalysisMaybe(
     return { block: null, references: [] };
   }
 
-  const mod = await import("@/lib/chroma/trendsSearchCore");
-  return mod.fetchTrendsContextForAnalysis(genre, workTitle);
+  const secret = process.env.TRENDS_RAG_API_SECRET?.trim();
+  const base = loopbackTrendsSearchBaseUrl();
+  if (!secret || !base) return { block: null, references: [] };
+
+  try {
+    const res = await fetch(`${base}/api/rag/trends/search`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${secret}`,
+      },
+      body: JSON.stringify({ query: `장르: ${genre}. 작품 제목: ${workTitle}.`, n: 8, genre }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!res.ok) return { block: null, references: [] };
+    const data = (await res.json()) as {
+      hits?: Array<{ document?: string; metadata?: { source?: string; date?: string } }>;
+    };
+    const hits = Array.isArray(data.hits) ? data.hits : [];
+    const references: TrendReferenceItem[] = hits
+      .map((h) => ({
+        source: h.metadata?.source ?? "내부 트렌드 코퍼스",
+        date: h.metadata?.date ?? "날짜 미표기",
+      }))
+      .filter((r) => Boolean(r.source) && Boolean(r.date));
+    const block =
+      hits.length > 0
+        ? `## 최신 웹소설 트렌드 참고 자료 (RAG)\n(개발 모드 루프백)\n\n${hits
+            .slice(0, 8)
+            .map((h, i) => `### 스니펫 ${i + 1}\n${String(h.document ?? "").trim()}`)
+            .join("\n\n")}`
+        : null;
+    return { block, references };
+  } catch {
+    return { block: null, references: [] };
+  }
 }
 
 function formatJsonParseFailures(first: unknown, second: unknown): string {
