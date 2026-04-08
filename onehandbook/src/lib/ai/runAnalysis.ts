@@ -50,7 +50,8 @@ function loopbackTrendsSearchBaseUrl(): string | null {
 
 async function fetchTrendsContextForAnalysisMaybe(
   genre: string,
-  workTitle: string
+  workTitle: string,
+  tags: string[] | undefined
 ): Promise<TrendsContextPack> {
   // Vercel serverless 번들 크기(250MB) 초과를 피하기 위해
   // 프로덕션 빌드에서는 로컬 Chroma(@chroma-core/default-embed 포함)를 아예 포함하지 않습니다.
@@ -62,6 +63,14 @@ async function fetchTrendsContextForAnalysisMaybe(
   const base = loopbackTrendsSearchBaseUrl();
   if (!secret || !base) return { block: null, references: [] };
 
+  const tagsNorm = Array.isArray(tags)
+    ? tags
+        .map((t) => String(t ?? "").trim().replace(/^#+/, "").trim())
+        .filter(Boolean)
+        .slice(0, 10)
+    : [];
+  const tagsLine = tagsNorm.length > 0 ? ` 태그: ${tagsNorm.join(", ")}.` : "";
+
   try {
     const res = await fetch(`${base}/api/rag/trends/search`, {
       method: "POST",
@@ -69,7 +78,12 @@ async function fetchTrendsContextForAnalysisMaybe(
         "Content-Type": "application/json",
         Authorization: `Bearer ${secret}`,
       },
-      body: JSON.stringify({ query: `장르: ${genre}. 작품 제목: ${workTitle}.`, n: 8, genre }),
+      body: JSON.stringify({
+        query: `장르: ${genre}. 작품 제목: ${workTitle}.${tagsLine}`,
+        n: 8,
+        genre,
+        ...(tagsNorm.length > 0 ? { tags: tagsNorm } : {}),
+      }),
       signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) return { block: null, references: [] };
@@ -166,7 +180,11 @@ export async function runAnalysis(
   }
 
   const { block: trendsBlock, references: trendRefs } =
-    await fetchTrendsContextForAnalysisMaybe(input.genre, input.work_title ?? "");
+    await fetchTrendsContextForAnalysisMaybe(
+      input.genre,
+      input.work_title ?? "",
+      input.tags
+    );
   const system = buildSystemPrompt(input.genre, profile, trendsBlock);
   const user = buildUserPrompt(input);
 
@@ -199,7 +217,11 @@ export async function runHolisticAnalysis(
   }
 
   const { block: trendsBlock, references: trendRefs } =
-    await fetchTrendsContextForAnalysisMaybe(input.genre, input.work_title ?? "");
+    await fetchTrendsContextForAnalysisMaybe(
+      input.genre,
+      input.work_title ?? "",
+      input.tags
+    );
   const system = buildHolisticSystemPrompt(input.genre, profile, trendsBlock);
   const user = buildHolisticUserPrompt(input.genre, input, segments);
 
@@ -228,7 +250,8 @@ export async function runHolisticMergeAnalysis(
   chunks: HolisticChunkPayload[],
   episodeWeights: Array<{ episode_number: number; charCount: number }>,
   versionId: string = ANALYSIS_PROFILES[0]!.id,
-  workTitle?: string
+  workTitle?: string,
+  tags?: string[]
 ): Promise<{
   result: HolisticAnalysisResult;
   version: AgentVersionConfig;
@@ -239,7 +262,7 @@ export async function runHolisticMergeAnalysis(
   }
 
   const { block: trendsBlock, references: trendRefs } =
-    await fetchTrendsContextForAnalysisMaybe(genre, workTitle ?? "");
+    await fetchTrendsContextForAnalysisMaybe(genre, workTitle ?? "", tags);
   const system = buildHolisticMergeSystemPrompt(genre, profile, trendsBlock);
   const user = buildHolisticMergeUserPrompt(genre, chunks, episodeWeights);
 

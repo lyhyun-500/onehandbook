@@ -8,7 +8,7 @@ type CopyWithBreaksProps = {
 };
 
 /**
- * 마침표·쉼표마다 줄바꿈(숫자·도메인 형태는 제외).
+ * 마침표 기반 줄바꿈(숫자·도메인 형태는 제외).
  */
 export function CopyWithBreaks({
   children,

@@ -115,7 +115,7 @@ export async function POST(request: Request) {
   const opts = parseNatOptions(body);
   const { data: workRow, error: workErr } = await supabase
     .from("works")
-    .select("id, genre, title, author_id, world_setting, character_settings")
+    .select("id, genre, title, tags, author_id, world_setting, character_settings")
     .eq("id", workIds[0])
     .single();
 

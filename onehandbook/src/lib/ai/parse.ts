@@ -25,11 +25,34 @@ export function parseAnalysisJson(raw: string): AnalysisResult {
   if (!Array.isArray(o.improvement_points)) {
     throw new Error("improvement_points 가 없습니다.");
   }
+  const ttf = o.tag_trend_fit as
+    | {
+        alignment?: unknown;
+        differentiation?: unknown;
+        suggested_trend_tags?: unknown;
+      }
+    | undefined;
   return {
     overall_score: o.overall_score,
     dimensions: o.dimensions as AnalysisResult["dimensions"],
     improvement_points: o.improvement_points as string[],
     comparable_note:
       typeof o.comparable_note === "string" ? o.comparable_note : undefined,
+    tag_trend_fit:
+      ttf &&
+      typeof ttf === "object" &&
+      typeof ttf.alignment === "string" &&
+      typeof ttf.differentiation === "string"
+        ? {
+            alignment: ttf.alignment,
+            differentiation: ttf.differentiation,
+            suggested_trend_tags: Array.isArray(ttf.suggested_trend_tags)
+              ? (ttf.suggested_trend_tags as unknown[])
+                  .map((x) => String(x ?? "").trim())
+                  .filter(Boolean)
+                  .slice(0, 12)
+              : undefined,
+          }
+        : undefined,
   };
 }

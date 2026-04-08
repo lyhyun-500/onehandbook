@@ -79,7 +79,7 @@ export async function runHolisticChunkAnalysis(
 
   const { data: work, error: wErr } = await supabase
     .from("works")
-    .select("id, genre, title, author_id, world_setting, character_settings")
+    .select("id, genre, title, tags, author_id, world_setting, character_settings")
     .eq("id", workId)
     .single();
 
@@ -138,6 +138,7 @@ export async function runHolisticChunkAnalysis(
     manuscript: "",
     genre: work.genre ?? "",
     work_title: work.title ?? undefined,
+    tags: Array.isArray(work.tags) ? work.tags : undefined,
     world_setting,
     character_settings:
       character_settings.length > 0 ? character_settings : undefined,

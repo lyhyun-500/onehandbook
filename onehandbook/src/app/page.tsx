@@ -46,7 +46,7 @@ export default async function HomePage() {
       </header>
 
       {/* 히어로: 배경(z-0) → 오버레이(z-1) → 콘텐츠(z-2). lg+ 에서만 콘텐츠를 absolute inset-0으로 스택 고정 */}
-      <section className="relative m-0 h-[100dvh] min-h-0 w-full shrink-0 overflow-hidden p-0 lg:h-[100vh] lg:isolate">
+      <section className="relative m-0 h-auto min-h-[100dvh] w-full shrink-0 overflow-hidden p-0 lg:h-[100vh] lg:isolate">
         <div className="absolute inset-0 z-0 min-h-0 min-w-0">
           <LandingHeroCoverSliders data={coverBackdrop} />
         </div>
@@ -61,6 +61,7 @@ export default async function HomePage() {
           style={{
             paddingTop:
               "max(env(safe-area-inset-top, 0px), var(--ohb-landing-header-h))",
+            paddingBottom: "max(env(safe-area-inset-bottom, 0px), 4rem)",
           }}
         >
           <div className="mx-auto flex w-full max-w-7xl flex-col gap-12 lg:flex-row lg:items-center lg:justify-center lg:gap-16 xl:gap-24">

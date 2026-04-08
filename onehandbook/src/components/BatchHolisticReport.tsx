@@ -262,6 +262,46 @@ export function BatchHolisticReport({
         </p>
       </section>
 
+      {result.tag_trend_fit && (
+        <section className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-5">
+          <h3 className="mb-3 text-sm font-semibold text-zinc-200">
+            태그 · 플랫폼 트렌드 적합도
+          </h3>
+          <div className="space-y-3 text-sm text-zinc-300">
+            <div>
+              <p className="text-xs font-medium text-zinc-500">일치</p>
+              <p className="mt-1 leading-relaxed text-zinc-300">
+                <CopyWithBreaks as="span">{result.tag_trend_fit.alignment}</CopyWithBreaks>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-zinc-500">차별화</p>
+              <p className="mt-1 leading-relaxed text-zinc-300">
+                <CopyWithBreaks as="span">
+                  {result.tag_trend_fit.differentiation}
+                </CopyWithBreaks>
+              </p>
+            </div>
+            {result.tag_trend_fit.suggested_trend_tags &&
+              result.tag_trend_fit.suggested_trend_tags.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-zinc-500">추천 트렌드 태그</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {result.tag_trend_fit.suggested_trend_tags.map((t, i) => (
+                    <span
+                      key={`${t}-${i}`}
+                      className="rounded-full border border-zinc-700 bg-zinc-900/40 px-2.5 py-1 text-xs text-zinc-200"
+                    >
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       <TrendReferencesSection references={result.trends_references} />
     </div>
   );

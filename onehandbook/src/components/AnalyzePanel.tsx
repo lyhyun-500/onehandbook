@@ -797,6 +797,53 @@ export function AnalyzePanel({
             </ul>
           </div>
 
+          {latest.result_json.tag_trend_fit && (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-4 py-3">
+              <h3 className="text-sm font-medium text-zinc-300">
+                태그 · 플랫폼 트렌드 적합도
+              </h3>
+              <div className="mt-2 space-y-2 text-sm text-zinc-400">
+                <div>
+                  <p className="text-xs font-medium text-zinc-500">일치</p>
+                  <p className="mt-1 text-zinc-300">
+                    <CopyWithBreaks as="span">
+                      {latest.result_json.tag_trend_fit.alignment}
+                    </CopyWithBreaks>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-zinc-500">차별화</p>
+                  <p className="mt-1 text-zinc-300">
+                    <CopyWithBreaks as="span">
+                      {latest.result_json.tag_trend_fit.differentiation}
+                    </CopyWithBreaks>
+                  </p>
+                </div>
+                {latest.result_json.tag_trend_fit.suggested_trend_tags &&
+                  latest.result_json.tag_trend_fit.suggested_trend_tags.length >
+                    0 && (
+                    <div>
+                      <p className="text-xs font-medium text-zinc-500">
+                        추천 트렌드 태그
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {latest.result_json.tag_trend_fit.suggested_trend_tags.map(
+                          (t, i) => (
+                            <span
+                              key={`${t}-${i}`}
+                              className="rounded-full border border-zinc-700 bg-zinc-900/40 px-2.5 py-1 text-xs text-zinc-200"
+                            >
+                              #{t}
+                            </span>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
+              </div>
+            </div>
+          )}
+
           {latest.result_json.comparable_note && (
             <p className="text-sm text-zinc-500">
               비교:{" "}

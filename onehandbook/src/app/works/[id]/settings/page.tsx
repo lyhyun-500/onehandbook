@@ -20,7 +20,9 @@ export default async function WorkSettingsPage({
 
   const { data: work } = await supabase
     .from("works")
-    .select("id, title, genre, status, author_id, world_setting, character_settings")
+    .select(
+      "id, title, genre, status, tags, author_id, world_setting, character_settings"
+    )
     .eq("id", id)
     .single();
 
@@ -53,6 +55,7 @@ export default async function WorkSettingsPage({
           initialTitle={work.title}
           initialGenre={work.genre}
           initialStatus={work.status}
+          initialTags={Array.isArray(work.tags) ? work.tags : []}
           initialWorld={normalizeWorldSetting(work.world_setting)}
           initialCharacters={normalizeCharacterSettings(work.character_settings)}
         />

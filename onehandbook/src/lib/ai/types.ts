@@ -25,6 +25,8 @@ export interface AnalysisInput {
   genre: string;
   /** works.title — RAG 트렌드 검색 쿼리에 사용 */
   work_title?: string;
+  /** works.tags — 트렌드 RAG 검색 힌트/필터(예: 법정물, 회귀물) */
+  tags?: string[];
   /** 작품 설정 — 비어 있으면 모델에 제약 안내 */
   world_setting?: AnalysisWorldSetting;
   character_settings?: AnalysisCharacterSetting[];
@@ -49,6 +51,17 @@ export interface AnalysisResult {
   dimensions: Record<string, { score: number; comment: string }>;
   improvement_points: string[];
   comparable_note?: string;
+  /**
+   * 태그 기반 플랫폼 트렌드 적합도/차별화 분석 (모델 출력).
+   * - alignment: 트렌드 태그와의 일치 정도
+   * - differentiation: 차별화 포인트 및 리스크/기회
+   * - suggested_trend_tags: 플랫폼에서 함께 쓰기 좋은 보조 태그(선택)
+   */
+  tag_trend_fit?: {
+    alignment: string;
+    differentiation: string;
+    suggested_trend_tags?: string[];
+  };
   /** 분석 시 참고한 트렌드 문서(출처·기준일) */
   trends_references?: TrendReferenceItem[];
 }
@@ -67,6 +80,11 @@ export interface HolisticAnalysisResult {
   strengths: string[];
   improvements: string[];
   executive_summary: string;
+  tag_trend_fit?: {
+    alignment: string;
+    differentiation: string;
+    suggested_trend_tags?: string[];
+  };
   trends_references?: TrendReferenceItem[];
 }
 

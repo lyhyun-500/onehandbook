@@ -55,6 +55,13 @@ export function parseHolisticAnalysisJson(raw: string): HolisticAnalysisResult {
   if (typeof o.executive_summary !== "string") {
     throw new Error("executive_summary 가 없습니다.");
   }
+  const ttf = o.tag_trend_fit as
+    | {
+        alignment?: unknown;
+        differentiation?: unknown;
+        suggested_trend_tags?: unknown;
+      }
+    | undefined;
   return {
     overall_score: Math.round(o.overall_score),
     episode_scores,
@@ -62,5 +69,21 @@ export function parseHolisticAnalysisJson(raw: string): HolisticAnalysisResult {
     strengths: o.strengths as string[],
     improvements: o.improvements as string[],
     executive_summary: o.executive_summary,
+    tag_trend_fit:
+      ttf &&
+      typeof ttf === "object" &&
+      typeof ttf.alignment === "string" &&
+      typeof ttf.differentiation === "string"
+        ? {
+            alignment: ttf.alignment,
+            differentiation: ttf.differentiation,
+            suggested_trend_tags: Array.isArray(ttf.suggested_trend_tags)
+              ? (ttf.suggested_trend_tags as unknown[])
+                  .map((x) => String(x ?? "").trim())
+                  .filter(Boolean)
+                  .slice(0, 12)
+              : undefined,
+          }
+        : undefined,
   };
 }

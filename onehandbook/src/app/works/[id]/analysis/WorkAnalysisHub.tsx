@@ -72,7 +72,25 @@ function WorkAnalysisHubInner({
   const searchParams = useSearchParams();
   const analysisJobsCtx = useAnalysisJobsOptional();
   const workIdNum = parseInt(workId, 10);
-  const latest = useMemo(() => latestAnalysisPerEpisode(runs), [runs]);
+
+  const [serverEpisodes, setServerEpisodes] = useState<EpisodeRow[] | null>(
+    null
+  );
+  const [serverRuns, setServerRuns] = useState<AnalysisRunRow[] | null>(null);
+  const [serverHolistic, setServerHolistic] = useState<HolisticRunRow | null>(
+    null
+  );
+  const [serverLoadError, setServerLoadError] = useState<string | null>(null);
+
+  const effectiveEpisodes = serverEpisodes ?? episodes;
+  const effectiveRuns = serverRuns ?? runs;
+  const effectiveLatestHolistic =
+    serverHolistic !== null ? serverHolistic : latestHolistic;
+
+  const latest = useMemo(
+    () => latestAnalysisPerEpisode(effectiveRuns),
+    [effectiveRuns]
+  );
 
   const defaultAgent = useMemo(
     () =>
@@ -106,6 +124,38 @@ function WorkAnalysisHubInner({
   const [activeTab, setActiveTab] = useState<"single" | "batch">(initialTab);
 
   useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await fetch(`/api/works/${workId}/analysis-data`, {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          episodes?: EpisodeRow[];
+          runs?: AnalysisRunRow[];
+          latestHolistic?: HolisticRunRow | null;
+        };
+        if (cancelled) return;
+        if (Array.isArray(data.episodes)) setServerEpisodes(data.episodes);
+        if (Array.isArray(data.runs)) setServerRuns(data.runs);
+        setServerHolistic(
+          data.latestHolistic && typeof data.latestHolistic.id === "number"
+            ? data.latestHolistic
+            : null
+        );
+      } catch (e) {
+        if (cancelled) return;
+        setServerLoadError(e instanceof Error ? e.message : "데이터 로딩 실패");
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [workId]);
+
+  useEffect(() => {
     const next: "single" | "batch" =
       searchParams.get("tab") === "batch" ? "batch" : "single";
     setActiveTab(next);
@@ -129,12 +179,12 @@ function WorkAnalysisHubInner({
   useEffect(() => {
     if (
       holisticClient &&
-      latestHolistic &&
-      latestHolistic.id === holisticClient.id
+      effectiveLatestHolistic &&
+      effectiveLatestHolistic.id === holisticClient.id
     ) {
       setHolisticClient(null);
     }
-  }, [latestHolistic, holisticClient]);
+  }, [effectiveLatestHolistic, holisticClient]);
 
   useEffect(() => {
     if (!batchIncludePlatform) {
@@ -150,7 +200,7 @@ function WorkAnalysisHubInner({
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => {
     const s = new Set<number>();
-    for (const e of episodes) s.add(e.id);
+    for (const e of effectiveEpisodes) s.add(e.id);
     return s;
   });
 
@@ -158,16 +208,19 @@ function WorkAnalysisHubInner({
   const [rangeTo, setRangeTo] = useState("");
 
   const [panelEpisodeId, setPanelEpisodeId] = useState<number | null>(() => {
-    if (initialFocusEpisodeId && episodes.some((e) => e.id === initialFocusEpisodeId)) {
+    if (
+      initialFocusEpisodeId &&
+      effectiveEpisodes.some((e) => e.id === initialFocusEpisodeId)
+    ) {
       return initialFocusEpisodeId;
     }
-    return episodes[0]?.id ?? null;
+    return effectiveEpisodes[0]?.id ?? null;
   });
 
   useEffect(() => {
     if (
       initialFocusEpisodeId &&
-      episodes.some((e) => e.id === initialFocusEpisodeId)
+      effectiveEpisodes.some((e) => e.id === initialFocusEpisodeId)
     ) {
       setActiveTab("single");
       setPanelEpisodeId(initialFocusEpisodeId);
@@ -177,11 +230,13 @@ function WorkAnalysisHubInner({
           ?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
-  }, [initialFocusEpisodeId, episodes]);
+  }, [initialFocusEpisodeId, effectiveEpisodes]);
 
   const orderedSelectedIds = useMemo(() => {
-    return episodes.filter((e) => selectedIds.has(e.id)).map((e) => e.id);
-  }, [episodes, selectedIds]);
+    return effectiveEpisodes
+      .filter((e) => selectedIds.has(e.id))
+      .map((e) => e.id);
+  }, [effectiveEpisodes, selectedIds]);
 
   const rangeStats = useMemo(
     () => scoreStatsForSelection(orderedSelectedIds, latest),
@@ -190,7 +245,7 @@ function WorkAnalysisHubInner({
 
   const panelAnalyses = useMemo(() => {
     if (panelEpisodeId == null) return [];
-    return runs
+    return effectiveRuns
       .filter((r) => r.episode_id === panelEpisodeId)
       .sort(
         (a, b) =>
@@ -202,17 +257,17 @@ function WorkAnalysisHubInner({
         result_json: r.result_json,
         created_at: r.created_at,
       }));
-  }, [runs, panelEpisodeId]);
+  }, [effectiveRuns, panelEpisodeId]);
 
-  const panelEpisode = episodes.find((e) => e.id === panelEpisodeId);
+  const panelEpisode = effectiveEpisodes.find((e) => e.id === panelEpisodeId);
   const panelCharCount = panelEpisode?.charCount ?? 0;
 
   const batchTotalChars = useMemo(() => {
     return orderedSelectedIds.reduce((sum, id) => {
-      const e = episodes.find((x) => x.id === id);
+      const e = effectiveEpisodes.find((x) => x.id === id);
       return sum + (e?.charCount ?? 0);
     }, 0);
-  }, [orderedSelectedIds, episodes]);
+  }, [orderedSelectedIds, effectiveEpisodes]);
 
   const batchBreakdown = useMemo(() => {
     const opts = {
@@ -229,7 +284,11 @@ function WorkAnalysisHubInner({
         opts
       );
     }
-    const est = estimateHolisticBatchTotalNat(episodes, orderedSelectedIds, opts);
+    const est = estimateHolisticBatchTotalNat(
+      effectiveEpisodes,
+      orderedSelectedIds,
+      opts
+    );
     const lines: { label: string; nat: number }[] = [
         {
         label: `10화 단위 배치 ${est.chunkCount}회`,
@@ -243,16 +302,16 @@ function WorkAnalysisHubInner({
   }, [
     batchTotalChars,
     orderedSelectedIds,
-    episodes,
+    effectiveEpisodes,
     batchIncludeLore,
     batchIncludePlatform,
   ]);
 
-  const activeHolistic = holisticClient ?? latestHolistic;
+  const activeHolistic = holisticClient ?? effectiveLatestHolistic;
 
   const holisticReportEpisodes = useMemo(() => {
     if (!activeHolistic) return null;
-    const byId = new Map(episodes.map((e) => [e.id, e]));
+    const byId = new Map(effectiveEpisodes.map((e) => [e.id, e]));
     const ordered = activeHolistic.episode_ids
       .map((id) => byId.get(Number(id)))
       .filter((e): e is EpisodeRow => Boolean(e));
@@ -262,7 +321,7 @@ function WorkAnalysisHubInner({
       title: e.title,
       charCount: e.charCount,
     }));
-  }, [activeHolistic, episodes]);
+  }, [activeHolistic, effectiveEpisodes]);
 
   const effectiveBatchAgentId = resolveAnalysisAgentVersion(
     batchIncludePlatform,
@@ -274,18 +333,18 @@ function WorkAnalysisHubInner({
 
   const batchHasBlockedEpisode = useMemo(() => {
     return orderedSelectedIds.some((id) => {
-      const ep = episodes.find((e) => e.id === id);
+      const ep = effectiveEpisodes.find((e) => e.id === id);
       return (ep?.charCount ?? 0) < MIN_ANALYSIS_CHARS;
     });
-  }, [orderedSelectedIds, episodes]);
+  }, [orderedSelectedIds, effectiveEpisodes]);
 
   const batchHasLowVolumeEpisode = useMemo(() => {
     if (batchHasBlockedEpisode) return false;
     return orderedSelectedIds.some((id) => {
-      const c = episodes.find((e) => e.id === id)?.charCount ?? 0;
+      const c = effectiveEpisodes.find((e) => e.id === id)?.charCount ?? 0;
       return c >= MIN_ANALYSIS_CHARS && c < 1000;
     });
-  }, [orderedSelectedIds, episodes, batchHasBlockedEpisode]);
+  }, [orderedSelectedIds, effectiveEpisodes, batchHasBlockedEpisode]);
 
   const toggle = (id: number) => {
     setSelectedIds((prev) => {
@@ -297,7 +356,7 @@ function WorkAnalysisHubInner({
   };
 
   const selectAll = () => {
-    setSelectedIds(new Set(episodes.map((e) => e.id)));
+    setSelectedIds(new Set(effectiveEpisodes.map((e) => e.id)));
   };
 
   const selectNone = () => {
@@ -306,7 +365,7 @@ function WorkAnalysisHubInner({
 
   const selectAnalyzedOnly = () => {
     const next = new Set<number>();
-    for (const e of episodes) {
+    for (const e of effectiveEpisodes) {
       if (latest.has(e.id)) next.add(e.id);
     }
     setSelectedIds(next);
@@ -317,7 +376,7 @@ function WorkAnalysisHubInner({
     const to = parseInt(rangeTo, 10);
     if (Number.isNaN(from) || Number.isNaN(to) || from > to) return;
     const next = new Set<number>();
-    for (const e of episodes) {
+    for (const e of effectiveEpisodes) {
       if (e.episode_number >= from && e.episode_number <= to) {
         next.add(e.id);
       }
@@ -365,7 +424,10 @@ function WorkAnalysisHubInner({
             : [];
           if (ids.length > 0) {
             const nums = ids
-              .map((id) => episodes.find((e) => e.id === id)?.episode_number)
+              .map(
+                (id) =>
+                  effectiveEpisodes.find((e) => e.id === id)?.episode_number
+              )
               .filter((n): n is number => typeof n === "number");
             setBatchUnchangedEpisodeNumbers(nums);
             setBatchUnchangedOpen(true);
@@ -384,7 +446,8 @@ function WorkAnalysisHubInner({
       if (blocked.length > 0) {
         const nums = blocked
           .map(
-            (id) => episodes.find((e) => e.id === id)?.episode_number
+            (id) =>
+              effectiveEpisodes.find((e) => e.id === id)?.episode_number
           )
           .filter((n): n is number => typeof n === "number");
         setBatchBusyEpisodeNumbers(nums.length > 0 ? nums : []);
@@ -445,7 +508,8 @@ function WorkAnalysisHubInner({
             : [];
           const nums = ids
             .map(
-              (id) => episodes.find((e) => e.id === id)?.episode_number
+              (id) =>
+                effectiveEpisodes.find((e) => e.id === id)?.episode_number
             )
             .filter((n): n is number => typeof n === "number");
           setBatchBusyEpisodeNumbers(nums.length > 0 ? nums : []);
@@ -660,8 +724,8 @@ function WorkAnalysisHubInner({
     }
   };
 
-  const maxEp = episodes.length
-    ? Math.max(...episodes.map((e) => e.episode_number))
+  const maxEp = effectiveEpisodes.length
+    ? Math.max(...effectiveEpisodes.map((e) => e.episode_number))
     : 0;
 
   return (
@@ -711,7 +775,7 @@ function WorkAnalysisHubInner({
               </CopyWithBreaks>
             </p>
 
-            {episodes.length === 0 ? (
+            {effectiveEpisodes.length === 0 ? (
               <p className="text-sm text-zinc-500">등록된 회차가 없습니다.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -727,7 +791,7 @@ function WorkAnalysisHubInner({
                     </tr>
                   </thead>
                   <tbody className="text-zinc-300">
-                    {episodes.map((ep) => {
+                    {effectiveEpisodes.map((ep) => {
                       const run = latest.get(ep.id);
                       return (
                         <tr

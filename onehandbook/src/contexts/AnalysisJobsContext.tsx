@@ -225,6 +225,8 @@ type AnalysisJobsContextValue = {
   registerJobStarted: (job: AnalysisJobListItem) => void;
   notifyAnalysisStarted: () => void;
   markJobOutcomeRead: (jobId: string) => void;
+  /** 알림 패널의 "모두 읽음" */
+  markAllOutcomesRead: () => Promise<void>;
   /** 진행 중(pending|processing) 작업을 failed로 마무리 — 서버 /api/analyze/jobs/:id/cancel */
   cancelAnalysisJob: (jobId: string) => Promise<void>;
   /** DB와 목록 동기화(Realtime 누락·optimistic 꼬임 복구) */
@@ -695,6 +697,21 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     });
   }, []);
 
+  const markAllOutcomesRead = useCallback(async () => {
+    const res = await fetch("/api/analyze/jobs/mark-all-read", { method: "POST" });
+    if (!res.ok) throw new Error("모두 읽음 처리에 실패했습니다.");
+    const data = (await res.json().catch(() => ({}))) as { job_ids?: string[] };
+    const ids = Array.isArray(data.job_ids) ? data.job_ids : [];
+    setReadOutcomeJobIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (typeof id === "string" && id) next.add(id);
+      }
+      persistReadJobIds(next);
+      return next;
+    });
+  }, []);
+
   const cancelAnalysisJob = useCallback(
     async (jobId: string) => {
       const res = await fetch(
@@ -842,6 +859,7 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
       registerJobStarted,
       notifyAnalysisStarted,
       markJobOutcomeRead,
+      markAllOutcomesRead,
       cancelAnalysisJob,
       refreshAnalysisJobs,
       unreadCount,
@@ -859,6 +877,7 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
       registerJobStarted,
       notifyAnalysisStarted,
       markJobOutcomeRead,
+      markAllOutcomesRead,
       cancelAnalysisJob,
       refreshAnalysisJobs,
       unreadCount,
@@ -902,6 +921,7 @@ export function HeaderAnalysisBell() {
     panelJobs,
     readOutcomeJobIds,
     markJobOutcomeRead,
+    markAllOutcomesRead,
     markNotificationRead,
     cancelAnalysisJob,
     refreshAnalysisJobs,
@@ -912,6 +932,7 @@ export function HeaderAnalysisBell() {
       unreadCount={unreadCount}
       panelJobs={panelJobs}
       readOutcomeJobIds={readOutcomeJobIds}
+      onMarkAllRead={markAllOutcomesRead}
       onCancelJob={cancelAnalysisJob}
       onPanelOpen={refreshAnalysisJobs}
       onNavigate={(href, jobId, notificationId) => {
@@ -1092,6 +1113,7 @@ function AnalysisBell({
   unreadCount,
   panelJobs,
   readOutcomeJobIds,
+  onMarkAllRead,
   onCancelJob,
   onPanelOpen,
   onNavigate,
@@ -1099,6 +1121,7 @@ function AnalysisBell({
   unreadCount: number;
   panelJobs: AnalysisJobListItem[];
   readOutcomeJobIds: ReadonlySet<string>;
+  onMarkAllRead: () => Promise<void>;
   onCancelJob: (jobId: string) => Promise<void>;
   onPanelOpen: () => Promise<void>;
   onNavigate: (href: string, jobId: string | null, notificationId: string | null) => void;
@@ -1107,12 +1130,92 @@ function AnalysisBell({
   const [open, setOpen] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [markAllBusy, setMarkAllBusy] = useState(false);
+  const [outcomes, setOutcomes] = useState<AnalysisJobListItem[]>([]);
+  const [outcomesCursor, setOutcomesCursor] = useState<string | null>(null);
+  const [outcomesHasMore, setOutcomesHasMore] = useState(true);
+  const [outcomesLoadingMore, setOutcomesLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     void onPanelOpen();
   }, [open, onPanelOpen]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    async function loadFirst() {
+      setOutcomesLoadingMore(true);
+      try {
+        const res = await fetch("/api/analyze/jobs/outcomes?sinceDays=7&limit=12", {
+          cache: "no-store",
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          jobs?: AnalysisJobListItem[];
+          nextCursor?: string | null;
+        };
+        if (cancelled) return;
+        const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+        setOutcomes(jobs);
+        setOutcomesCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
+        setOutcomesHasMore(jobs.length >= 12);
+      } finally {
+        if (!cancelled) setOutcomesLoadingMore(false);
+      }
+    }
+    void loadFirst();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    if (!outcomesHasMore || outcomesLoadingMore) return;
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.some((e) => e.isIntersecting);
+        if (!hit) return;
+        if (!outcomesHasMore || outcomesLoadingMore) return;
+        if (!outcomesCursor) return;
+        setOutcomesLoadingMore(true);
+        void (async () => {
+          try {
+            const res = await fetch(
+              `/api/analyze/jobs/outcomes?cursor=${encodeURIComponent(outcomesCursor)}&limit=12`,
+              { cache: "no-store" }
+            );
+            const data = (await res.json().catch(() => ({}))) as {
+              jobs?: AnalysisJobListItem[];
+              nextCursor?: string | null;
+            };
+            const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+            setOutcomes((prev) => {
+              const byId = new Map(prev.map((j) => [j.id, j]));
+              for (const j of jobs) byId.set(j.id, j);
+              return [...byId.values()].sort(
+                (a, b) =>
+                  new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+              );
+            });
+            setOutcomesCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
+            setOutcomesHasMore(jobs.length >= 12);
+          } finally {
+            setOutcomesLoadingMore(false);
+          }
+        })();
+      },
+      { root: el.parentElement, rootMargin: "200px", threshold: 0.1 }
+    );
+
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [open, outcomesCursor, outcomesHasMore, outcomesLoadingMore]);
 
   useEffect(() => {
     if (!open) return;
@@ -1128,9 +1231,7 @@ function AnalysisBell({
   const activeJobs = panelJobs.filter(
     (j) => j.status === "pending" || j.status === "processing"
   );
-  const outcomeJobs = panelJobs
-    .filter((j) => j.status === "completed" || j.status === "failed")
-    .slice(0, 12);
+  const outcomeJobs = outcomes;
 
   return (
     <div className="relative" ref={wrapRef}>
@@ -1151,8 +1252,29 @@ function AnalysisBell({
       {open && (
         <div className="absolute right-0 top-full z-[60] mt-2 w-[min(calc(100vw-2rem),22rem)] overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/50">
           <div className="border-b border-zinc-800 bg-zinc-900/90 px-3 py-2.5">
-            <p className="text-sm font-semibold text-zinc-100">분석</p>
-            <p className="text-[11px] text-zinc-500">진행 중인 작업과 최근 결과</p>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-zinc-100">분석</p>
+                <p className="text-[11px] text-zinc-500">
+                  진행 중인 작업과 최근 결과
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={markAllBusy}
+                onClick={async () => {
+                  setMarkAllBusy(true);
+                  try {
+                    await onMarkAllRead();
+                  } finally {
+                    setMarkAllBusy(false);
+                  }
+                }}
+                className="rounded-lg border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+              >
+                {markAllBusy ? "처리 중…" : "모두 읽음"}
+              </button>
+            </div>
           </div>
           <div className="max-h-[min(70vh,28rem)] overflow-y-auto">
             <div className="px-3 py-2">
@@ -1247,9 +1369,16 @@ function AnalysisBell({
                     const kst = formatKstYYMMDD(j.created_at);
                     return (
                       <li key={j.id}>
-                        <div
-                          className={`flex flex-col gap-1 rounded-xl border border-zinc-800/80 px-3 py-2 transition-opacity ${
-                            read ? "opacity-45" : "opacity-100"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpen(false);
+                            onNavigate(href, j.id, null);
+                          }}
+                          className={`w-full text-left flex flex-col gap-1 rounded-xl border border-zinc-800/80 px-3 py-2 transition-colors hover:border-zinc-700 hover:bg-zinc-900/60 ${
+                            read
+                              ? "bg-zinc-950/40 opacity-55"
+                              : "bg-zinc-900/40 opacity-100"
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2">
@@ -1279,21 +1408,30 @@ function AnalysisBell({
                             ) : null}
                           </div>
                           <p className="text-xs text-zinc-300">{jobCardTitle(j)}</p>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpen(false);
-                              onNavigate(href, j.id, null);
-                            }}
-                            className="text-left text-xs font-medium text-cyan-400 hover:text-cyan-300"
-                          >
+                          {read ? (
+                            <p className="text-[10px] font-medium text-zinc-500">
+                              ✓ 읽음
+                            </p>
+                          ) : null}
+                          <p className="text-left text-xs font-medium text-cyan-400">
                             결과 보기 →
-                          </button>
-                        </div>
+                          </p>
+                        </button>
                       </li>
                     );
                   })}
                 </ul>
+                <div ref={sentinelRef} className="h-1" />
+                {outcomesLoadingMore && (
+                  <p className="px-1 py-2 text-center text-xs text-zinc-600">
+                    더 불러오는 중…
+                  </p>
+                )}
+                {!outcomesHasMore && outcomeJobs.length > 0 && (
+                  <p className="px-1 py-2 text-center text-[10px] text-zinc-700">
+                    더 이상 알림이 없습니다
+                  </p>
+                )}
               </div>
             )}
 

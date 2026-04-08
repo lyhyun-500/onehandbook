@@ -4,9 +4,8 @@ import { listAgentVersionsWithAvailability } from "@/lib/ai";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AppShellHeader } from "@/components/AppShellHeader";
-import type { AnalysisRunRow, HolisticRunRow } from "@/lib/analysisSummary";
-import { countManuscriptChars } from "@/lib/nat";
 import { WorkAnalysisHub } from "./WorkAnalysisHub";
+import type { AnalysisRunRow, HolisticRunRow } from "@/lib/analysisSummary";
 
 export default async function WorkAnalysisPage({
   params,
@@ -38,7 +37,7 @@ export default async function WorkAnalysisPage({
 
   const { data: episodesRaw } = await supabase
     .from("episodes")
-    .select("id, episode_number, title, content")
+    .select("id, episode_number, title")
     .eq("work_id", id)
     .order("episode_number", { ascending: true });
 
@@ -46,33 +45,12 @@ export default async function WorkAnalysisPage({
     id: e.id,
     episode_number: e.episode_number,
     title: e.title,
-    charCount: countManuscriptChars(e.content ?? ""),
+    // 초기 로딩 성능 개선: charCount/분석 runs/통합 결과는 클라이언트에서 비동기로 로드
+    charCount: 0,
   }));
 
-  const { data: analysisRuns } = await supabase
-    .from("analysis_runs")
-    .select("id, episode_id, agent_version, result_json, created_at")
-    .eq("work_id", id)
-    .order("created_at", { ascending: false });
-
-  const runs = (analysisRuns ?? []) as AnalysisRunRow[];
-
-  const { data: holisticRows, error: holisticErr } = await supabase
-    .from("holistic_analysis_runs")
-    .select(
-      "id, work_id, episode_ids, agent_version, result_json, nat_cost, created_at"
-    )
-    .eq("work_id", id)
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  if (holisticErr) {
-    console.warn("holistic_analysis_runs 조회 실패(마이그레이션 미적용 가능):", holisticErr.message);
-  }
-
-  const latestHolistic = !holisticErr
-    ? ((holisticRows?.[0] ?? null) as HolisticRunRow | null)
-    : null;
+  const runs: AnalysisRunRow[] = [];
+  const latestHolistic: HolisticRunRow | null = null;
   const versions = listAgentVersionsWithAvailability().map((v) => ({
     id: v.id,
     label: v.label,

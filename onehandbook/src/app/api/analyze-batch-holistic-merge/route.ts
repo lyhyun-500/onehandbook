@@ -131,7 +131,7 @@ export async function POST(request: Request) {
 
   const { data: work, error: wErr } = await supabase
     .from("works")
-    .select("id, genre, title, author_id, world_setting, character_settings")
+    .select("id, genre, title, tags, author_id, world_setting, character_settings")
     .eq("id", workId)
     .single();
 
@@ -439,7 +439,8 @@ export async function POST(request: Request) {
       mergePayloads,
       episodeWeights,
       effectiveVersion,
-      work.title ?? ""
+      work.title ?? "",
+      Array.isArray(work.tags) ? work.tags : undefined
     );
 
     logHolisticPipeline(
