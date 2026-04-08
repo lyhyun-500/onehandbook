@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import {
-  executeTrendsSearch,
-  TRENDS_SEARCH_MAX_N,
-} from "@/lib/chroma/trendsSearchCore";
+import type { TrendsSearchExecutionResult } from "@/lib/chroma/trendsTypes";
 
 export const runtime = "nodejs";
 
@@ -34,6 +31,15 @@ async function authorize(request: Request): Promise<boolean> {
  * — 로컬 Chroma 서버(`npm run chroma:run`) 및 인제스트(`npm run trends:ingest`) 선행
  */
 export async function POST(request: Request) {
+  // 프로덕션에서는 로컬 Chroma(+default-embed/transformers)가 서버리스 번들 한도를 초과할 수 있어 비활성화합니다.
+  // (필요하면 별도 서비스로 분리하거나, 원격 임베딩/DB로 대체하세요.)
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { error: "현재 배포 환경에서는 트렌드 RAG 검색을 사용할 수 없습니다." },
+      { status: 404 }
+    );
+  }
+
   if (!(await authorize(request))) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
@@ -50,6 +56,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "query 필수" }, { status: 400 });
   }
 
+  const { executeTrendsSearch, TRENDS_SEARCH_MAX_N } = await import(
+    "@/lib/chroma/trendsSearchCore"
+  );
+
   const n = Math.min(
     TRENDS_SEARCH_MAX_N,
     Math.max(1, typeof body.n === "number" && Number.isFinite(body.n) ? body.n : 8)
@@ -61,13 +71,14 @@ export async function POST(request: Request) {
     const exec = await executeTrendsSearch(query, n, {
       genre: genreRaw || undefined,
     });
+    const typed = exec as TrendsSearchExecutionResult;
     return NextResponse.json({
       query,
       n,
       genre: genreRaw || null,
-      hits: exec.hits,
-      usedGenreFilter: exec.usedGenreFilter,
-      unfilteredFallback: exec.unfilteredFallback,
+      hits: typed.hits,
+      usedGenreFilter: typed.usedGenreFilter,
+      unfilteredFallback: typed.unfilteredFallback,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

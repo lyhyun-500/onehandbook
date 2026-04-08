@@ -26,12 +26,31 @@ import type {
   AnalysisInput,
   AnalysisResult,
   HolisticAnalysisResult,
+  TrendReferenceItem,
 } from "./types";
 import { isProviderConfigured } from "./availability";
-import { fetchTrendsContextForAnalysis } from "@/lib/chroma/trendsSearchCore";
 
 const JSON_PARSE_RETRY_USER_MESSAGE =
   "너의 이전 답변은 JSON 형식이 유효하지 않아. 다른 잡담은 하지 말고 오직 순수한 JSON 구조로만 다시 답변해줘.";
+
+type TrendsContextPack = {
+  block: string | null;
+  references: TrendReferenceItem[];
+};
+
+async function fetchTrendsContextForAnalysisMaybe(
+  genre: string,
+  workTitle: string
+): Promise<TrendsContextPack> {
+  // Vercel serverless 번들 크기(250MB) 초과를 피하기 위해
+  // 프로덕션 빌드에서는 로컬 Chroma(@chroma-core/default-embed 포함)를 아예 포함하지 않습니다.
+  if (process.env.NODE_ENV === "production") {
+    return { block: null, references: [] };
+  }
+
+  const mod = await import("@/lib/chroma/trendsSearchCore");
+  return mod.fetchTrendsContextForAnalysis(genre, workTitle);
+}
 
 function formatJsonParseFailures(first: unknown, second: unknown): string {
   const a = first instanceof Error ? first.message : String(first);
@@ -103,7 +122,7 @@ export async function runAnalysis(
   }
 
   const { block: trendsBlock, references: trendRefs } =
-    await fetchTrendsContextForAnalysis(input.genre, input.work_title ?? "");
+    await fetchTrendsContextForAnalysisMaybe(input.genre, input.work_title ?? "");
   const system = buildSystemPrompt(input.genre, profile, trendsBlock);
   const user = buildUserPrompt(input);
 
@@ -136,7 +155,7 @@ export async function runHolisticAnalysis(
   }
 
   const { block: trendsBlock, references: trendRefs } =
-    await fetchTrendsContextForAnalysis(input.genre, input.work_title ?? "");
+    await fetchTrendsContextForAnalysisMaybe(input.genre, input.work_title ?? "");
   const system = buildHolisticSystemPrompt(input.genre, profile, trendsBlock);
   const user = buildHolisticUserPrompt(input.genre, input, segments);
 
@@ -176,7 +195,7 @@ export async function runHolisticMergeAnalysis(
   }
 
   const { block: trendsBlock, references: trendRefs } =
-    await fetchTrendsContextForAnalysis(genre, workTitle ?? "");
+    await fetchTrendsContextForAnalysisMaybe(genre, workTitle ?? "");
   const system = buildHolisticMergeSystemPrompt(genre, profile, trendsBlock);
   const user = buildHolisticMergeUserPrompt(genre, chunks, episodeWeights);
 
