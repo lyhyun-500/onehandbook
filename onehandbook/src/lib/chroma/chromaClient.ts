@@ -4,11 +4,16 @@ import type { EmbeddingFunction } from "chromadb";
 import { TRENDS_COLLECTION_NAME } from "./constants";
 
 export function getChromaHost(): string {
-  return process.env.CHROMA_HOST ?? "localhost";
+  // Prefer explicit "server" variables (AWS 등 외부 Chroma)
+  return (
+    process.env.CHROMA_SERVER_HOST ??
+    process.env.CHROMA_HOST ??
+    "localhost"
+  );
 }
 
 export function getChromaPort(): number {
-  const p = process.env.CHROMA_PORT;
+  const p = process.env.CHROMA_SERVER_PORT ?? process.env.CHROMA_PORT;
   return p ? Number.parseInt(p, 10) || 8000 : 8000;
 }
 
