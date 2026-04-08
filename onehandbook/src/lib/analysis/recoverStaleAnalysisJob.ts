@@ -1,7 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** processing 상태가 이 시간을 넘기면 실패 처리 (updated_at 기준) */
+/** 이 화 분석: processing 상태가 이 시간을 넘기면 실패 처리 (updated_at 기준) */
 export const ANALYSIS_JOB_PROCESSING_STALE_MS = 10 * 60 * 1000;
+
+/**
+ * 통합 분석: LLM 구간에서 `updated_at`이 안 바뀌는 시간이 길어 10분 만료에 걸리면
+ * 워커는 돌고 있는데 폴링이 잡을 failed로 바꿔 완료 갱신이 막히는 문제가 생김.
+ */
+export const ANALYSIS_JOB_HOLISTIC_PROCESSING_STALE_MS = 55 * 60 * 1000;
 
 const STALE_ERROR_MESSAGE =
   "분석 처리 시간이 초과되었습니다. 다시 시도해 주세요.";
@@ -14,9 +20,21 @@ export async function expireStaleProcessingJobIfNeeded(
   supabase: SupabaseClient,
   jobId: string
 ): Promise<void> {
-  const cutoff = new Date(
-    Date.now() - ANALYSIS_JOB_PROCESSING_STALE_MS
-  ).toISOString();
+  const { data: row } = await supabase
+    .from("analysis_jobs")
+    .select("job_kind")
+    .eq("id", jobId)
+    .eq("status", "processing")
+    .maybeSingle();
+
+  if (!row) return;
+
+  const staleMs =
+    row.job_kind === "holistic_batch"
+      ? ANALYSIS_JOB_HOLISTIC_PROCESSING_STALE_MS
+      : ANALYSIS_JOB_PROCESSING_STALE_MS;
+
+  const cutoff = new Date(Date.now() - staleMs).toISOString();
 
   await supabase
     .from("analysis_jobs")

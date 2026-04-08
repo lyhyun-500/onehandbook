@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
+import { createSupabaseWithAccessToken } from "@/lib/supabase/authedClient";
 import { executeAnalysisJob } from "@/lib/analysis/executeAnalysisJob";
+import { executeHolisticAnalysisJob } from "@/lib/analysis/executeHolisticAnalysisJob";
+import {
+  isHolisticAnalysisJobPeek,
+  orderedEpisodeIdsFromJobPayload,
+} from "@/lib/analysis/holisticJobPayload";
 
-/** LLM·저장 구간 전용 — Vercel에서 별도 호출당 최대 60초 */
-export const maxDuration = 60;
+/**
+ * Vercel/Next route segment: `maxDuration` 은 정적 숫자 리터럴만 허용됩니다.
+ * 스테일 잡 복구 등은 `executeHolisticAnalysisJob` 의 `ANALYZE_PROCESS_MAX_DURATION_SEC` 로 조정합니다.
+ */
+export const maxDuration = 800;
 
 export async function POST(request: Request) {
   const secret = process.env.ANALYZE_PROCESS_SECRET;
@@ -38,7 +47,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "jobId가 필요합니다." }, { status: 400 });
   }
 
-  const result = await executeAnalysisJob(jobId, accessToken);
+  const supabasePeek = createSupabaseWithAccessToken(accessToken);
+  const { data: peekRow, error: peekErr } = await supabasePeek
+    .from("analysis_jobs")
+    .select("job_kind, payload")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (peekErr || !peekRow) {
+    return NextResponse.json(
+      { ok: false, error: "작업을 찾을 수 없습니다." },
+      { status: 200 }
+    );
+  }
+
+  const runHolistic = isHolisticAnalysisJobPeek(
+    peekRow.job_kind,
+    peekRow.payload
+  );
+  const idCount = orderedEpisodeIdsFromJobPayload(peekRow.payload)?.length ?? 0;
+  console.info("[analyze/process] dispatch", {
+    jobId,
+    job_kind: peekRow.job_kind,
+    runHolistic,
+    orderedEpisodeIdCount: idCount,
+    payloadType: peekRow.payload == null ? "null" : typeof peekRow.payload,
+  });
+
+  const result = runHolistic
+    ? await executeHolisticAnalysisJob(jobId, accessToken)
+    : await executeAnalysisJob(jobId, accessToken);
 
   if (result.ok && result.skipped) {
     return NextResponse.json({ ok: true, skipped: true });

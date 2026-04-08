@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { AnalysisResult } from "@/lib/ai/types";
+import { TrendReferencesSection } from "@/components/TrendReferencesSection";
 import { formatKoreanDateTime } from "@/lib/formatKoreanDateTime";
 import { getProfileLabel } from "@/lib/ai/profileLookup";
 import {
@@ -19,8 +20,12 @@ import {
 import { NatSpendConfirmModal } from "@/components/NatSpendConfirmModal";
 import { ManuscriptLowVolumeModal } from "@/components/ManuscriptLowVolumeModal";
 import { ContentUnchangedModal } from "@/components/ContentUnchangedModal";
+import { EpisodeInActiveAnalysisModal } from "@/components/EpisodeInActiveAnalysisModal";
 import { CopyWithBreaks } from "@/components/CopyWithBreaks";
 import { useAnalysisJobs } from "@/contexts/AnalysisJobsContext";
+import type { AnalyzeJobPollBody } from "@/lib/analysis/buildAnalyzeJobPollResponse";
+import { ANALYSIS_JOB_FAILURE_CONTENT_UNCHANGED } from "@/lib/analysis/analysisJobFailureCodes";
+import { isContentUnchangedFailure } from "@/lib/analysis/analysisJobFailureHeuristics";
 import { formatDimensionLabel } from "@/lib/analysis/dimensionLabel";
 import type { PreviousAnalysisResultPayload } from "@/lib/analysisResultCache";
 
@@ -42,6 +47,7 @@ export function AnalyzePanel({
   workId,
   episodeId,
   episodeLabel,
+  workTitle,
   versions,
   initialAnalyses,
   natBalance,
@@ -51,6 +57,7 @@ export function AnalyzePanel({
   workId: number;
   episodeId: number;
   episodeLabel?: string;
+  workTitle?: string;
   versions: VersionOption[];
   initialAnalyses: AnalysisRow[];
   natBalance: number;
@@ -62,6 +69,8 @@ export function AnalyzePanel({
     registerJobStarted,
     notifyAnalysisStarted,
     getLatestJobForEpisode,
+    getActiveJobCoveringEpisode,
+    showUnchangedJobNotice,
   } = useAnalysisJobs();
   const [includeLore, setIncludeLore] = useState(true);
   const [includePlatformOptimization, setIncludePlatformOptimization] =
@@ -81,6 +90,8 @@ export function AnalyzePanel({
     retryable: boolean;
     code?: string;
   } | null>(null);
+  const [pollJobId, setPollJobId] = useState<string | null>(null);
+  const [episodeBusyModalOpen, setEpisodeBusyModalOpen] = useState(false);
   const [cacheNotice, setCacheNotice] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState(initialAnalyses);
   const [rerunCompare, setRerunCompare] = useState<{
@@ -153,9 +164,35 @@ export function AnalyzePanel({
 
     const applyFailed = async () => {
       const pr = await fetch(`/api/analyze/jobs/${jid}`);
-      const pj = await pr.json().catch(() => ({}));
+      const pj = (await pr.json().catch(() => ({}))) as AnalyzeJobPollBody;
       if (!pr.ok) return;
       if (pj.status === "failed") {
+        const unchanged =
+          pj.code === ANALYSIS_JOB_FAILURE_CONTENT_UNCHANGED ||
+          isContentUnchangedFailure({
+            failure_code: null,
+            error_message:
+              typeof pj.error === "string" ? pj.error : null,
+          });
+        if (unchanged) {
+          if (pj.job_kind === "holistic_batch") {
+            showUnchangedJobNotice({
+              jobIds: [jid],
+              workId: pj.work_id ?? latestJobForEp?.work_id ?? workId,
+              episodeIds: [
+                pj.episode_id ?? latestJobForEp?.episode_id ?? episodeId,
+              ],
+              jobKind: "holistic_batch",
+              details: typeof pj.error === "string" ? [pj.error] : [],
+            });
+          } else {
+            setUnchangedOpen(true);
+          }
+          setJobFailedBanner(null);
+          setError(null);
+          router.refresh();
+          return;
+        }
         setJobFailedBanner({
           message:
             typeof pj.error === "string" ? pj.error : "분석에 실패했습니다.",
@@ -173,6 +210,99 @@ export function AnalyzePanel({
       void applyFailed();
     }
   }, [latestJobForEp?.id, latestJobForEp?.status, episodeId, router]);
+
+  useEffect(() => {
+    if (!pollJobId) return;
+    let cancelled = false;
+
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch(`/api/analyze/jobs/${pollJobId}`, {
+          cache: "no-store",
+        });
+        if (res.status === 404) {
+          if (!cancelled) setPollJobId(null);
+          return;
+        }
+        if (!res.ok) return;
+        const body = (await res.json()) as AnalyzeJobPollBody;
+        if (body.status === "pending" || body.status === "processing") return;
+
+        if (!cancelled) setPollJobId(null);
+
+        if (
+          body.status === "completed" &&
+          body.job_kind === "holistic_batch"
+        ) {
+          setJobFailedBanner(null);
+          setError(null);
+          router.refresh();
+          return;
+        }
+
+        if (body.status === "completed" && body.analysis) {
+          const row = body.analysis as AnalysisRow;
+          setAnalyses((prev) => {
+            const id = row.id;
+            return [row, ...prev.filter((a) => a.id !== id)];
+          });
+          setPendingScrollToResult(true);
+          setCacheNotice(null);
+          const prev = body.previousResult ?? null;
+          if (
+            prev &&
+            typeof (body.analysis.result_json as { overall_score?: number })
+              ?.overall_score === "number"
+          ) {
+            setRerunCompare({
+              previous: prev,
+              currentScore: (body.analysis.result_json as { overall_score: number })
+                .overall_score,
+            });
+          } else {
+            setRerunCompare(null);
+          }
+          setJobFailedBanner(null);
+          router.refresh();
+          return;
+        }
+
+        if (body.status === "failed") {
+          const unchanged =
+            body.code === ANALYSIS_JOB_FAILURE_CONTENT_UNCHANGED ||
+            isContentUnchangedFailure({
+              failure_code: null,
+              error_message:
+                typeof body.error === "string" ? body.error : null,
+            });
+          if (unchanged) {
+            setUnchangedOpen(true);
+            setJobFailedBanner(null);
+            setError(null);
+            router.refresh();
+            return;
+          }
+          setError(body.error ?? "분석에 실패했습니다.");
+          setJobFailedBanner({
+            message: body.error ?? "분석에 실패했습니다.",
+            retryable: body.retryable !== false,
+            code: body.code,
+          });
+          router.refresh();
+        }
+      } catch {
+        /* 다음 폴링에서 재시도 */
+      }
+    };
+
+    const id = setInterval(() => void tick(), 2000);
+    void tick();
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [pollJobId, router]);
 
   useEffect(() => {
     if (!analyzing && pendingScrollToResult && analyses[0]) {
@@ -211,6 +341,10 @@ export function AnalyzePanel({
   );
 
   const requestAnalyze = async (force?: boolean) => {
+    if (getActiveJobCoveringEpisode(episodeId, workId)) {
+      setEpisodeBusyModalOpen(true);
+      return;
+    }
     setAnalyzing(true);
     setError(null);
     setJobFailedBanner(null);
@@ -229,6 +363,11 @@ export function AnalyzePanel({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (data.code === "EPISODE_ANALYSIS_IN_PROGRESS") {
+          setAnalyzing(false);
+          setEpisodeBusyModalOpen(true);
+          return;
+        }
         if (data.code === "CONTENT_UNCHANGED") {
           setAnalyzing(false);
           setUnchangedOpen(true);
@@ -274,14 +413,26 @@ export function AnalyzePanel({
 
       if (data.job_id && typeof data.job_id === "string") {
         const jobId = data.job_id;
+        const now = new Date().toISOString();
         registerJobStarted({
           id: jobId,
           episode_id: episodeId,
           work_id: workId,
+          work_title: workTitle?.trim() || null,
           status: "pending",
-          updated_at: new Date().toISOString(),
+          updated_at: now,
+          created_at: now,
+          job_kind: "episode",
+          progress_phase: "received",
+          holistic_run_id: null,
+          ordered_episode_ids: [episodeId],
+          error_message: null,
+          estimated_seconds: 75,
+          failure_code: null,
+          progress_percent: null,
         });
         notifyAnalysisStarted();
+        setPollJobId(jobId);
         return;
       }
 
@@ -325,6 +476,10 @@ export function AnalyzePanel({
 
   const onClickAnalyze = () => {
     if (analyzeDisabled) return;
+    if (getActiveJobCoveringEpisode(episodeId, workId)) {
+      setEpisodeBusyModalOpen(true);
+      return;
+    }
     if (tier === "low") {
       setLowVolumeOpen(true);
       return;
@@ -529,6 +684,11 @@ export function AnalyzePanel({
         onConfirm={onConfirmUnchangedAnalyze}
       />
 
+      <EpisodeInActiveAnalysisModal
+        open={episodeBusyModalOpen}
+        onClose={() => setEpisodeBusyModalOpen(false)}
+      />
+
       {latest && (
         <div
           id="analysis-result-anchor"
@@ -645,6 +805,10 @@ export function AnalyzePanel({
               </CopyWithBreaks>
             </p>
           )}
+
+          <TrendReferencesSection
+            references={latest.result_json.trends_references}
+          />
         </div>
       )}
 

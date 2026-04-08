@@ -125,7 +125,12 @@ export default async function WorkDetailPage({
                       {ep.episode_number}화
                     </span>
                     <span className="text-zinc-100">{ep.title}</span>
-                    <EpisodeRowAnalysisBadge episodeId={ep.id} />
+                    <EpisodeRowAnalysisBadge
+                      episodeId={ep.id}
+                      serverLatestRunCreatedAt={
+                        latestByEpisode.get(ep.id)?.created_at ?? null
+                      }
+                    />
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-xs text-zinc-500">

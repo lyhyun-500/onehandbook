@@ -34,8 +34,10 @@ export function buildHolisticDisplay(
   for (const ep of orderedEpisodes) {
     const sc = scoreByEp.get(ep.episode_number);
     if (sc == null) continue;
-    num += sc * ep.charCount;
-    den += ep.charCount;
+    /** UI에서 charCount가 0으로만 넘어와도 LLM 점수는 있을 수 있어 최소 가중 1 */
+    const weight = ep.charCount > 0 ? ep.charCount : 1;
+    num += sc * weight;
+    den += weight;
     chartPoints.push({
       episode_number: ep.episode_number,
       label: `${ep.episode_number}화`,

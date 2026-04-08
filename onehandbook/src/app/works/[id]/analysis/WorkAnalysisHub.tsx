@@ -1,29 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import {
+  useMemo,
+  useState,
+  useEffect,
+  useCallback,
+  Suspense,
+  type ComponentProps,
+} from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnalyzePanel, type VersionOption } from "@/components/AnalyzePanel";
 import { CopyWithBreaks } from "@/components/CopyWithBreaks";
 import { NatSpendConfirmModal } from "@/components/NatSpendConfirmModal";
 import { ManuscriptLowVolumeModal } from "@/components/ManuscriptLowVolumeModal";
 import { BatchHolisticReport } from "@/components/BatchHolisticReport";
+import { BatchContentUnchangedModal } from "@/components/BatchContentUnchangedModal";
 import type { AnalysisRunRow, HolisticRunRow } from "@/lib/analysisSummary";
 import {
   latestAnalysisPerEpisode,
   scoreStatsForSelection,
 } from "@/lib/analysisSummary";
 import { getProfileLabel } from "@/lib/ai/profileLookup";
-import type { HolisticAnalysisResult } from "@/lib/ai/types";
 import {
   NAT_GENERIC_AGENT_ID,
   buildHolisticNatBreakdown,
   estimateHolisticBatchTotalNat,
   resolveAnalysisAgentVersion,
 } from "@/lib/nat";
-import { useAnalysisNavigationGuard } from "@/hooks/useAnalysisNavigationGuard";
 import { useAnalysisJobsOptional } from "@/contexts/AnalysisJobsContext";
-import { AnalysisStatusBadge } from "@/components/AnalysisStatusBadge";
+import { EpisodeInActiveAnalysisModal } from "@/components/EpisodeInActiveAnalysisModal";
+import { EpisodeRowAnalysisBadge } from "@/components/EpisodeRowAnalysisBadge";
 import {
   MANUSCRIPT_LOW_VOLUME_WARNING,
   MANUSCRIPT_TOO_SHORT_MESSAGE,
@@ -37,7 +44,7 @@ type EpisodeRow = {
   charCount: number;
 };
 
-export function WorkAnalysisHub({
+function WorkAnalysisHubInner({
   workId,
   workTitle,
   episodes,
@@ -46,6 +53,7 @@ export function WorkAnalysisHub({
   versions,
   natBalance,
   initialFocusEpisodeId,
+  initialTab,
   phoneVerified,
 }: {
   workId: string;
@@ -56,9 +64,12 @@ export function WorkAnalysisHub({
   versions: VersionOption[];
   natBalance: number;
   initialFocusEpisodeId?: number;
+  initialTab: "single" | "batch";
   phoneVerified: boolean;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const analysisJobsCtx = useAnalysisJobsOptional();
   const workIdNum = parseInt(workId, 10);
   const latest = useMemo(() => latestAnalysisPerEpisode(runs), [runs]);
@@ -74,21 +85,46 @@ export function WorkAnalysisHub({
   const [batchIncludePlatform, setBatchIncludePlatform] = useState(true);
   const [batchConfirmOpen, setBatchConfirmOpen] = useState(false);
   const [batchLowVolumeOpen, setBatchLowVolumeOpen] = useState(false);
-  const [batchRunning, setBatchRunning] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
+  const [batchUnchangedOpen, setBatchUnchangedOpen] = useState(false);
+  const [batchUnchangedEpisodeNumbers, setBatchUnchangedEpisodeNumbers] =
+    useState<number[]>([]);
+  const [batchEpisodeBusyOpen, setBatchEpisodeBusyOpen] = useState(false);
+  const [batchBusyEpisodeNumbers, setBatchBusyEpisodeNumbers] = useState<
+    number[]
+  >([]);
+  /** 10화 초과 통합: 클라이언트 청크·병합 진행률(페이지 내 표시) */
+  const [holisticClientProgress, setHolisticClientProgress] = useState<{
+    percent: number;
+    phase: "chunks" | "merge";
+    label: string;
+  } | null>(null);
   const [holisticClient, setHolisticClient] = useState<HolisticRunRow | null>(
     null
   );
 
-  const [batchProgress, setBatchProgress] = useState<{
-    completedEpisodes: number;
-    totalEpisodes: number;
-    phase: "chunks" | "merge";
-    percent: number;
-    etaSeconds: number | null;
-  } | null>(null);
+  const [activeTab, setActiveTab] = useState<"single" | "batch">(initialTab);
 
-  const [activeTab, setActiveTab] = useState<"single" | "batch">("single");
+  useEffect(() => {
+    const next: "single" | "batch" =
+      searchParams.get("tab") === "batch" ? "batch" : "single";
+    setActiveTab(next);
+  }, [searchParams]);
+
+  const goToTab = useCallback(
+    (next: "single" | "batch") => {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      if (next === "batch") {
+        nextParams.set("tab", "batch");
+        nextParams.delete("focus");
+      } else {
+        nextParams.delete("tab");
+      }
+      const qs = nextParams.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
   useEffect(() => {
     if (
@@ -105,8 +141,6 @@ export function WorkAnalysisHub({
       setBatchAgent(NAT_GENERIC_AGENT_ID);
     }
   }, [batchIncludePlatform]);
-
-  useAnalysisNavigationGuard(batchRunning);
 
   useEffect(() => {
     setBatchAgent((prev) =>
@@ -291,7 +325,9 @@ export function WorkAnalysisHub({
     setSelectedIds(next);
   };
 
-  const runBatchAnalyzeSelected = async () => {
+  const runBatchAnalyzeSelected = async (opts?: {
+    skipUnchangedPrecheck?: boolean;
+  }) => {
     if (orderedSelectedIds.length === 0) return;
     if (!batchEffectiveAvailable) {
       setBatchError("이 조건으로 분석을 시작할 수 없습니다. API 키와 옵션을 확인해 주세요.");
@@ -303,200 +339,324 @@ export function WorkAnalysisHub({
       return;
     }
 
-    const totalEp = orderedSelectedIds.length;
-    const chunkSize = 10;
-    const startedAt = Date.now();
-
-    setBatchRunning(true);
     setBatchConfirmOpen(false);
     setBatchError(null);
-    if (totalEp > chunkSize) {
-      setBatchProgress({
-        completedEpisodes: 0,
-        totalEpisodes: totalEp,
-        phase: "chunks",
-        percent: 0,
-        etaSeconds: null,
-      });
-    } else {
-      setBatchProgress(null);
-    }
 
-    const updateEta = (completed: number, phase: "chunks" | "merge") => {
-      const elapsed = (Date.now() - startedAt) / 1000;
-      let eta: number | null = null;
-      if (phase === "chunks" && completed > 0 && completed < totalEp) {
-        const rate = completed / elapsed;
-        if (rate > 0) {
-          eta = Math.round((totalEp - completed) / rate + 50);
-        }
-      } else if (phase === "merge") {
-        eta = 50;
-      }
-      const pct =
-        phase === "merge"
-          ? 95
-          : Math.min(99, Math.round((completed / totalEp) * 90));
-      setBatchProgress({
-        completedEpisodes: completed,
-        totalEpisodes: totalEp,
-        phase,
-        percent: pct,
-        etaSeconds: eta,
-      });
-    };
-
-    try {
-      if (totalEp <= chunkSize) {
-        const res = await fetch("/api/analyze-batch-holistic", {
+    // A안: 통합 분석 시작 전 "원고 변경 없음"을 한 번에 안내 후, 이번 실행에서는 추가 확인 없이 진행
+    // (모달에서 재호출 시 opts.skipUnchangedPrecheck — setState 플래그는 같은 틱에 반영되지 않아 반복 모달이 남)
+    if (!opts?.skipUnchangedPrecheck) {
+      try {
+        const pr = await fetch("/api/analyze-batch-holistic-precheck", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            workId: workIdNum,
             episodeIds: orderedSelectedIds,
-            agentVersion: batchAgent,
             includeLore: batchIncludeLore,
             includePlatformOptimization: batchIncludePlatform,
           }),
         });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          if (data.code === "PHONE_NOT_VERIFIED") {
-            setBatchError(
-              typeof data.error === "string"
-                ? data.error
-                : "휴대폰 인증 후 이용 가능합니다."
-            );
+        const pd = await pr.json().catch(() => ({}));
+        if (pr.ok) {
+          const raw = pd.unchanged_episode_ids as unknown;
+          const ids = Array.isArray(raw)
+            ? raw
+                .map((x) => (typeof x === "number" ? x : parseInt(String(x), 10)))
+                .filter((n) => !Number.isNaN(n))
+            : [];
+          if (ids.length > 0) {
+            const nums = ids
+              .map((id) => episodes.find((e) => e.id === id)?.episode_number)
+              .filter((n): n is number => typeof n === "number");
+            setBatchUnchangedEpisodeNumbers(nums);
+            setBatchUnchangedOpen(true);
             return;
           }
-          if (data.code === "MANUSCRIPT_TOO_SHORT") {
-            setBatchError(
-              typeof data.error === "string"
-                ? data.error
-                : MANUSCRIPT_TOO_SHORT_MESSAGE
-            );
-            return;
-          }
-          if (data.code === "INSUFFICIENT_NAT") {
-            setBatchError(
-              `NAT가 부족합니다. (필요 ${data.required ?? "?"}, 보유 ${data.balance ?? "?"})`
-            );
-            return;
-          }
+        }
+      } catch {
+        // precheck 실패해도 분석 플로우는 계속 진행
+      }
+    }
+
+    if (analysisJobsCtx) {
+      const blocked = orderedSelectedIds.filter((id) =>
+        analysisJobsCtx.getActiveJobCoveringEpisode(id, workIdNum)
+      );
+      if (blocked.length > 0) {
+        const nums = blocked
+          .map(
+            (id) => episodes.find((e) => e.id === id)?.episode_number
+          )
+          .filter((n): n is number => typeof n === "number");
+        setBatchBusyEpisodeNumbers(nums.length > 0 ? nums : []);
+        setBatchEpisodeBusyOpen(true);
+        return;
+      }
+    }
+
+    try {
+      const res = await fetch("/api/analyze-batch-holistic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workId: workIdNum,
+          episodeIds: orderedSelectedIds,
+          agentVersion: batchAgent,
+          includeLore: batchIncludeLore,
+          includePlatformOptimization: batchIncludePlatform,
+          ...(opts?.skipUnchangedPrecheck ? { force: true } : {}),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (data.code === "PHONE_NOT_VERIFIED") {
           setBatchError(
             typeof data.error === "string"
               ? data.error
-              : "통합 분석 요청에 실패했습니다."
+              : "휴대폰 인증 후 이용 가능합니다."
           );
           return;
         }
-        if (data.holistic) {
-          setHolisticClient(data.holistic as HolisticRunRow);
+        if (data.code === "MANUSCRIPT_TOO_SHORT") {
+          setBatchError(
+            typeof data.error === "string"
+              ? data.error
+              : MANUSCRIPT_TOO_SHORT_MESSAGE
+          );
+          return;
         }
-        router.refresh();
+        if (data.code === "INSUFFICIENT_NAT") {
+          setBatchError(
+            `NAT가 부족합니다. (필요 ${data.required ?? "?"}, 보유 ${data.balance ?? "?"})`
+          );
+          return;
+        }
+        if (data.code === "MIGRATION_REQUIRED") {
+          setBatchError(
+            typeof data.error === "string"
+              ? data.error
+              : "데이터베이스 마이그레이션이 필요합니다."
+          );
+          return;
+        }
+        if (data.code === "EPISODE_ANALYSIS_IN_PROGRESS") {
+          const raw = data.conflicting_episode_ids as unknown;
+          const ids = Array.isArray(raw)
+            ? raw.filter((x): x is number => typeof x === "number")
+            : [];
+          const nums = ids
+            .map(
+              (id) => episodes.find((e) => e.id === id)?.episode_number
+            )
+            .filter((n): n is number => typeof n === "number");
+          setBatchBusyEpisodeNumbers(nums.length > 0 ? nums : []);
+          setBatchEpisodeBusyOpen(true);
+          return;
+        }
+        setBatchError(
+          typeof data.error === "string"
+            ? data.error
+            : "통합 분석 요청에 실패했습니다."
+        );
         return;
       }
 
-      const chunkResults: Array<{
-        episodeIds: number[];
-        result: HolisticAnalysisResult;
-      }> = [];
+      const jobId = data.job_id;
+      if (typeof jobId !== "string") {
+        setBatchError("작업 ID를 받지 못했습니다.");
+        return;
+      }
 
-      for (let i = 0; i < totalEp; i += chunkSize) {
-        const chunkIds = orderedSelectedIds.slice(i, i + chunkSize);
-        let lastErr = "배치 분석에 실패했습니다.";
-        let ok = false;
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const res = await fetch("/api/analyze-batch-holistic-chunk", {
+      const clientChunked = data.client_chunked === true;
+      const sessionId =
+        typeof data.session_id === "string" ? data.session_id : "";
+      const chunkPlan: number[][] | null =
+        clientChunked && Array.isArray(data.chunk_plan)
+          ? (data.chunk_plan as unknown[]).map((row) =>
+              Array.isArray(row)
+                ? row
+                    .map((x) =>
+                      typeof x === "number" ? x : parseInt(String(x), 10)
+                    )
+                    .filter((n) => !Number.isNaN(n))
+                : []
+            )
+          : null;
+
+      if (clientChunked) {
+        if (
+          !sessionId ||
+          !chunkPlan ||
+          chunkPlan.length < 2 ||
+          chunkPlan.some((c) => c.length === 0)
+        ) {
+          setBatchError("통합 분석 청크 정보가 올바르지 않습니다.");
+          return;
+        }
+
+        if (analysisJobsCtx) {
+          const now = new Date().toISOString();
+          analysisJobsCtx.registerJobStarted({
+            id: jobId,
+            episode_id: orderedSelectedIds[0]!,
+            work_id: workIdNum,
+            work_title: workTitle.trim() || null,
+            status: "processing",
+            updated_at: now,
+            created_at: now,
+            job_kind: "holistic_batch",
+            progress_phase: "ai_analyzing",
+            holistic_run_id: null,
+            ordered_episode_ids: [...orderedSelectedIds],
+            error_message: null,
+            estimated_seconds:
+              typeof data.estimated_seconds === "number"
+                ? data.estimated_seconds
+                : null,
+            failure_code: null,
+            progress_percent: 0,
+          });
+          analysisJobsCtx.notifyAnalysisStarted();
+        }
+
+        const total = chunkPlan.length;
+        try {
+          for (let i = 0; i < total; i++) {
+            setHolisticClientProgress({
+              percent: Math.round((i / total) * 85),
+              phase: "chunks",
+              label: `구간 ${i + 1}/${total} AI 분석 중`,
+            });
+            const cr = await fetch("/api/analyze-batch-holistic-chunk", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                jobId,
+                sessionId,
+                chunkIndex: i,
+                episodeIds: chunkPlan[i],
+              }),
+            });
+            const cd = await cr.json().catch(() => ({}));
+            if (!cr.ok) {
+              setHolisticClientProgress(null);
+              if (cd.code === "MIGRATION_REQUIRED") {
+                setBatchError(
+                  typeof cd.error === "string"
+                    ? cd.error
+                    : "DB 마이그레이션이 필요합니다."
+                );
+              } else if (cd.code === "INSUFFICIENT_NAT") {
+                setBatchError(
+                  typeof cd.error === "string" ? cd.error : "NAT가 부족합니다."
+                );
+              } else {
+                setBatchError(
+                  typeof cd.error === "string"
+                    ? cd.error
+                    : "통합 분석 구간 처리에 실패했습니다."
+                );
+              }
+              router.refresh();
+              return;
+            }
+            if (typeof cd.progress_percent === "number") {
+              setHolisticClientProgress({
+                percent: Math.min(88, cd.progress_percent),
+                phase: "chunks",
+                label: `구간 저장 ${cd.chunks_completed ?? i + 1}/${cd.chunk_total ?? total}`,
+              });
+            }
+          }
+
+          setHolisticClientProgress({
+            percent: 90,
+            phase: "merge",
+            label: "구간 병합·리포트 작성 중",
+          });
+          const mr = await fetch("/api/analyze-batch-holistic-merge", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              source: "db_session",
+              sessionId,
+              jobId,
               workId: workIdNum,
-              episodeIds: chunkIds,
+              orderedEpisodeIds: orderedSelectedIds,
               agentVersion: batchAgent,
               includeLore: batchIncludeLore,
               includePlatformOptimization: batchIncludePlatform,
             }),
           });
-          const data = await res.json().catch(() => ({}));
-          if (res.ok && data.chunk?.result) {
-            chunkResults.push({
-              episodeIds: data.chunk.episode_ids as number[],
-              result: data.chunk.result as HolisticAnalysisResult,
-            });
-            ok = true;
-            break;
-          }
-          lastErr =
-            typeof data.error === "string"
-              ? data.error
-              : "배치 분석에 실패했습니다.";
-          if (data.code === "INSUFFICIENT_NAT") {
-            setBatchError(
-              `NAT가 부족합니다. (필요 ${data.required ?? "?"}, 보유 ${data.balance ?? "?"})`
-            );
+          const md = await mr.json().catch(() => ({}));
+          if (!mr.ok) {
+            setHolisticClientProgress(null);
+            if (md.code === "INSUFFICIENT_NAT") {
+              setBatchError(
+                typeof md.error === "string"
+                  ? md.error
+                  : "병합에 필요한 NAT가 부족합니다."
+              );
+            } else {
+              setBatchError(
+                typeof md.error === "string"
+                  ? md.error
+                  : "통합 결과 병합에 실패했습니다."
+              );
+            }
+            router.refresh();
             return;
           }
-          if (data.code === "PHONE_NOT_VERIFIED") {
-            setBatchError(
-              typeof data.error === "string"
-                ? data.error
-                : "휴대폰 인증 후 이용 가능합니다."
-            );
-            return;
+
+          setHolisticClientProgress({
+            percent: 100,
+            phase: "merge",
+            label: "완료",
+          });
+          window.setTimeout(() => setHolisticClientProgress(null), 900);
+          const hol = md.holistic as HolisticRunRow | undefined;
+          if (hol && typeof hol.id === "number") {
+            setHolisticClient(hol);
           }
-          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-        }
-        if (!ok) {
-          setBatchError(lastErr);
-          return;
-        }
-        const completed = Math.min(i + chunkIds.length, totalEp);
-        updateEta(completed, "chunks");
-      }
-
-      updateEta(totalEp, "merge");
-
-      const mergeRes = await fetch("/api/analyze-batch-holistic-merge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workId: workIdNum,
-          orderedEpisodeIds: orderedSelectedIds,
-          chunks: chunkResults,
-          agentVersion: batchAgent,
-          includeLore: batchIncludeLore,
-          includePlatformOptimization: batchIncludePlatform,
-        }),
-      });
-      const mergeData = await mergeRes.json().catch(() => ({}));
-
-      if (!mergeRes.ok) {
-        if (mergeData.code === "INSUFFICIENT_NAT") {
+          router.refresh();
+        } catch (err) {
+          setHolisticClientProgress(null);
           setBatchError(
-            `NAT가 부족합니다. (병합 필요 ${mergeData.required ?? "?"}, 보유 ${mergeData.balance ?? "?"})`
+            err instanceof Error ? err.message : "통합 분석 중 오류가 났습니다."
           );
-          return;
+          router.refresh();
         }
-        setBatchError(
-          typeof mergeData.error === "string"
-            ? mergeData.error
-            : "통합 병합에 실패했습니다."
-        );
         return;
       }
 
-      if (mergeData.holistic) {
-        setHolisticClient(mergeData.holistic as HolisticRunRow);
+      if (analysisJobsCtx) {
+        const now = new Date().toISOString();
+        analysisJobsCtx.registerJobStarted({
+          id: jobId,
+          episode_id: orderedSelectedIds[0]!,
+          work_id: workIdNum,
+          work_title: workTitle.trim() || null,
+          status: "pending",
+          updated_at: now,
+          created_at: now,
+          job_kind: "holistic_batch",
+          progress_phase: "received",
+          holistic_run_id: null,
+          ordered_episode_ids: [...orderedSelectedIds],
+          error_message: null,
+          estimated_seconds:
+            typeof data.estimated_seconds === "number"
+              ? data.estimated_seconds
+              : null,
+          failure_code: null,
+          progress_percent: null,
+        });
+        analysisJobsCtx.notifyAnalysisStarted();
       }
       router.refresh();
     } catch (e) {
       setBatchError(
-        e instanceof Error ? e.message : "일괄 분석 중 오류가 났습니다."
+        e instanceof Error ? e.message : "일괄 분석 요청 중 오류가 났습니다."
       );
-    } finally {
-      setBatchRunning(false);
-      setBatchProgress(null);
     }
   };
 
@@ -515,7 +675,7 @@ export function WorkAnalysisHub({
           type="button"
           role="tab"
           aria-selected={activeTab === "single"}
-          onClick={() => setActiveTab("single")}
+          onClick={() => goToTab("single")}
           className={`min-h-[44px] flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
             activeTab === "single"
               ? "bg-zinc-800 text-cyan-100 shadow-sm"
@@ -528,7 +688,7 @@ export function WorkAnalysisHub({
           type="button"
           role="tab"
           aria-selected={activeTab === "batch"}
-          onClick={() => setActiveTab("batch")}
+          onClick={() => goToTab("batch")}
           className={`min-h-[44px] flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
             activeTab === "batch"
               ? "bg-zinc-800 text-cyan-100 shadow-sm"
@@ -569,8 +729,6 @@ export function WorkAnalysisHub({
                   <tbody className="text-zinc-300">
                     {episodes.map((ep) => {
                       const run = latest.get(ep.id);
-                      const job =
-                        analysisJobsCtx?.getLatestJobForEpisode(ep.id) ?? null;
                       return (
                         <tr
                           key={ep.id}
@@ -588,7 +746,12 @@ export function WorkAnalysisHub({
                             </Link>
                           </td>
                           <td className="py-2 pr-4 align-top">
-                            <AnalysisStatusBadge job={job} variant="episode" />
+                            <EpisodeRowAnalysisBadge
+                              episodeId={ep.id}
+                              serverLatestRunCreatedAt={
+                                run?.created_at ?? null
+                              }
+                            />
                           </td>
                           <td className="py-2 pr-4 align-top font-medium text-zinc-100">
                             {run ? run.result_json.overall_score : "—"}
@@ -638,6 +801,7 @@ export function WorkAnalysisHub({
                 key={panelEpisodeId}
                 workId={workIdNum}
                 episodeId={panelEpisodeId}
+                workTitle={workTitle}
                 episodeLabel={`${panelEpisode.episode_number}화 · ${panelEpisode.title} · ${workTitle}`}
                 versions={versions}
                 initialAnalyses={panelAnalyses}
@@ -786,7 +950,6 @@ export function WorkAnalysisHub({
                   type="checkbox"
                   checked={batchIncludeLore}
                   onChange={(e) => setBatchIncludeLore(e.target.checked)}
-                  disabled={batchRunning}
                   className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-cyan-600"
                 />
                 세계관·인물 반영 (+1 NAT, 통합 1회)
@@ -796,7 +959,6 @@ export function WorkAnalysisHub({
                   type="checkbox"
                   checked={batchIncludePlatform}
                   onChange={(e) => setBatchIncludePlatform(e.target.checked)}
-                  disabled={batchRunning}
                   className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-cyan-600"
                 />
                 플랫폼 맞춤 분석 (+1 NAT, 통합 1회)
@@ -810,7 +972,7 @@ export function WorkAnalysisHub({
                 <select
                   value={batchAgent}
                   onChange={(e) => setBatchAgent(e.target.value)}
-                  disabled={batchRunning || !batchIncludePlatform}
+                  disabled={!batchIncludePlatform}
                   className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 disabled:opacity-50"
                 >
                   {versions.map((v) => (
@@ -835,17 +997,15 @@ export function WorkAnalysisHub({
                   setBatchConfirmOpen(true);
                 }}
                 disabled={
-                  batchRunning ||
                   orderedSelectedIds.length === 0 ||
                   !batchEffectiveAvailable ||
                   batchHasBlockedEpisode ||
-                  !phoneVerified
+                  !phoneVerified ||
+                  holisticClientProgress != null
                 }
                 className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-zinc-950 shadow-md shadow-cyan-500/15 hover:bg-cyan-400 disabled:opacity-50"
               >
-                {batchRunning
-                  ? "통합 분석 중…"
-                  : `선택 회차 통합 분석 (${orderedSelectedIds.length}개)`}
+                {`선택 회차 통합 분석 (${orderedSelectedIds.length}개)`}
               </button>
             </div>
             <p className="text-xs text-zinc-500">
@@ -875,6 +1035,31 @@ export function WorkAnalysisHub({
                 </CopyWithBreaks>
               </p>
             )}
+            {holisticClientProgress && (
+              <div className="rounded-lg border border-cyan-500/25 bg-cyan-950/20 px-4 py-3">
+                <p className="text-sm font-medium text-cyan-100/95">
+                  통합 분석 진행 중
+                </p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  {holisticClientProgress.label}
+                </p>
+                <div
+                  className="mt-2 h-2 w-full overflow-hidden rounded-full bg-zinc-800"
+                  role="progressbar"
+                  aria-valuenow={holisticClientProgress.percent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <div
+                    className="h-full rounded-full bg-cyan-500/90 transition-[width] duration-300"
+                    style={{ width: `${holisticClientProgress.percent}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-right text-xs tabular-nums text-cyan-200/90">
+                  {holisticClientProgress.percent}%
+                </p>
+              </div>
+            )}
             {batchError && (
               <p className="text-sm text-red-400">
                 <CopyWithBreaks as="span">{batchError}</CopyWithBreaks>{" "}
@@ -886,7 +1071,7 @@ export function WorkAnalysisHub({
             <ManuscriptLowVolumeModal
               open={batchLowVolumeOpen}
               message={MANUSCRIPT_LOW_VOLUME_WARNING}
-              loading={batchRunning}
+              loading={false}
               onCancel={() => setBatchLowVolumeOpen(false)}
               onConfirm={() => {
                 setBatchLowVolumeOpen(false);
@@ -903,7 +1088,23 @@ export function WorkAnalysisHub({
               confirmLabel="NAT 차감 후 통합 분석"
               loading={false}
               onCancel={() => setBatchConfirmOpen(false)}
-              onConfirm={runBatchAnalyzeSelected}
+              onConfirm={() => {
+                void runBatchAnalyzeSelected();
+              }}
+            />
+            <BatchContentUnchangedModal
+              open={batchUnchangedOpen}
+              episodeNumbers={batchUnchangedEpisodeNumbers}
+              loading={false}
+              onCancel={() => {
+                setBatchUnchangedOpen(false);
+                setBatchUnchangedEpisodeNumbers([]);
+              }}
+              onConfirm={() => {
+                setBatchUnchangedOpen(false);
+                setBatchUnchangedEpisodeNumbers([]);
+                void runBatchAnalyzeSelected({ skipUnchangedPrecheck: true });
+              }}
             />
           </div>
         )}
@@ -928,8 +1129,6 @@ export function WorkAnalysisHub({
                 {episodes.map((ep) => {
                   const run = latest.get(ep.id);
                   const checked = selectedIds.has(ep.id);
-                  const job =
-                    analysisJobsCtx?.getLatestJobForEpisode(ep.id) ?? null;
                   return (
                     <tr
                       key={ep.id}
@@ -955,7 +1154,12 @@ export function WorkAnalysisHub({
                         </Link>
                       </td>
                       <td className="py-2 pr-4 align-top">
-                        <AnalysisStatusBadge job={job} variant="episode" />
+                        <EpisodeRowAnalysisBadge
+                          episodeId={ep.id}
+                          serverLatestRunCreatedAt={
+                            run?.created_at ?? null
+                          }
+                        />
                       </td>
                       <td className="py-2 pr-4 align-top font-medium text-zinc-100">
                         {run ? run.result_json.overall_score : "—"}
@@ -968,7 +1172,16 @@ export function WorkAnalysisHub({
                           type="button"
                           onClick={() => {
                             setPanelEpisodeId(ep.id);
-                            setActiveTab("single");
+                            const nextParams = new URLSearchParams(
+                              searchParams.toString()
+                            );
+                            nextParams.set("focus", String(ep.id));
+                            nextParams.delete("tab");
+                            const qs = nextParams.toString();
+                            router.replace(
+                              qs ? `${pathname}?${qs}` : pathname,
+                              { scroll: false }
+                            );
                             requestAnimationFrame(() => {
                               document
                                 .getElementById("ai-analysis-panel")
@@ -991,60 +1204,6 @@ export function WorkAnalysisHub({
           </div>
         )}
 
-        {batchRunning && (
-          <div
-            className="fixed inset-0 z-[55] flex flex-col items-center justify-center gap-4 bg-zinc-950/80 p-6 backdrop-blur-sm"
-            role="status"
-            aria-live="polite"
-            aria-busy="true"
-          >
-            <div
-              className="h-12 w-12 shrink-0 animate-spin rounded-full border-2 border-cyan-500/25 border-t-cyan-400"
-              aria-hidden
-            />
-            {batchProgress ? (
-              <div className="flex w-full max-w-md flex-col items-center gap-3 text-center">
-                <p className="text-sm font-medium text-zinc-100">
-                  분석 중… {batchProgress.completedEpisodes}/
-                  {batchProgress.totalEpisodes}화 완료
-                  {batchProgress.phase === "merge" ? (
-                    <span className="text-cyan-300/90"> · 최종 병합 중</span>
-                  ) : null}
-                </p>
-                <div className="w-full max-w-sm">
-                  <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-800">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-[width] duration-300"
-                      style={{ width: `${Math.min(100, batchProgress.percent)}%` }}
-                    />
-                  </div>
-                  <p className="mt-1.5 text-xs tabular-nums text-zinc-400">
-                    {Math.min(100, batchProgress.percent)}%
-                  </p>
-                </div>
-                {batchProgress.etaSeconds != null && batchProgress.phase !== "merge" ? (
-                  <p className="text-xs text-zinc-500">
-                    예상 소요 시간:{" "}
-                    {batchProgress.etaSeconds < 90
-                      ? `약 ${Math.max(10, Math.round(batchProgress.etaSeconds))}초`
-                      : `약 ${Math.max(1, Math.round(batchProgress.etaSeconds / 60))}분`}
-                  </p>
-                ) : batchProgress.phase === "merge" ? (
-                  <p className="text-xs text-zinc-500">
-                    구간 결과를 하나의 통합 리포트로 합치는 중입니다…
-                  </p>
-                ) : null}
-              </div>
-            ) : (
-              <p className="max-w-sm text-center text-sm font-medium text-zinc-200">
-                <CopyWithBreaks as="span">
-                  선택한 회차를 합쳐 통합 분석 중입니다…
-                </CopyWithBreaks>
-              </p>
-            )}
-          </div>
-        )}
-
         {activeHolistic && holisticReportEpisodes && (
           <div className="mt-10">
             <BatchHolisticReport
@@ -1058,6 +1217,34 @@ export function WorkAnalysisHub({
         )}
         </section>
       )}
+
+      <EpisodeInActiveAnalysisModal
+        open={batchEpisodeBusyOpen}
+        onClose={() => setBatchEpisodeBusyOpen(false)}
+        episodeNumbers={batchBusyEpisodeNumbers}
+      />
     </div>
+  );
+}
+
+function WorkAnalysisHubSuspenseFallback() {
+  return (
+    <div className="space-y-8">
+      <div className="flex gap-1 rounded-xl border border-zinc-800 bg-zinc-950/50 p-1">
+        <div className="min-h-[44px] flex-1 animate-pulse rounded-lg bg-zinc-800/40" />
+        <div className="min-h-[44px] flex-1 animate-pulse rounded-lg bg-zinc-800/40" />
+      </div>
+      <div className="h-96 animate-pulse rounded-xl border border-zinc-800 bg-zinc-900/30" />
+    </div>
+  );
+}
+
+export function WorkAnalysisHub(
+  props: ComponentProps<typeof WorkAnalysisHubInner>
+) {
+  return (
+    <Suspense fallback={<WorkAnalysisHubSuspenseFallback />}>
+      <WorkAnalysisHubInner {...props} />
+    </Suspense>
   );
 }

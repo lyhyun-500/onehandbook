@@ -13,13 +13,15 @@ export default async function WorkAnalysisPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ focus?: string }>;
+  searchParams: Promise<{ focus?: string; tab?: string }>;
 }) {
   const { id } = await params;
-  const { focus } = await searchParams;
+  const { focus, tab } = await searchParams;
   const focusId = focus ? parseInt(focus, 10) : undefined;
   const initialFocusEpisodeId =
     focusId != null && !Number.isNaN(focusId) ? focusId : undefined;
+  const initialTab: "single" | "batch" =
+    tab === "batch" && initialFocusEpisodeId == null ? "batch" : "single";
 
   const supabase = await createClient();
   const appUser = await requireAppUser(supabase);
@@ -117,6 +119,7 @@ export default async function WorkAnalysisPage({
           versions={versions}
           natBalance={natBalance}
           initialFocusEpisodeId={initialFocusEpisodeId}
+          initialTab={initialTab}
           phoneVerified={appUser.phone_verified}
         />
       </main>

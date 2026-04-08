@@ -25,6 +25,14 @@ import {
 } from "@/lib/analysisResultCache";
 import { md5Hex } from "@/lib/contentHash";
 import { buildPreviousEpisodesAnalysisContext } from "@/lib/previousEpisodeContext";
+import {
+  computeWorkAnalysisContextHash,
+  workContextAllowsContentUnchanged,
+} from "@/lib/analysis/workAnalysisContextHash";
+import {
+  fetchLatestAnalysisResultForContentGuard,
+  insertAnalysisResultSnapshot,
+} from "@/lib/analysis/analysisResultsWorkContextSupport";
 import type { AppUser } from "@/lib/supabase/appUser";
 import { AnalysisProviderExhaustedError } from "@/lib/analysis/analysisErrors";
 
@@ -61,9 +69,11 @@ export async function runEpisodeAnalysisPipeline(
     force: boolean;
     requestedVersion: string;
     opts: NatAnalysisOptions;
+    analysisJobProgress?: { jobId: string };
   }
 ): Promise<EpisodeAnalysisSuccess> {
-  const { episodeId, appUser, force, requestedVersion, opts } = params;
+  const { episodeId, appUser, force, requestedVersion, opts, analysisJobProgress } =
+    params;
 
   const effectiveVersion = resolveAnalysisAgentVersion(
     opts.includePlatformOptimization,
@@ -87,7 +97,7 @@ export async function runEpisodeAnalysisPipeline(
 
   const { data: work, error: wErr } = await supabase
     .from("works")
-    .select("id, genre, author_id, world_setting, character_settings")
+    .select("id, genre, title, author_id, world_setting, character_settings")
     .eq("id", episode.work_id)
     .single();
 
@@ -103,6 +113,7 @@ export async function runEpisodeAnalysisPipeline(
   const cost = computeNatCost(charCount, opts);
   const breakdown = buildNatBreakdown(charCount, opts);
   const currentHash = md5Hex(episode.content);
+  const workContextHash = computeWorkAnalysisContextHash(work, opts.includeLore);
 
   if (!isProviderConfigured(profile.provider)) {
     throw new Error(
@@ -119,18 +130,19 @@ export async function runEpisodeAnalysisPipeline(
     throw err;
   }
 
-  const { data: previousRow } = await supabase
-    .from("analysis_results")
-    .select("score, feedback, nat_consumed, created_at, content_hash")
-    .eq("episode_id", episode.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const { row: previousRow } = await fetchLatestAnalysisResultForContentGuard(
+    supabase,
+    episode.id
+  );
 
   if (
     !force &&
     previousRow?.content_hash &&
-    previousRow.content_hash === currentHash
+    previousRow.content_hash === currentHash &&
+    workContextAllowsContentUnchanged(
+      previousRow.work_context_hash,
+      workContextHash
+    )
   ) {
     const err = new Error(
       "변경된 사항이 없습니다. 그래도 분석하려면 확인 후 다시 요청해 주세요."
@@ -180,6 +192,7 @@ export async function runEpisodeAnalysisPipeline(
       {
         manuscript: episode.content,
         genre: work.genre,
+        work_title: work.title ?? undefined,
         world_setting,
         character_settings:
           character_settings.length > 0 ? character_settings : undefined,
@@ -195,6 +208,16 @@ export async function runEpisodeAnalysisPipeline(
     }
     const message = e instanceof Error ? e.message : "분석에 실패했습니다.";
     throw new Error(message);
+  }
+
+  if (analysisJobProgress?.jobId) {
+    await supabase
+      .from("analysis_jobs")
+      .update({
+        progress_phase: "report_writing",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", analysisJobProgress.jobId);
   }
 
   const optionsRecord = {
@@ -253,7 +276,7 @@ export async function runEpisodeAnalysisPipeline(
   }
 
   const analyzedAt = new Date().toISOString();
-  const { error: cacheErr } = await supabase.from("analysis_results").insert({
+  const { error: cacheErr } = await insertAnalysisResultSnapshot(supabase, {
     work_id: work.id,
     episode_id: episode.id,
     analysis_run_id: row.id,
@@ -261,10 +284,11 @@ export async function runEpisodeAnalysisPipeline(
     feedback: serializeAnalysisFeedback(result),
     nat_consumed: cost,
     content_hash: currentHash,
+    work_context_hash: workContextHash,
     analyzed_at: analyzedAt,
   });
   if (cacheErr) {
-    console.error("analysis_results 캐시 저장 실패:", cacheErr);
+    console.error("analysis_results 캐시 저장 실패:", cacheErr.message);
   }
 
   const { error: epHashErr } = await supabase

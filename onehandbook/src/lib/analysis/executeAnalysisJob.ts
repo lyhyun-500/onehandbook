@@ -7,6 +7,12 @@ import {
   type EpisodeAnalysisSuccess,
 } from "@/lib/analysis/runEpisodeAnalysisPipeline";
 import type { NatAnalysisOptions } from "@/lib/nat";
+import { executeHolisticAnalysisJob } from "@/lib/analysis/executeHolisticAnalysisJob";
+import { ANALYSIS_JOB_FAILURE_CONTENT_UNCHANGED } from "@/lib/analysis/analysisJobFailureCodes";
+import {
+  isHolisticAnalysisJobPeek,
+  parseJobPayloadRecord,
+} from "@/lib/analysis/holisticJobPayload";
 
 export type AnalysisJobPayload = {
   requestedVersion: string;
@@ -15,16 +21,29 @@ export type AnalysisJobPayload = {
   includePlatformOptimization: boolean;
 };
 
-async function markJobFailed(jobId: string, errorMessage: string, accessToken: string) {
+async function markJobFailed(
+  jobId: string,
+  errorMessage: string,
+  accessToken: string,
+  options?: { failureCode?: string }
+) {
   const supabase = createSupabaseWithAccessToken(accessToken);
-  await supabase
-    .from("analysis_jobs")
-    .update({
-      status: "failed",
-      error_message: errorMessage,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", jobId);
+  const patch: Record<string, unknown> = {
+    status: "failed",
+    error_message: errorMessage,
+    progress_phase: null,
+    updated_at: new Date().toISOString(),
+  };
+  if (options?.failureCode != null) {
+    const { data: row } = await supabase
+      .from("analysis_jobs")
+      .select("payload")
+      .eq("id", jobId)
+      .maybeSingle();
+    const base = (row?.payload as Record<string, unknown> | null) ?? {};
+    patch.payload = { ...base, failure_code: options.failureCode };
+  }
+  await supabase.from("analysis_jobs").update(patch).eq("id", jobId);
 }
 
 /**
@@ -35,33 +54,58 @@ export async function executeAnalysisJob(
   jobId: string,
   accessToken: string
 ): Promise<
-  | { ok: true; result: EpisodeAnalysisSuccess; skipped?: false }
+  | { ok: true; result?: EpisodeAnalysisSuccess; skipped?: false }
   | { ok: true; skipped: true }
   | { ok: false; error: string; code?: string }
 > {
+  console.info("[executeAnalysisJob] start", { jobId });
   const supabase = createSupabaseWithAccessToken(accessToken);
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
+    console.warn("[executeAnalysisJob] unauthorized", { jobId });
     return { ok: false, error: "로그인이 필요합니다.", code: "UNAUTHORIZED" };
   }
 
   const { data: job, error: jobErr } = await supabase
     .from("analysis_jobs")
-    .select("id, app_user_id, status, episode_id, payload")
+    .select("id, app_user_id, status, episode_id, payload, job_kind")
     .eq("id", jobId)
     .single();
 
   if (jobErr || !job) {
+    console.warn("[executeAnalysisJob] job not found", { jobId, jobErr });
     return { ok: false, error: "작업을 찾을 수 없습니다." };
   }
 
   const appUser = await syncAppUser(supabase);
   if (!appUser || appUser.id !== job.app_user_id) {
+    console.warn("[executeAnalysisJob] forbidden", { jobId });
     return { ok: false, error: "권한이 없습니다." };
   }
+
+  const runHolisticRoute = isHolisticAnalysisJobPeek(job.job_kind, job.payload);
+
+  console.info("[executeAnalysisJob] loaded", {
+    jobId,
+    status: job.status,
+    job_kind: job.job_kind,
+    runHolisticRoute,
+    payloadKeys: Object.keys(
+      (job.payload && typeof job.payload === "object"
+        ? (job.payload as object)
+        : {}) as Record<string, unknown>
+    ).slice(0, 24),
+  });
+
+  if (runHolisticRoute) {
+    console.info("[executeAnalysisJob] route=holistic", { jobId });
+    return executeHolisticAnalysisJob(jobId, accessToken);
+  }
+
+  console.info("[executeAnalysisJob] route=episode", { jobId });
 
   if (job.status === "completed") {
     return { ok: true, skipped: true };
@@ -89,6 +133,9 @@ export async function executeAnalysisJob(
     return { ok: false, error: "잘못된 작업 데이터입니다." };
   }
 
+  const payloadRec = parseJobPayloadRecord(job.payload);
+  const forceFromPayload = payloadRec?.force === true;
+
   const opts: NatAnalysisOptions = {
     includeLore: raw.includeLore !== false,
     includePlatformOptimization: raw.includePlatformOptimization !== false,
@@ -98,6 +145,7 @@ export async function executeAnalysisJob(
     .from("analysis_jobs")
     .update({
       status: "processing",
+      progress_phase: "ai_analyzing",
       updated_at: new Date().toISOString(),
     })
     .eq("id", jobId)
@@ -113,9 +161,10 @@ export async function executeAnalysisJob(
     const result = await runEpisodeAnalysisPipeline(supabase, {
       episodeId: job.episode_id,
       appUser,
-      force: raw.force === true,
+      force: raw.force === true || forceFromPayload,
       requestedVersion: raw.requestedVersion,
       opts,
+      analysisJobProgress: { jobId },
     });
 
     await supabase
@@ -123,9 +172,11 @@ export async function executeAnalysisJob(
       .update({
         status: "completed",
         analysis_run_id: result.analysis.id,
+        progress_phase: null,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", jobId);
+      .eq("id", jobId)
+      .eq("status", "processing");
 
     void (async () => {
       const { data: ep } = await supabase
@@ -159,9 +210,19 @@ export async function executeAnalysisJob(
         ? e.message
         : "분석에 실패했습니다.";
 
-    await markJobFailed(jobId, message, accessToken);
+    const isContentUnchanged =
+      e instanceof Error &&
+      (e as Error & { code?: string }).code === "CONTENT_UNCHANGED";
+    await markJobFailed(
+      jobId,
+      message,
+      accessToken,
+      isContentUnchanged
+        ? { failureCode: ANALYSIS_JOB_FAILURE_CONTENT_UNCHANGED }
+        : undefined
+    );
 
-    if (e instanceof Error && (e as Error & { code?: string }).code === "CONTENT_UNCHANGED") {
+    if (isContentUnchanged) {
       return {
         ok: false,
         error: message,

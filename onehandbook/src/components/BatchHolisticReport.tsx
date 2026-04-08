@@ -2,11 +2,27 @@
 
 import { CopyWithBreaks } from "@/components/CopyWithBreaks";
 import type { HolisticAnalysisResult } from "@/lib/ai/types";
+import { TrendReferencesSection } from "@/components/TrendReferencesSection";
 import { getProfileLabel } from "@/lib/ai/profileLookup";
 import {
   buildHolisticDisplay,
   type HolisticChartPoint,
 } from "@/lib/holisticWeightedScore";
+
+function formatKoreanDateTime(input: string): string {
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return input;
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(d);
+}
 
 const DIM_ORDER = [
   "플로우 일관성",
@@ -162,7 +178,7 @@ export function BatchHolisticReport({
         <div className="text-right text-xs text-zinc-500">
           <p>{getProfileLabel(agentVersion)}</p>
           <p className="tabular-nums">NAT {natConsumed}</p>
-          <p>{new Date(analyzedAt).toLocaleString("ko-KR")}</p>
+          <p>{formatKoreanDateTime(analyzedAt)}</p>
         </div>
       </header>
 
@@ -245,6 +261,8 @@ export function BatchHolisticReport({
           <CopyWithBreaks as="span">{result.executive_summary}</CopyWithBreaks>
         </p>
       </section>
+
+      <TrendReferencesSection references={result.trends_references} />
     </div>
   );
 }

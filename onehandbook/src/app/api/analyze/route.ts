@@ -21,9 +21,15 @@ import {
 } from "@/lib/analysisResultCache";
 import { md5Hex } from "@/lib/contentHash";
 import { findCachedAnalysisRun } from "@/lib/analysisCache";
+import {
+  computeWorkAnalysisContextHash,
+  workContextAllowsContentUnchanged,
+} from "@/lib/analysis/workAnalysisContextHash";
+import { fetchLatestAnalysisResultForContentGuard } from "@/lib/analysis/analysisResultsWorkContextSupport";
 import { checkAnalyzeRateLimit } from "@/lib/rateLimit/analyzeRateLimit";
 import { isMissingAnalysisJobsTableError } from "@/lib/db/analysisJobsTable";
 import { runAnalysisProcessAfterResponse } from "@/lib/analysis/scheduleAnalysisProcess";
+import { conflictingEpisodeIdsForActiveJobs } from "@/lib/analysis/activeAnalysisJobConflict";
 
 function parseNatOptions(body: Record<string, unknown>): NatAnalysisOptions {
   const includeLore = body.includeLore !== false;
@@ -32,13 +38,6 @@ function parseNatOptions(body: Record<string, unknown>): NatAnalysisOptions {
 }
 
 export async function POST(request: Request) {
-  if (!process.env.ANALYZE_PROCESS_SECRET) {
-    return NextResponse.json(
-      { error: "서버 설정이 완료되지 않았습니다. (ANALYZE_PROCESS_SECRET)" },
-      { status: 500 }
-    );
-  }
-
   const supabase = await createClient();
   const {
     data: { user },
@@ -119,7 +118,7 @@ export async function POST(request: Request) {
 
   const { data: work, error: wErr } = await supabase
     .from("works")
-    .select("id, genre, author_id, world_setting, character_settings")
+    .select("id, genre, title, author_id, world_setting, character_settings")
     .eq("id", episode.work_id)
     .single();
 
@@ -142,12 +141,14 @@ export async function POST(request: Request) {
   const breakdown = buildNatBreakdown(charCount, opts);
 
   const currentHash = md5Hex(episode.content);
+  const workContextHash = computeWorkAnalysisContextHash(work, opts.includeLore);
 
   const cachedRun = !force
     ? await findCachedAnalysisRun(
         supabase,
         episode.id,
         currentHash,
+        workContextHash,
         effectiveVersion
       )
     : null;
@@ -210,22 +211,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: previousRow, error: prevErr } = await supabase
-    .from("analysis_results")
-    .select("score, feedback, nat_consumed, created_at, content_hash")
-    .eq("episode_id", episode.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (prevErr) {
-    console.warn("analysis_results 이전 조회 실패(마이그레이션 미적용 가능):", prevErr.message);
-  }
+  const { row: previousRow } = await fetchLatestAnalysisResultForContentGuard(
+    supabase,
+    episode.id
+  );
 
   if (
     !force &&
     previousRow?.content_hash &&
-    previousRow.content_hash === currentHash
+    previousRow.content_hash === currentHash &&
+    workContextAllowsContentUnchanged(
+      previousRow.work_context_hash,
+      workContextHash
+    )
   ) {
     return NextResponse.json(
       {
@@ -248,17 +246,38 @@ export async function POST(request: Request) {
     );
   }
 
+  const busy = await conflictingEpisodeIdsForActiveJobs(
+    supabase,
+    appUser.id,
+    [episodeId]
+  );
+  if (busy.length > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "이 회차는 이미 진행 중인 분석(단일 또는 통합)에 포함되어 있습니다. 완료 후 다시 시도해 주세요.",
+        code: "EPISODE_ANALYSIS_IN_PROGRESS" as const,
+        conflicting_episode_ids: busy,
+      },
+      { status: 409 }
+    );
+  }
+
   const { data: jobRow, error: jobInsErr } = await supabase
     .from("analysis_jobs")
     .insert({
       app_user_id: appUser.id,
       episode_id: episodeId,
+      work_id: episode.work_id,
+      job_kind: "episode",
       status: "pending",
+      progress_phase: "received",
       payload: {
         requestedVersion,
         force,
         includeLore: opts.includeLore,
         includePlatformOptimization: opts.includePlatformOptimization,
+        estimatedSeconds: 75,
       },
     })
     .select("id")
@@ -284,9 +303,14 @@ export async function POST(request: Request) {
 
   const jobId = jobRow.id as string;
 
-  after(() => {
+  if (process.env.NODE_ENV !== "production") {
+    // dev에서는 after()가 실행되지 않는 경우가 있어 즉시 트리거한다.
     void runAnalysisProcessAfterResponse(jobId, session.access_token);
-  });
+  } else {
+    after(() => {
+      void runAnalysisProcessAfterResponse(jobId, session.access_token);
+    });
+  }
 
   return NextResponse.json({
     job_id: jobId,

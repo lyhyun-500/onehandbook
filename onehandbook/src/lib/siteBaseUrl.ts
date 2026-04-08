@@ -16,3 +16,15 @@ export function getInternalSiteBaseUrl(): string {
 
   return `http://127.0.0.1:${process.env.PORT ?? 3000}`;
 }
+
+/**
+ * 로컬 `npm run dev`에서 `NEXT_PUBLIC_SITE_URL`이 프로덕션(예: novelagent.kr)이면
+ * `runAnalysisProcessAfterResponse`가 원격 `/api/analyze/process`를 때려 **로컬 DB의 잡을 못 찾는** 문제가 납니다.
+ * 개발 모드에서는 항상 현재 머신의 dev 서버로 self-call 합니다.
+ */
+export function getAnalyzeProcessBaseUrl(): string {
+  if (process.env.NODE_ENV !== "production") {
+    return `http://127.0.0.1:${process.env.PORT ?? 3000}`;
+  }
+  return getInternalSiteBaseUrl();
+}

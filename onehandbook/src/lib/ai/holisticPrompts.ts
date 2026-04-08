@@ -34,7 +34,8 @@ const HOLISTIC_TASK = `## 통합 분석 임무
 
 export function buildHolisticSystemPrompt(
   genre: string,
-  profile: AnalysisProfileConfig
+  profile: AnalysisProfileConfig,
+  trendsContextBlock?: string | null
 ): string {
   const base = loadBaseSystem().replace(/\{\{genre\}\}/g, genre);
   const genreAxes = buildGenreEvalAxesSection(genre);
@@ -45,7 +46,11 @@ export function buildHolisticSystemPrompt(
     genreAxes,
     platform,
   ].filter(Boolean);
-  return `${parts.join("\n\n")}\n\n${HOLISTIC_JSON_SHAPE}`;
+  const core = parts.join("\n\n");
+  const trends = trendsContextBlock?.trim()
+    ? `\n\n${trendsContextBlock.trim()}`
+    : "";
+  return `${core}${trends}\n\n${HOLISTIC_JSON_SHAPE}`;
 }
 
 export type HolisticEpisodeSegment = {
@@ -69,11 +74,26 @@ export function buildHolisticUserPrompt(
 
   for (const seg of segments) {
     const header = `\n\n=== ${seg.episode_number}화 · ${seg.title} (약 ${seg.charCount.toLocaleString()}자) ===\n`;
-    const room = HOLISTIC_MAX_COMBINED_CHARS - used - header.length;
+    let room = HOLISTIC_MAX_COMBINED_CHARS - used - header.length;
+
     if (room <= 0) {
       truncated = true;
-      break;
+      const fallback =
+        `\n\n=== ${seg.episode_number}화 · ${seg.title || "제목 없음"} ===\n` +
+        `[본문: 통합 원고 ${HOLISTIC_MAX_COMBINED_CHARS.toLocaleString()}자 한도로 이 회차는 넣지 못했습니다. ` +
+        `JSON의 episode_scores에 **반드시 ${seg.episode_number}화** 항목을 넣고, 앞선 구간·작품 맥락만으로 점수를 매기세요.]\n`;
+      if (used + fallback.length > HOLISTIC_MAX_COMBINED_CHARS) {
+        const micro = `\n[${seg.episode_number}화 본문 생략 — episode_scores에 ${seg.episode_number}화 포함 필수]\n`;
+        if (used + micro.length > HOLISTIC_MAX_COMBINED_CHARS) break;
+        lines.push(micro);
+        used += micro.length;
+        continue;
+      }
+      lines.push(fallback);
+      used += fallback.length;
+      continue;
     }
+
     let body = seg.content;
     if (body.length > room) {
       body = `${body.slice(0, room)}\n\n[이하 생략: 통합 분석용 글자 수 한도]`;
@@ -81,7 +101,6 @@ export function buildHolisticUserPrompt(
     }
     lines.push(header + body);
     used += header.length + body.length;
-    if (truncated) break;
   }
 
   const manuscriptBlock = lines.join("");
@@ -89,7 +108,7 @@ export function buildHolisticUserPrompt(
   return `${lore}장르: ${genre}
 
 다음은 선택된 회차들을 **순서대로** 이어 붙인 통합 원고입니다. 위 JSON 형식으로만 답하세요.
-${truncated ? "\n(일부 회차 본문이 길이 한도로 잘렸을 수 있습니다. 제공된 구간만으로 판단하세요.)\n" : ""}
+${truncated ? "\n(일부 회차 본문이 길이 한도로 잘리거나 생략되었을 수 있습니다. 생략된 회차도 episode_scores에 반드시 포함하세요.)\n" : ""}
 
 --- 통합 원고 시작 ---
 ${manuscriptBlock}

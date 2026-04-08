@@ -1,4 +1,5 @@
 import { ANALYSIS_PROFILES } from "@/config/analysis-profiles";
+import { HOLISTIC_CLIENT_CHUNK_SIZE } from "@/lib/analysis/holisticEpisodeChunks";
 
 /** 플랫폼 비특화 범용 분석 (NAT 옵션 미포함 시 사용) — Claude + generic 프롬프트 */
 export const NAT_GENERIC_AGENT_ID = "generic";
@@ -165,7 +166,7 @@ export function estimateHolisticBatchTotalNat(
   mergeNat: number;
   total: number;
 } {
-  const chunkSize = 10;
+  const chunkSize = HOLISTIC_CLIENT_CHUNK_SIZE;
   const ids = orderedEpisodeIds;
   const chunkCount = Math.ceil(ids.length / chunkSize) || 0;
   let batchNat = 0;

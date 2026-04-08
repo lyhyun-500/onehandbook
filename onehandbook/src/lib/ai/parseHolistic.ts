@@ -1,3 +1,4 @@
+import { extractBalancedJsonObject } from "./jsonExtract";
 import type { HolisticAnalysisResult } from "./types";
 
 const DIM_KEYS = [
@@ -9,8 +10,13 @@ const DIM_KEYS = [
 
 export function parseHolisticAnalysisJson(raw: string): HolisticAnalysisResult {
   const trimmed = raw.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)```$/m);
-  const jsonStr = fenced ? fenced[1].trim() : trimmed;
+  let jsonStr: string;
+  try {
+    jsonStr = extractBalancedJsonObject(trimmed);
+  } catch {
+    const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)```$/m);
+    jsonStr = fenced ? fenced[1].trim() : trimmed;
+  }
   const data = JSON.parse(jsonStr) as unknown;
   if (!data || typeof data !== "object") {
     throw new Error("통합 분석 결과가 올바른 객체가 아닙니다.");

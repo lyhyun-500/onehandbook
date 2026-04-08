@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isMissingWorkContextHashColumnError } from "@/lib/analysis/analysisResultsWorkContextSupport";
 
 export type CachedAnalysisRunRow = {
   id: number;
@@ -10,21 +11,34 @@ export type CachedAnalysisRunRow = {
 };
 
 /**
- * 동일 episode + content_hash + agent_version(프로필 id)인 가장 최신 분석이 있으면 반환.
+ * 동일 episode + content_hash + work_context_hash + agent_version(프로필 id)인 가장 최신 분석이 있으면 반환.
  * NAT/API 없이 재사용 가능.
  */
 export async function findCachedAnalysisRun(
   supabase: SupabaseClient,
   episodeId: number,
   contentHash: string,
+  workContextHash: string,
   agentVersion: string
 ): Promise<CachedAnalysisRunRow | null> {
-  const { data: ar, error } = await supabase
+  let { data: ar, error } = await supabase
     .from("analysis_results")
     .select("analysis_run_id")
     .eq("episode_id", episodeId)
     .eq("content_hash", contentHash)
+    .eq("work_context_hash", workContextHash)
     .order("created_at", { ascending: false });
+
+  if (error && isMissingWorkContextHashColumnError(error)) {
+    const second = await supabase
+      .from("analysis_results")
+      .select("analysis_run_id")
+      .eq("episode_id", episodeId)
+      .eq("content_hash", contentHash)
+      .order("created_at", { ascending: false });
+    ar = second.data;
+    error = second.error;
+  }
 
   if (error || !ar?.length) return null;
 

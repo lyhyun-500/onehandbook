@@ -1,44 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
-import { runHolisticAnalysis } from "@/lib/ai";
-import { getProfileConfig } from "@/lib/ai/profileLookup";
-import type { AnalysisCharacterSetting, AnalysisWorldSetting } from "@/lib/ai/types";
-import { isProviderConfigured } from "@/lib/ai/availability";
-import {
-  buildHolisticNatBreakdown,
-  computeHolisticNatCost,
-  countManuscriptChars,
-  resolveAnalysisAgentVersion,
-  type NatAnalysisOptions,
-} from "@/lib/nat";
-import { buildHolisticDisplay } from "@/lib/holisticWeightedScore";
-import {
-  normalizeCharacterSettings,
-  normalizeWorldSetting,
-} from "@/lib/works/loreTypes";
-import {
-  MANUSCRIPT_TOO_SHORT_MESSAGE,
-  MIN_ANALYSIS_CHARS,
-} from "@/lib/manuscriptEligibility";
 import { NextResponse } from "next/server";
 import { syncAppUser } from "@/lib/supabase/appUser";
-import type { HolisticAnalysisResult } from "@/lib/ai/types";
+import { runHolisticChunkAnalysis } from "@/lib/analysis/holisticChunkAnalysis";
+import { isMissingHolisticChunkResultsTableError } from "@/lib/db/holisticChunkResultsTable";
+import { isMissingAnalysisJobsTableError } from "@/lib/db/analysisJobsTable";
 
-type ConsumeNatRpcResult = {
-  ok?: boolean;
-  error?: string;
-  balance?: number;
-  required?: number;
-};
-
-const MAX_CHUNK_EPISODES = 10;
-
-function parseNatOptions(body: Record<string, unknown>): NatAnalysisOptions {
+function parseNatOptions(body: Record<string, unknown>) {
   const includeLore = body.includeLore !== false;
   const includePlatformOptimization = body.includePlatformOptimization !== false;
   return { includeLore, includePlatformOptimization };
 }
 
-/** 10화 이하 통합 분석(배치 1회). DB에 holistic_analysis_runs 저장 없이 NAT만 차감. */
+function numArraysEqual(a: number[], b: number[]) {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -56,42 +32,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "잘못된 요청 본문입니다." }, { status: 400 });
   }
 
-  const rawIds = body.episodeIds;
-  if (!Array.isArray(rawIds) || rawIds.length === 0) {
+  const jobId = typeof body.jobId === "string" ? body.jobId : "";
+  const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";
+  const chunkIndex =
+    typeof body.chunkIndex === "number"
+      ? body.chunkIndex
+      : parseInt(String(body.chunkIndex ?? ""), 10);
+  const rawEp = body.episodeIds;
+  const episodeIds = Array.isArray(rawEp)
+    ? rawEp
+        .map((x) => (typeof x === "number" ? x : parseInt(String(x), 10)))
+        .filter((n) => !Number.isNaN(n))
+    : [];
+
+  if (!jobId || !sessionId || Number.isNaN(chunkIndex) || chunkIndex < 0) {
+    return NextResponse.json({ error: "jobId, sessionId, chunkIndex가 필요합니다." }, { status: 400 });
+  }
+  if (episodeIds.length === 0 || episodeIds.length > 10) {
     return NextResponse.json(
-      { error: "episodeIds 배열이 필요합니다." },
+      { error: "episodeIds는 1~10개여야 합니다." },
       { status: 400 }
     );
-  }
-
-  const episodeIds = rawIds
-    .map((x) => (typeof x === "number" ? x : parseInt(String(x), 10)))
-    .filter((n) => !Number.isNaN(n));
-
-  if (episodeIds.length === 0 || episodeIds.length > MAX_CHUNK_EPISODES) {
-    return NextResponse.json(
-      {
-        error: `배치당 최대 ${MAX_CHUNK_EPISODES}개 회차만 전달할 수 있습니다.`,
-      },
-      { status: 400 }
-    );
-  }
-
-  const opts = parseNatOptions(body);
-  const requestedVersion =
-    typeof body.agentVersion === "string" ? body.agentVersion : "";
-  if (!requestedVersion) {
-    return NextResponse.json({ error: "agentVersion이 필요합니다." }, { status: 400 });
-  }
-
-  const effectiveVersion = resolveAnalysisAgentVersion(
-    opts.includePlatformOptimization,
-    requestedVersion
-  );
-
-  const profile = getProfileConfig(effectiveVersion);
-  if (!profile) {
-    return NextResponse.json({ error: "알 수 없는 분석 프로필입니다." }, { status: 400 });
   }
 
   const appUser = await syncAppUser(supabase);
@@ -99,193 +60,195 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "사용자 정보를 찾을 수 없습니다." }, { status: 403 });
   }
 
-  if (!appUser.phone_verified) {
-    return NextResponse.json(
-      {
-        error: "휴대폰 인증 후 이용 가능합니다.",
-        code: "PHONE_NOT_VERIFIED" as const,
-      },
-      { status: 403 }
-    );
-  }
-
-  const workIdRaw = body.workId;
-  const workId =
-    typeof workIdRaw === "number"
-      ? workIdRaw
-      : parseInt(String(workIdRaw ?? ""), 10);
-  if (Number.isNaN(workId)) {
-    return NextResponse.json({ error: "workId가 필요합니다." }, { status: 400 });
-  }
-
-  const { data: work, error: wErr } = await supabase
-    .from("works")
-    .select("id, genre, author_id, world_setting, character_settings")
-    .eq("id", workId)
+  const { data: job, error: jobErr } = await supabase
+    .from("analysis_jobs")
+    .select("id, app_user_id, status, payload, work_id")
+    .eq("id", jobId)
     .single();
 
-  if (wErr || !work || work.author_id !== appUser.id) {
-    return NextResponse.json({ error: "이 작품을 수정할 권한이 없습니다." }, { status: 403 });
-  }
-
-  const { data: epRows, error: epErr } = await supabase
-    .from("episodes")
-    .select("id, episode_number, title, content")
-    .eq("work_id", work.id)
-    .in("id", episodeIds);
-
-  if (epErr || !epRows || epRows.length !== episodeIds.length) {
-    return NextResponse.json(
-      { error: "선택한 회차를 모두 찾을 수 없거나 작품과 맞지 않습니다." },
-      { status: 400 }
-    );
-  }
-
-  const byId = new Map(epRows.map((e) => [e.id, e]));
-  const ordered = episodeIds.map((id) => byId.get(id)!);
-
-  for (const e of ordered) {
-    const n = countManuscriptChars(e.content ?? "");
-    if (n < MIN_ANALYSIS_CHARS) {
+  if (jobErr || !job) {
+    if (isMissingAnalysisJobsTableError(jobErr)) {
       return NextResponse.json(
-        {
-          error: MANUSCRIPT_TOO_SHORT_MESSAGE,
-          code: "MANUSCRIPT_TOO_SHORT" as const,
-        },
-        { status: 400 }
+        { error: "analysis_jobs 테이블이 없습니다.", code: "MIGRATION_REQUIRED" as const },
+        { status: 503 }
       );
     }
+    return NextResponse.json({ error: "작업을 찾을 수 없습니다." }, { status: 404 });
   }
 
-  const totalCombinedChars = ordered.reduce(
-    (s, e) => s + countManuscriptChars(e.content ?? ""),
-    0
-  );
+  if (job.app_user_id !== appUser.id) {
+    return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
+  }
 
-  const cost = computeHolisticNatCost(totalCombinedChars, opts);
-  const breakdown = buildHolisticNatBreakdown(
-    totalCombinedChars,
-    ordered.length,
-    opts
-  );
-
-  if (!isProviderConfigured(profile.provider)) {
+  if (job.status !== "processing") {
     return NextResponse.json(
-      {
-        error: `${profile.label}에 필요한 API 키가 설정되어 있지 않습니다.`,
-      },
+      { error: "진행 중인 통합 분석 작업만 청크를 추가할 수 있습니다." },
+      { status: 409 }
+    );
+  }
+
+  const payload = (job.payload ?? {}) as Record<string, unknown>;
+  if (payload.clientChunked !== true || payload.chunkSessionId !== sessionId) {
+    return NextResponse.json(
+      { error: "작업 세션 정보가 맞지 않습니다." },
       { status: 400 }
     );
   }
 
-  const balance = appUser.nat_balance ?? 0;
-  if (balance < cost) {
+  const chunkPlan = payload.chunkPlan as unknown;
+  if (!Array.isArray(chunkPlan) || chunkIndex >= chunkPlan.length) {
+    return NextResponse.json({ error: "유효하지 않은 chunkIndex입니다." }, { status: 400 });
+  }
+
+  const expectedRaw = chunkPlan[chunkIndex] as unknown;
+  if (!Array.isArray(expectedRaw)) {
+    return NextResponse.json({ error: "작업의 chunkPlan이 잘못되었습니다." }, { status: 500 });
+  }
+  const expected = expectedRaw
+    .map((x) => (typeof x === "number" ? x : parseInt(String(x), 10)))
+    .filter((n) => !Number.isNaN(n));
+
+  if (!numArraysEqual(expected, episodeIds)) {
     return NextResponse.json(
-      {
-        error: `NAT가 부족합니다. 이번 배치에는 ${cost} NAT가 필요합니다.`,
-        code: "INSUFFICIENT_NAT" as const,
-        required: cost,
-        balance,
-        breakdown,
-      },
-      { status: 402 }
+      { error: "episodeIds가 서버에 등록된 청크와 일치하지 않습니다." },
+      { status: 400 }
     );
   }
 
-  const wLore = normalizeWorldSetting(work.world_setting);
-  const world_setting: AnalysisWorldSetting | undefined =
-    opts.includeLore && (wLore.background || wLore.era || wLore.rules)
-      ? {
-          background: wLore.background || undefined,
-          era: wLore.era || undefined,
-          rules: wLore.rules || undefined,
-        }
-      : undefined;
+  const requestedVersion =
+    typeof payload.requestedVersion === "string" ? payload.requestedVersion : "";
+  if (!requestedVersion) {
+    return NextResponse.json({ error: "작업에 분석 버전 정보가 없습니다." }, { status: 500 });
+  }
 
-  const character_settings: AnalysisCharacterSetting[] = opts.includeLore
-    ? normalizeCharacterSettings(work.character_settings).filter((c) =>
-        c.name.trim()
-      )
-    : [];
+  const opts = parseNatOptions({
+    includeLore: payload.includeLore,
+    includePlatformOptimization: payload.includePlatformOptimization,
+  });
 
-  const segments = ordered.map((e) => ({
-    episode_number: e.episode_number,
-    title: e.title ?? "",
-    content: e.content ?? "",
-    charCount: countManuscriptChars(e.content ?? ""),
-  }));
+  const workId =
+    typeof job.work_id === "number"
+      ? job.work_id
+      : parseInt(String(job.work_id ?? payload.workId ?? ""), 10);
+  if (Number.isNaN(workId)) {
+    return NextResponse.json({ error: "workId를 확인할 수 없습니다." }, { status: 500 });
+  }
 
+  const chunkTotal =
+    typeof payload.chunkTotal === "number" && !Number.isNaN(payload.chunkTotal)
+      ? payload.chunkTotal
+      : chunkPlan.length;
+
+  const failJob = async (message: string) => {
+    await supabase
+      .from("analysis_jobs")
+      .update({
+        status: "failed",
+        error_message: message,
+        progress_phase: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", jobId)
+      .eq("status", "processing");
+  };
+
+  let resultJson: unknown;
   try {
-    const { result: rawResult, version } = await runHolisticAnalysis(
-      {
-        manuscript: "",
-        genre: work.genre ?? "",
-        world_setting,
-        character_settings:
-          character_settings.length > 0 ? character_settings : undefined,
-      },
-      segments,
-      effectiveVersion
-    );
-
-    const orderedForWeight = ordered.map((e) => ({
-      episode_number: e.episode_number,
-      title: e.title ?? "",
-      charCount: countManuscriptChars(e.content ?? ""),
-    }));
-
-    const { weightedOverall } = buildHolisticDisplay(rawResult, orderedForWeight);
-
-    const result: HolisticAnalysisResult = {
-      ...rawResult,
-      overall_score: weightedOverall,
-    };
-
-    const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
-      p_amount: cost,
-      p_ref_type: "holistic_batch_chunk",
-      p_ref_id: null,
-      p_metadata: {
-        work_id: work.id,
-        episode_ids: episodeIds,
-        agent_version: version.id,
+    const { result } = await runHolisticChunkAnalysis(supabase, appUser, {
+      workId,
+      chunkEpisodeIds: episodeIds,
+      requestedVersion,
+      opts,
+      pipelineDbLog: {
+        supabase,
+        appUserId: appUser.id,
+        analysisJobId: jobId,
       },
     });
-
-    if (rpcErr) {
-      console.error(rpcErr);
+    resultJson = result;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "청크 분석에 실패했습니다.";
+    const code =
+      e instanceof Error && (e as Error & { code?: string }).code === "INSUFFICIENT_NAT"
+        ? "INSUFFICIENT_NAT"
+        : undefined;
+    await failJob(msg);
+    if (code === "INSUFFICIENT_NAT") {
       return NextResponse.json(
-        { error: "NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요." },
-        { status: 500 }
-      );
-    }
-
-    const rpc = rpcData as ConsumeNatRpcResult;
-    if (!rpc?.ok) {
-      return NextResponse.json(
-        {
-          error: `NAT가 부족합니다. 이번 배치에는 ${cost} NAT가 필요합니다.`,
-          code: "INSUFFICIENT_NAT" as const,
-          required: rpc?.required ?? cost,
-          balance: rpc?.balance ?? balance,
-          breakdown,
-        },
+        { error: msg, code: "INSUFFICIENT_NAT" as const },
         { status: 402 }
       );
     }
-
-    return NextResponse.json({
-      chunk: {
-        result,
-        episode_ids: episodeIds,
-        agent_version: version.id,
-      },
-      nat: { spent: cost, balance: rpc.balance },
-      breakdown,
-    });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "배치 분석에 실패했습니다.";
-    console.error(e);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
+
+  const { error: insErr } = await supabase.from("holistic_chunk_results").upsert(
+    {
+      session_id: sessionId,
+      analysis_job_id: jobId,
+      chunk_index: chunkIndex,
+      episode_ids: episodeIds,
+      result_json: resultJson,
+      app_user_id: appUser.id,
+    },
+    { onConflict: "session_id,chunk_index" }
+  );
+
+  if (insErr) {
+    console.error(insErr);
+    if (isMissingHolisticChunkResultsTableError(insErr)) {
+      await failJob(
+        "holistic_chunk_results 테이블이 없습니다. Supabase에 마이그레이션을 적용해 주세요."
+      );
+      return NextResponse.json(
+        {
+          error:
+            "holistic_chunk_results 테이블이 없습니다. supabase-migration-holistic-chunk-results.sql을 적용해 주세요.",
+          code: "MIGRATION_REQUIRED" as const,
+        },
+        { status: 503 }
+      );
+    }
+    await failJob("청크 결과 저장에 실패했습니다.");
+    return NextResponse.json(
+      { error: "청크 결과 저장에 실패했습니다." },
+      { status: 500 }
+    );
+  }
+
+  const { count, error: cntErr } = await supabase
+    .from("holistic_chunk_results")
+    .select("*", { count: "exact", head: true })
+    .eq("session_id", sessionId);
+
+  if (cntErr) {
+    console.error(cntErr);
+  }
+
+  const done = count ?? 0;
+  const progressPercent = Math.min(88, Math.round((done / Math.max(1, chunkTotal)) * 88));
+
+  const nextPayload = {
+    ...payload,
+    progressPercent,
+    chunkCompleted: done,
+  };
+
+  await supabase
+    .from("analysis_jobs")
+    .update({
+      payload: nextPayload,
+      progress_phase: "ai_analyzing",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", jobId)
+    .eq("status", "processing");
+
+  return NextResponse.json({
+    ok: true,
+    chunk_index: chunkIndex,
+    chunks_completed: done,
+    chunk_total: chunkTotal,
+    progress_percent: progressPercent,
+  });
 }

@@ -4,19 +4,23 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "db:push": "supabase db push"
+    "db:push": "supabase db push",
+    "chroma:run": "npx chroma run --path ./data/chroma_db --host localhost --port 8000",
+    "trends:ingest": "tsx scripts/ingest-trends.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
+    "@chroma-core/default-embed": "^0.1.9",
     "@google/generative-ai": "^0.24.1",
     "@sentry/nextjs": "^10.47.0",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.99.2",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
+    "chromadb": "^3.4.0",
     "cookie": "^1.1.1",
     "md5": "^2.3.0",
     "next": "16.1.7",
@@ -33,6 +37,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.7",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

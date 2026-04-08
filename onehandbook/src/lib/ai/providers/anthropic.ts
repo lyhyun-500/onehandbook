@@ -13,11 +13,36 @@ function getStatus(err: unknown): number | undefined {
   return undefined;
 }
 
+type AnthropicTurn = { role: "user" | "assistant"; content: string };
+
+function extractTextFromAnthropicMessage(msg: {
+  content: Array<{ type: string; text?: string }>;
+}): string {
+  const block = msg.content.find((b) => b.type === "text");
+  if (block?.type !== "text" || typeof block.text !== "string") {
+    throw new Error("Claude 응답에 텍스트가 없습니다.");
+  }
+  return block.text;
+}
+
 /** 429 시 지수 백오프로 최대 3회 재시도(총 최대 4회 호출). 실패 시 NAT 미차감 안내용 에러 */
 export async function completeAnthropic(params: {
   model: string;
   system: string;
   user: string;
+}): Promise<string> {
+  return completeAnthropicConversation({
+    model: params.model,
+    system: params.system,
+    messages: [{ role: "user", content: params.user }],
+  });
+}
+
+/** user/assistant 교차 대화(재요청·JSON 수정용 등). 마지막 턴은 user 여야 함. */
+export async function completeAnthropicConversation(params: {
+  model: string;
+  system: string;
+  messages: AnthropicTurn[];
 }): Promise<string> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
@@ -34,14 +59,9 @@ export async function completeAnthropic(params: {
         max_tokens: 8192,
         temperature: 0,
         system: params.system,
-        messages: [{ role: "user", content: params.user }],
+        messages: params.messages,
       });
-
-      const block = msg.content.find((b) => b.type === "text");
-      if (block?.type !== "text") {
-        throw new Error("Claude 응답에 텍스트가 없습니다.");
-      }
-      return block.text;
+      return extractTextFromAnthropicMessage(msg);
     } catch (e) {
       const status = getStatus(e);
       const retryable = status === 429 || status === 529;
@@ -57,5 +77,5 @@ export async function completeAnthropic(params: {
     }
   }
 
-  throw new Error("completeAnthropic: unreachable");
+  throw new Error("completeAnthropicConversation: unreachable");
 }

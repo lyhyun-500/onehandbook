@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { executeAnalysisJob } from "@/lib/analysis/executeAnalysisJob";
-import { getInternalSiteBaseUrl } from "@/lib/siteBaseUrl";
+import { getAnalyzeProcessBaseUrl } from "@/lib/siteBaseUrl";
 
 type ProcessBody = {
   ok?: boolean;
@@ -17,13 +17,23 @@ export async function runAnalysisProcessAfterResponse(
   jobId: string,
   fallbackAccessToken: string
 ): Promise<void> {
+  console.info("[analysis/process] trigger start", { jobId });
   const secret = process.env.ANALYZE_PROCESS_SECRET;
   if (!secret) {
-    console.error("ANALYZE_PROCESS_SECRET 미설정");
+    console.warn(
+      "ANALYZE_PROCESS_SECRET 미설정 — /api/analyze/process 대신 executeAnalysisJob 직접 실행 (통합 분석 등 작업이 대기에서 멈추지 않도록)"
+    );
+    try {
+      console.info("[analysis/process] direct executeAnalysisJob", { jobId });
+      await executeAnalysisJob(jobId, fallbackAccessToken);
+      console.info("[analysis/process] direct executeAnalysisJob done", { jobId });
+    } catch (e) {
+      console.error("executeAnalysisJob 직접 실행 실패:", e);
+    }
     return;
   }
 
-  const base = getInternalSiteBaseUrl();
+  const base = getAnalyzeProcessBaseUrl();
 
   const doFetch = (accessToken: string) =>
     fetch(`${base}/api/analyze/process`, {
@@ -52,6 +62,12 @@ export async function runAnalysisProcessAfterResponse(
 
     let res = await doFetch(accessToken);
     let body = await parseBody(res);
+    console.info("[analysis/process] http", {
+      jobId,
+      status: res.status,
+      ok: res.ok,
+      body,
+    });
 
     const looksUnauthorized =
       res.status === 401 ||

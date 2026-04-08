@@ -33,3 +33,13 @@ AI 분석(`POST /api/analyze`)은 **NAT**를 소모합니다. 상위 폴더의 *
 
 분석 엔진은 **Claude** 단일 모델이며, 문피아·카카오페이지·네이버 시리즈·범용은 **프롬프트만** 다릅니다. 환경 변수는 **`ANTHROPIC_API_KEY`** 가 필요합니다. **네이버 로그인**은 서버 전용 **`NAVER_CLIENT_ID`**, **`NAVER_CLIENT_SECRET`** (로컬 `.env.local` + **Vercel** 동시 설정). 끄려면 `NAVER_LOGIN_ENABLED=false` 또는 `NEXT_PUBLIC_NAVER_LOGIN_ENABLED=false` — 예시는 `.env.local.example` 참고.  
 제품·요구사항·백로그는 상위 **`docs/PRD.md`**, **`docs/BACKLOG.md`** 를 참고하세요.
+
+## Chroma RAG (웹소설 트렌드)
+
+`data/trends/` 에 `.txt` / `.md` 를 두고, 로컬 Chroma 서버를 띄운 뒤 인제스트합니다.
+
+1. `npm run chroma:run` (별 터미널, 영속: `data/chroma_db/`)
+2. `npm run trends:ingest`
+3. 앱 실행 후 `POST /api/rag/trends/search` — 본문 `{ "query": "…", "n": 8, "genre": "로맨스" }` (로그인 또는 `TRENDS_RAG_API_SECRET`). `.md` 프론트매터로 `genre`·`date` 를 넣어 인제스트하면 메타 필터·최신순 정렬이 동작합니다. 분석 에이전트에는 **트렌드 요약 블록**만 system 프롬프트로 주입됩니다.
+
+자세한 절차는 **`data/trends/README.md`** 참고. 프로덕션 빌드는 `@chroma-core/default-embed` 와 Turbopack 충돌을 피하기 위해 **`npm run build` 가 `next build --webpack`** 을 사용합니다.
