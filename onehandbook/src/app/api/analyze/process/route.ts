@@ -11,7 +11,8 @@ import {
  * Vercel/Next route segment: `maxDuration` 은 정적 숫자 리터럴만 허용됩니다.
  * 스테일 잡 복구 등은 `executeHolisticAnalysisJob` 의 `ANALYZE_PROCESS_MAX_DURATION_SEC` 로 조정합니다.
  */
-export const maxDuration = 800;
+// Vercel Hobby 기준 허용 범위(기본 60s)를 넘기면 빌드가 실패합니다.
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const secret = process.env.ANALYZE_PROCESS_SECRET;
