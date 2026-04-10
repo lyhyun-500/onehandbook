@@ -1,160 +1,99 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { randomBytes } from "crypto";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
-import { createSupabaseServiceRole } from "@/lib/supabase/serviceRole";
-import { syncAppUser, setUserLoginProvider } from "@/lib/supabase/appUser";
-import {
-  exchangeNaverCode,
-  fetchNaverProfile,
-  naverSyntheticEmail,
-} from "@/lib/auth/naverOAuth";
 
-const STATE_COOKIE = "naver_oauth_state";
-
-async function findUserIdByEmail(
-  admin: SupabaseClient,
-  email: string
-): Promise<string | null> {
-  let page = 1;
-  for (let i = 0; i < 100; i++) {
-    const { data, error } = await admin.auth.admin.listUsers({
-      page,
-      perPage: 200,
-    });
-    if (error || !data?.users?.length) return null;
-    const hit = data.users.find((u) => u.email === email);
-    if (hit) return hit.id;
-    if (!data.nextPage) return null;
-    page = data.nextPage;
-  }
-  return null;
-}
+const MESSAGES = [
+  "스튜디오 불러오는 중...",
+  "펜에 잉크 채우는 중..",
+  "맞춤법 검수중..",
+] as const;
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
-  const err = searchParams.get("error");
-  const errDesc = searchParams.get("error_description");
-  if (err) {
-    const q = new URLSearchParams({ error: "naver", detail: errDesc ?? err });
+  const code = searchParams.get("code");
+  const state = searchParams.get("state");
+  const providerError = searchParams.get("error");
+  const providerErrorDesc = searchParams.get("error_description");
+
+  if (providerError) {
+    const q = new URLSearchParams({
+      error: "naver",
+      detail: providerErrorDesc ?? providerError,
+    });
     return NextResponse.redirect(`${origin}/login?${q.toString()}`);
   }
 
-  const code = searchParams.get("code");
-  const state = searchParams.get("state");
-  if (!code || !state) {
-    return NextResponse.redirect(`${origin}/login?error=naver&detail=missing_code`);
-  }
+  const msgJson = JSON.stringify(MESSAGES);
+  const html = `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>로그인 처리 중…</title>
+    <style>
+      body { margin:0; background:#09090b; color:#f4f4f5; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; }
+      .wrap { height:100vh; width:100%; display:flex; align-items:center; justify-content:center; padding:24px; }
+      .card { width:100%; max-width:420px; border:1px solid rgba(63,63,70,.9); background: rgba(24,24,27,.4); backdrop-filter: blur(8px); border-radius: 16px; padding: 40px; text-align:center; box-shadow: 0 20px 60px rgba(0,0,0,.55); }
+      .brand { font-size: 24px; font-weight: 800; letter-spacing:-0.02em; }
+      .sub { margin-top: 4px; font-size: 12px; color: #71717a; }
+      .spin { margin: 28px auto 0; width:40px; height:40px; border-radius:999px; border: 2px solid rgba(82,82,91,.9); border-top-color: rgba(34,211,238,.95); animation: s 1s linear infinite; }
+      @keyframes s { to { transform: rotate(360deg); } }
+      .msg { margin-top: 16px; font-size: 14px; color: #a1a1aa; min-height: 20px; }
+      .err { margin-top: 16px; font-size: 14px; color: #f87171; background: rgba(239,68,68,.08); padding: 10px 12px; border-radius: 10px; display:none; }
+      a { color: #67e8f9; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <div class="brand">Novel Agent</div>
+        <div class="sub">로그인 처리 중…</div>
+        <div class="spin" role="status" aria-label="로딩 중"></div>
+        <div id="msg" class="msg" aria-live="polite"></div>
+        <div id="err" class="err"></div>
+        <div id="back" style="margin-top: 12px; display:none;">
+          <a href="/login">로그인 페이지로 돌아가기</a>
+        </div>
+      </div>
+    </div>
+    <script>
+      const M = ${msgJson};
+      const msgEl = document.getElementById('msg');
+      const errEl = document.getElementById('err');
+      const backEl = document.getElementById('back');
+      let i = 0;
+      function tick() {
+        msgEl.textContent = M[i % M.length];
+        i++;
+      }
+      tick();
+      setInterval(tick, 3000);
 
-  const cookieStore = await cookies();
-  const expected = cookieStore.get(STATE_COOKIE)?.value;
-  if (!expected || expected !== state) {
-    return NextResponse.redirect(`${origin}/login?error=naver&detail=invalid_state`);
-  }
+      (async () => {
+        const code = ${JSON.stringify(code)};
+        const state = ${JSON.stringify(state)};
+        if (!code || !state) {
+          errEl.textContent = '로그인 코드가 없습니다. 다시 시도해 주세요.';
+          errEl.style.display = 'block';
+          backEl.style.display = 'block';
+          return;
+        }
+        try {
+          const q = new URLSearchParams({ code, state });
+          const res = await fetch('/api/auth/naver/complete?' + q.toString(), { method: 'POST', credentials: 'include', cache: 'no-store' });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.ok !== true) throw new Error(data.error || '로그인 처리에 실패했습니다.');
+          location.replace(data.redirectPath || '/studio');
+        } catch (e) {
+          errEl.textContent = (e && e.message) ? e.message : '로그인 처리에 실패했습니다.';
+          errEl.style.display = 'block';
+          backEl.style.display = 'block';
+        }
+      })();
+    </script>
+  </body>
+</html>`;
 
-  const redirectUri = `${origin}/auth/callback/naver`;
-
-  let profile;
-  try {
-    const { access_token } = await exchangeNaverCode({
-      code,
-      state,
-      redirectUri,
-    });
-    profile = await fetchNaverProfile(access_token);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "naver_oauth_failed";
-    return NextResponse.redirect(
-      `${origin}/login?error=naver&detail=${encodeURIComponent(msg)}`
-    );
-  }
-
-  let admin: SupabaseClient;
-  try {
-    admin = createSupabaseServiceRole();
-  } catch {
-    return NextResponse.redirect(
-      `${origin}/login?error=naver&detail=missing_service_role`
-    );
-  }
-
-  const email = naverSyntheticEmail(profile.id);
-  const displayName = profile.name || profile.nickname || "네이버 사용자";
-  const user_metadata: Record<string, unknown> = {
-    naver_id: profile.id,
-    full_name: displayName,
-    name: displayName,
-    avatar_url: profile.profile_image,
-    provider: "naver",
-  };
-  if (profile.email) {
-    user_metadata.naver_email = profile.email;
-  }
-
-  const tempPassword = randomBytes(32).toString("base64url");
-
-  let userId = await findUserIdByEmail(admin, email);
-  if (userId) {
-    const { error: upErr } = await admin.auth.admin.updateUserById(userId, {
-      password: tempPassword,
-      user_metadata,
-    });
-    if (upErr) {
-      return NextResponse.redirect(
-        `${origin}/login?error=naver&detail=${encodeURIComponent(upErr.message)}`
-      );
-    }
-  } else {
-    const { data: created, error: crErr } = await admin.auth.admin.createUser({
-      email,
-      password: tempPassword,
-      email_confirm: true,
-      user_metadata,
-    });
-    if (crErr || !created.user) {
-      return NextResponse.redirect(
-        `${origin}/login?error=naver&detail=${encodeURIComponent(crErr?.message ?? "create_user")}`
-      );
-    }
-  }
-
-  const supabase = await createClient();
-  const { error: signErr } = await supabase.auth.signInWithPassword({
-    email,
-    password: tempPassword,
+  return new NextResponse(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
   });
-
-  if (signErr) {
-    return NextResponse.redirect(
-      `${origin}/login?error=naver&detail=${encodeURIComponent(signErr.message)}`
-    );
-  }
-
-  await syncAppUser(supabase);
-  await setUserLoginProvider(supabase, "naver");
-
-  const {
-    data: { user: sessionUser },
-  } = await supabase.auth.getUser();
-
-  let redirectPath = "/dashboard";
-  if (sessionUser) {
-    const { data: consentRow } = await supabase
-      .from("users")
-      .select("terms_agreed_at")
-      .eq("auth_id", sessionUser.id)
-      .maybeSingle();
-    if (!consentRow?.terms_agreed_at) {
-      redirectPath = "/auth/welcome";
-    }
-  }
-
-  cookieStore.set(STATE_COOKIE, "", {
-    path: "/",
-    maxAge: 0,
-    sameSite: "lax",
-  });
-
-  return NextResponse.redirect(`${origin}${redirectPath}`);
 }

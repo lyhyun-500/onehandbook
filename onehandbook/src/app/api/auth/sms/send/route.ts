@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createSupabaseServiceRole } from "@/lib/supabase/serviceRole";
 import { syncAppUser } from "@/lib/supabase/appUser";
 import { normalizeKrPhone } from "@/lib/phone";
 import {
@@ -54,6 +55,43 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "올바른 휴대폰 번호를 입력해 주세요. (예: 010-1234-5678)" },
       { status: 400 }
+    );
+  }
+
+  let adminSend;
+  try {
+    adminSend = createSupabaseServiceRole();
+  } catch {
+    return NextResponse.json(
+      { error: "서버 설정(SUPABASE_SERVICE_ROLE_KEY)이 필요합니다." },
+      { status: 500 }
+    );
+  }
+
+  const { data: blocked } = await adminSend
+    .from("blacklisted_phones")
+    .select("phone_e164")
+    .eq("phone_e164", normalized)
+    .maybeSingle();
+
+  if (blocked) {
+    return NextResponse.json(
+      { error: "탈퇴 이력이 있는 번호는 인증할 수 없습니다." },
+      { status: 403 }
+    );
+  }
+
+  const { data: profileTaken } = await adminSend
+    .from("profiles")
+    .select("id")
+    .eq("phone_number", normalized)
+    .neq("id", appUser.id)
+    .maybeSingle();
+
+  if (profileTaken) {
+    return NextResponse.json(
+      { error: "이 번호는 이미 다른 계정에서 인증되었습니다." },
+      { status: 409 }
     );
   }
 

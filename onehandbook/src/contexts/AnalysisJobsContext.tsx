@@ -45,6 +45,9 @@ type ToastItem = {
 
 const READ_JOBS_KEY = "ohb_analysis_read_job_outcomes";
 
+/** 알림 패널 완료/실패 목록: 최근 7일, 페이지당 건수 */
+const NOTIFICATION_OUTCOMES_PAGE_SIZE = 20;
+
 function loadReadJobIds(): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
@@ -1134,6 +1137,7 @@ function AnalysisBell({
   const [outcomes, setOutcomes] = useState<AnalysisJobListItem[]>([]);
   const [outcomesCursor, setOutcomesCursor] = useState<string | null>(null);
   const [outcomesHasMore, setOutcomesHasMore] = useState(true);
+  const [outcomesLoadingInitial, setOutcomesLoadingInitial] = useState(false);
   const [outcomesLoadingMore, setOutcomesLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -1147,11 +1151,16 @@ function AnalysisBell({
     if (!open) return;
     let cancelled = false;
     async function loadFirst() {
-      setOutcomesLoadingMore(true);
+      setOutcomes([]);
+      setOutcomesCursor(null);
+      setOutcomesHasMore(true);
+      setOutcomesLoadingMore(false);
+      setOutcomesLoadingInitial(true);
       try {
-        const res = await fetch("/api/analyze/jobs/outcomes?sinceDays=7&limit=12", {
-          cache: "no-store",
-        });
+        const res = await fetch(
+          `/api/analyze/jobs/outcomes?sinceDays=7&limit=${NOTIFICATION_OUTCOMES_PAGE_SIZE}`,
+          { cache: "no-store" }
+        );
         const data = (await res.json().catch(() => ({}))) as {
           jobs?: AnalysisJobListItem[];
           nextCursor?: string | null;
@@ -1160,9 +1169,9 @@ function AnalysisBell({
         const jobs = Array.isArray(data.jobs) ? data.jobs : [];
         setOutcomes(jobs);
         setOutcomesCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
-        setOutcomesHasMore(jobs.length >= 12);
+        setOutcomesHasMore(jobs.length >= NOTIFICATION_OUTCOMES_PAGE_SIZE);
       } finally {
-        if (!cancelled) setOutcomesLoadingMore(false);
+        if (!cancelled) setOutcomesLoadingInitial(false);
       }
     }
     void loadFirst();
@@ -1175,21 +1184,25 @@ function AnalysisBell({
     if (!open) return;
     const el = sentinelRef.current;
     if (!el) return;
-    if (!outcomesHasMore || outcomesLoadingMore) return;
+    if (!outcomesHasMore || outcomesLoadingMore || outcomesLoadingInitial) return;
 
     const obs = new IntersectionObserver(
       (entries) => {
         const hit = entries.some((e) => e.isIntersecting);
         if (!hit) return;
-        if (!outcomesHasMore || outcomesLoadingMore) return;
+        if (!outcomesHasMore || outcomesLoadingMore || outcomesLoadingInitial) return;
         if (!outcomesCursor) return;
         setOutcomesLoadingMore(true);
         void (async () => {
           try {
-            const res = await fetch(
-              `/api/analyze/jobs/outcomes?cursor=${encodeURIComponent(outcomesCursor)}&limit=12`,
-              { cache: "no-store" }
-            );
+            const q = new URLSearchParams({
+              cursor: outcomesCursor,
+              limit: String(NOTIFICATION_OUTCOMES_PAGE_SIZE),
+              sinceDays: "7",
+            });
+            const res = await fetch(`/api/analyze/jobs/outcomes?${q.toString()}`, {
+              cache: "no-store",
+            });
             const data = (await res.json().catch(() => ({}))) as {
               jobs?: AnalysisJobListItem[];
               nextCursor?: string | null;
@@ -1204,7 +1217,7 @@ function AnalysisBell({
               );
             });
             setOutcomesCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
-            setOutcomesHasMore(jobs.length >= 12);
+            setOutcomesHasMore(jobs.length >= NOTIFICATION_OUTCOMES_PAGE_SIZE);
           } finally {
             setOutcomesLoadingMore(false);
           }
@@ -1215,7 +1228,7 @@ function AnalysisBell({
 
     obs.observe(el);
     return () => obs.disconnect();
-  }, [open, outcomesCursor, outcomesHasMore, outcomesLoadingMore]);
+  }, [open, outcomesCursor, outcomesHasMore, outcomesLoadingMore, outcomesLoadingInitial]);
 
   useEffect(() => {
     if (!open) return;
@@ -1357,11 +1370,19 @@ function AnalysisBell({
               ) : null}
             </div>
 
-            {outcomeJobs.length > 0 && (
+            {(outcomeJobs.length > 0 || outcomesLoadingInitial) && (
               <div className="border-t border-zinc-800 px-3 py-2">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                   최근 완료
                 </p>
+                {outcomesLoadingInitial && outcomeJobs.length === 0 ? (
+                  <div className="flex justify-center py-8" aria-busy="true" aria-label="알림 불러오는 중">
+                    <span
+                      className="inline-block h-6 w-6 shrink-0 animate-spin rounded-full border-2 border-zinc-600 border-t-cyan-400"
+                      role="status"
+                    />
+                  </div>
+                ) : (
                 <ul className="space-y-2 pt-1">
                   {outcomeJobs.map((j) => {
                     const read = readOutcomeJobIds.has(j.id);
@@ -1421,17 +1442,29 @@ function AnalysisBell({
                     );
                   })}
                 </ul>
-                <div ref={sentinelRef} className="h-1" />
-                {outcomesLoadingMore && (
-                  <p className="px-1 py-2 text-center text-xs text-zinc-600">
-                    더 불러오는 중…
-                  </p>
                 )}
-                {!outcomesHasMore && outcomeJobs.length > 0 && (
-                  <p className="px-1 py-2 text-center text-[10px] text-zinc-700">
-                    더 이상 알림이 없습니다
-                  </p>
-                )}
+                {!outcomesLoadingInitial || outcomeJobs.length > 0 ? (
+                  <>
+                    <div ref={sentinelRef} className="h-1" />
+                    {outcomesLoadingMore && (
+                      <div
+                        className="flex justify-center py-3"
+                        aria-busy="true"
+                        aria-label="추가 알림 불러오는 중"
+                      >
+                        <span
+                          className="inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-zinc-600 border-t-cyan-400"
+                          role="status"
+                        />
+                      </div>
+                    )}
+                    {!outcomesHasMore && outcomeJobs.length > 0 && !outcomesLoadingMore && (
+                      <p className="px-1 py-2 text-center text-[10px] text-zinc-600">
+                        모든 알림을 불러왔습니다
+                      </p>
+                    )}
+                  </>
+                ) : null}
               </div>
             )}
 

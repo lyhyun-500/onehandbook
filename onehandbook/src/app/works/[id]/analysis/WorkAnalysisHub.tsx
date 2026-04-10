@@ -12,6 +12,7 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnalyzePanel, type VersionOption } from "@/components/AnalyzePanel";
 import { CopyWithBreaks } from "@/components/CopyWithBreaks";
+import { PHONE_SIGNUP_REWARD_COINS } from "@/config/phoneSignupReward";
 import { NatSpendConfirmModal } from "@/components/NatSpendConfirmModal";
 import { ManuscriptLowVolumeModal } from "@/components/ManuscriptLowVolumeModal";
 import { BatchHolisticReport } from "@/components/BatchHolisticReport";
@@ -53,7 +54,6 @@ function WorkAnalysisHubInner({
   versions,
   natBalance,
   initialFocusEpisodeId,
-  initialTab,
   phoneVerified,
 }: {
   workId: string;
@@ -80,6 +80,7 @@ function WorkAnalysisHubInner({
   const [serverHolistic, setServerHolistic] = useState<HolisticRunRow | null>(
     null
   );
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [serverLoadError, setServerLoadError] = useState<string | null>(null);
 
   const effectiveEpisodes = serverEpisodes ?? episodes;
@@ -121,8 +122,6 @@ function WorkAnalysisHubInner({
     null
   );
 
-  const [activeTab, setActiveTab] = useState<"single" | "batch">(initialTab);
-
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -155,11 +154,14 @@ function WorkAnalysisHubInner({
     };
   }, [workId]);
 
-  useEffect(() => {
-    const next: "single" | "batch" =
-      searchParams.get("tab") === "batch" ? "batch" : "single";
-    setActiveTab(next);
-  }, [searchParams]);
+  const urlTab: "single" | "batch" =
+    searchParams.get("tab") === "batch" ? "batch" : "single";
+
+  const activeTab: "single" | "batch" =
+    initialFocusEpisodeId &&
+    effectiveEpisodes.some((e) => e.id === initialFocusEpisodeId)
+      ? "single"
+      : urlTab;
 
   const goToTab = useCallback(
     (next: "single" | "batch") => {
@@ -176,27 +178,19 @@ function WorkAnalysisHubInner({
     [pathname, router, searchParams]
   );
 
-  useEffect(() => {
-    if (
-      holisticClient &&
-      effectiveLatestHolistic &&
-      effectiveLatestHolistic.id === holisticClient.id
-    ) {
-      setHolisticClient(null);
-    }
-  }, [effectiveLatestHolistic, holisticClient]);
+  const effectiveHolisticClient =
+    holisticClient &&
+    effectiveLatestHolistic &&
+    effectiveLatestHolistic.id === holisticClient.id
+      ? null
+      : holisticClient;
 
-  useEffect(() => {
-    if (!batchIncludePlatform) {
-      setBatchAgent(NAT_GENERIC_AGENT_ID);
-    }
-  }, [batchIncludePlatform]);
-
-  useEffect(() => {
-    setBatchAgent((prev) =>
-      prev && versions.some((v) => v.id === prev) ? prev : defaultAgent
-    );
-  }, [defaultAgent, versions]);
+  const effectiveBatchAgent = useMemo(() => {
+    if (!batchIncludePlatform) return NAT_GENERIC_AGENT_ID;
+    return batchAgent && versions.some((v) => v.id === batchAgent)
+      ? batchAgent
+      : defaultAgent;
+  }, [batchIncludePlatform, batchAgent, defaultAgent, versions]);
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => {
     const s = new Set<number>();
@@ -222,7 +216,7 @@ function WorkAnalysisHubInner({
       initialFocusEpisodeId &&
       effectiveEpisodes.some((e) => e.id === initialFocusEpisodeId)
     ) {
-      setActiveTab("single");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPanelEpisodeId(initialFocusEpisodeId);
       requestAnimationFrame(() => {
         document
@@ -307,7 +301,7 @@ function WorkAnalysisHubInner({
     batchIncludePlatform,
   ]);
 
-  const activeHolistic = holisticClient ?? effectiveLatestHolistic;
+  const activeHolistic = effectiveHolisticClient ?? effectiveLatestHolistic;
 
   const holisticReportEpisodes = useMemo(() => {
     if (!activeHolistic) return null;
@@ -325,7 +319,7 @@ function WorkAnalysisHubInner({
 
   const effectiveBatchAgentId = resolveAnalysisAgentVersion(
     batchIncludePlatform,
-    batchAgent
+    effectiveBatchAgent
   );
   const batchEffectiveAvailable = versions.some(
     (v) => v.id === effectiveBatchAgentId && v.available
@@ -463,7 +457,7 @@ function WorkAnalysisHubInner({
         body: JSON.stringify({
           workId: workIdNum,
           episodeIds: orderedSelectedIds,
-          agentVersion: batchAgent,
+          agentVersion: effectiveBatchAgent,
           includeLore: batchIncludeLore,
           includePlatformOptimization: batchIncludePlatform,
           ...(opts?.skipUnchangedPrecheck ? { force: true } : {}),
@@ -475,7 +469,7 @@ function WorkAnalysisHubInner({
           setBatchError(
             typeof data.error === "string"
               ? data.error
-              : "휴대폰 인증 후 이용 가능합니다."
+              : `휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인을 드립니다. 인증 후 이용할 수 있습니다.`
           );
           return;
         }
@@ -646,7 +640,7 @@ function WorkAnalysisHubInner({
               jobId,
               workId: workIdNum,
               orderedEpisodeIds: orderedSelectedIds,
-              agentVersion: batchAgent,
+              agentVersion: effectiveBatchAgent,
               includeLore: batchIncludeLore,
               includePlatformOptimization: batchIncludePlatform,
             }),
@@ -999,7 +993,9 @@ function WorkAnalysisHubInner({
           <div className="mb-8 space-y-4 rounded-lg border border-zinc-800 bg-zinc-950/40 p-4">
             {!phoneVerified && (
               <p className="rounded-lg border border-amber-500/30 bg-amber-950/25 px-3 py-2 text-sm text-amber-100/95">
-                <CopyWithBreaks as="span">휴대폰 인증 후 이용 가능합니다.</CopyWithBreaks>{" "}
+                <CopyWithBreaks as="span">
+                  {`휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인을 드립니다. 인증 후 이용할 수 있습니다.`}
+                </CopyWithBreaks>{" "}
                 <Link
                   href="/verify-phone"
                   className="font-medium text-cyan-400 underline-offset-2 hover:text-cyan-300 hover:underline"
@@ -1022,7 +1018,19 @@ function WorkAnalysisHubInner({
                 <input
                   type="checkbox"
                   checked={batchIncludePlatform}
-                  onChange={(e) => setBatchIncludePlatform(e.target.checked)}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setBatchIncludePlatform(next);
+                    if (!next) {
+                      setBatchAgent(NAT_GENERIC_AGENT_ID);
+                    } else {
+                      setBatchAgent((prev) =>
+                        prev && versions.some((v) => v.id === prev)
+                          ? prev
+                          : defaultAgent
+                      );
+                    }
+                  }}
                   className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-cyan-600"
                 />
                 플랫폼 맞춤 분석 (+1 NAT, 통합 1회)
@@ -1034,7 +1042,7 @@ function WorkAnalysisHubInner({
                   분석 플랫폼
                 </label>
                 <select
-                  value={batchAgent}
+                  value={effectiveBatchAgent}
                   onChange={(e) => setBatchAgent(e.target.value)}
                   disabled={!batchIncludePlatform}
                   className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 disabled:opacity-50"

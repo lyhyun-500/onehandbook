@@ -286,10 +286,10 @@ export async function buildAnalyzeJobPollResponse(
   if (user) {
     const { data: app } = await supabase
       .from("users")
-      .select("nat_balance")
+      .select("coin_balance")
       .eq("auth_id", user.id)
       .maybeSingle();
-    balance = app?.nat_balance ?? undefined;
+    balance = app?.coin_balance ?? undefined;
   }
 
   return {

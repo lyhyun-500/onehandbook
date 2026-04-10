@@ -27,7 +27,7 @@ function scoreClass(score: number) {
   return "text-zinc-500";
 }
 
-export function DashboardWorkCard({
+export function StudioWorkCard({
   work,
   agentScore,
 }: {

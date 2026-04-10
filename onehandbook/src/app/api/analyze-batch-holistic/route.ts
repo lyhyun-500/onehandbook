@@ -219,7 +219,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const balance = appUser.nat_balance ?? 0;
+  const balance = appUser.coin_balance ?? 0;
   if (balance < estNat.total) {
     return NextResponse.json(
       {

@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { PHONE_SIGNUP_REWARD_COINS } from "@/config/phoneSignupReward";
 import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import { CopyWithBreaks } from "@/components/CopyWithBreaks";
@@ -8,21 +10,30 @@ import {
   type AnalysisRunRow,
 } from "@/lib/analysisSummary";
 import { AddWorkButton } from "./AddWorkButton";
-import { DashboardWorkCard } from "./DashboardWorkCard";
+import { StudioWorkCard } from "./StudioWorkCard";
 
-export default async function DashboardPage() {
+export default async function StudioPage() {
   const supabase = await createClient();
-  const { id: userId, email: userEmail, nat_balance, phone_verified } =
+  const { id: userId, email: userEmail, coin_balance, phone_verified } =
     await requireAppUser(supabase);
 
-  // 1. 내 작품 목록
+  // 로그인 콜백에서는 DB 조회를 기다리지 않고 /studio로 보내므로,
+  // 최초 진입 시 여기서 약관 동의 여부를 확인해 /auth/welcome로 이동시킵니다.
+  const { data: consentRow } = await supabase
+    .from("users")
+    .select("terms_agreed_at")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!consentRow?.terms_agreed_at) {
+    redirect("/auth/welcome");
+  }
+
   const { data: works } = await supabase
     .from("works")
     .select("id, title, genre, status, total_episodes, created_at")
     .eq("author_id", userId)
     .order("created_at", { ascending: false });
 
-  // 3. Agent Score — 작품별 분석이 있는 회차 종합 점수 평균
   const workIds = (works ?? []).map((w) => w.id);
   let agentScores: Record<number, number | null> = {};
 
@@ -38,7 +49,7 @@ export default async function DashboardPage() {
     agentScores = agentScoresByWorkFromRuns(runs);
   }
 
-  const natBalance = nat_balance ?? 0;
+  const natBalance = coin_balance ?? 0;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -48,7 +59,7 @@ export default async function DashboardPage() {
         {!phone_verified && (
           <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-950/25 px-4 py-3 text-sm text-amber-100/95">
             <CopyWithBreaks as="span">
-              휴대폰 인증 후 AI 분석을 이용할 수 있습니다.
+              {`휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인을 드립니다. AI 분석은 인증 후 이용할 수 있습니다.`}
             </CopyWithBreaks>{" "}
             <Link
               href="/verify-phone"
@@ -61,9 +72,9 @@ export default async function DashboardPage() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="mb-1 text-xs font-medium uppercase tracking-widest text-cyan-400/90">
-              작가 스튜디오
+              작가 도구
             </p>
-            <h1 className="text-2xl font-bold text-zinc-100">작가 대시보드</h1>
+            <h1 className="text-2xl font-bold text-zinc-100">스튜디오</h1>
             <p className="mt-1 text-sm text-zinc-400 sm:text-base">
               내 작품 현황과 Agent Score(분석 회차 평균)를 확인하세요
             </p>
@@ -81,7 +92,7 @@ export default async function DashboardPage() {
         ) : (
           <div className="space-y-4">
             {works.map((work) => (
-              <DashboardWorkCard
+              <StudioWorkCard
                 key={work.id}
                 work={{
                   id: work.id,

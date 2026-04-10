@@ -75,6 +75,7 @@
 > 스트레스 줄이려고 “한 줄 요약”만.
 
 - **2026-04-04 전후 묶음:** 회원 탈퇴(`POST /api/account/withdraw`·모달·`탈퇴합니다` 확인·NAT 삭제 안내 강조)·`users.deleted_at` 소프트 삭제·관련 SQL 마이그레이션. OAuth **로컬 개발** 시 `oauthCallbackOrigin`으로 localhost면 `NEXT_PUBLIC_SITE_URL` 대신 **현재 origin**을 `redirectTo`에 사용. **네이버 로그인** 기본 노출 + Vercel에 `NAVER_CLIENT_ID`/`SECRET` 없으면 `/api/auth/naver/start` JSON 오류(검수와 무관, 환경 변수 이슈). **랜딩(/):** 네이버 검수 전 히어로에서 플랫폼 브랜드 나열 제거 → 카피를 **「장르·연재 맥락에 맞춘 AI 흥행 분석」** 으로 단순화.
+- **2026-04-09:** 네이버 커스텀 콜백 멱등 로그인/속도 개선(이메일 매칭 정규화·HTTP lookup 우선·재시도 축소). 트렌드 RAG 인제스트(시드니 Chroma + Supabase `trends`) dedup/upsert·로컬 백업. `training_logs` 수집/좋아요 마킹 API 추가. `/dashboard`→`/studio` 전환 및 알림(벨) 패널 무한스크롤. **회원 탈퇴 플로우 2단계 개편**(이유 라디오 + 동의 체크) + `account_withdrawals` 저장 후 삭제. 탈퇴용 service_role 권한/유니크 인덱스 정리. Vercel 프로덕션 배포 완료 + 인제스트 스모크 테스트(`check-count.ts`/`test-ingest.ts`) 통과.
 - (예) 원고 글자수 분기·Claude 통일·`users` 동기화·Agent Score=분석 평균 …
 - **이 화 분석 연속성:** 앞선 회차 **분석 요약만** 컨텍스트로 주입(원고 전체 재전송 없음). `previous_episodes_context`·프롬프트·`/api/analyze` 연동.
 - **일괄 통합 대용량:** 10화 초과 시 `analyze-batch-holistic-chunk`(최대 10화)·순차 처리·재시도 → `analyze-batch-holistic-merge`로 종합 리포트·`holistic_analysis_runs` 저장. UI: 진행률·ETA·병합 단계 표시. NAT: `estimateHolisticBatchTotalNat`로 배치+병합 안내.

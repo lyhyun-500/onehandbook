@@ -10,18 +10,17 @@ import {
   OHB_REMEMBER_ME_LS_KEY,
   setClientPersistencePreferenceCookie,
 } from "@/lib/supabase/authPersistence";
+import { getOAuthRedirectBaseForBrowser } from "@/lib/oauthRedirectBase";
 
 export type LoginPageClientProps = {
   naverLoginEnabled: boolean;
-  /** Google OAuth `redirectTo` — Supabase Redirect URLs·실제 접속 도메인과 같아야 함 */
-  oauthCallbackOrigin: string;
 };
 
 export function LoginPageClient({
   naverLoginEnabled,
-  oauthCallbackOrigin,
 }: LoginPageClientProps) {
   const [loading, setLoading] = useState(false);
+  const [loadingProvider, setLoadingProvider] = useState<"google" | "naver" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const supabase = createClient();
@@ -47,15 +46,24 @@ export function LoginPageClient({
     }
   };
 
+  /** 다른 OAuth(구글↔네이버)를 연속 시도할 때 남은 Supabase 세션·PKCE 잔여와 섞이지 않게 로컬만 정리 */
+  async function clearLocalAuthBeforeOAuth() {
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+  }
+
   const signInWithGoogle = async () => {
     setLoading(true);
+    setLoadingProvider("google");
     setError(null);
     try {
       persistSessionPreference();
+      await clearLocalAuthBeforeOAuth();
+      // Supabase 허용 목록과 맞추기 위해 개발 시 127.0.0.1 → localhost 통일 (`oauthRedirectBase`).
+      const callbackBase = getOAuthRedirectBaseForBrowser();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${oauthCallbackOrigin.replace(/\/$/, "")}/auth/callback`,
+          redirectTo: `${callbackBase}/auth/callback?provider=google`,
         },
       });
       if (error) throw error;
@@ -64,6 +72,7 @@ export function LoginPageClient({
         err instanceof Error ? err.message : "Google 로그인에 실패했습니다."
       );
       setLoading(false);
+      setLoadingProvider(null);
     }
   };
 
@@ -103,23 +112,54 @@ export function LoginPageClient({
                 className="h-5 w-5 shrink-0"
                 aria-hidden
               />
-              Google로 계속
+              {loadingProvider === "google" ? "로그인 중…" : "Google로 계속"}
             </button>
 
             {naverLoginEnabled && (
               <Link
                 href="/api/auth/naver/start"
-                onClick={persistSessionPreference}
-                className="block w-full overflow-hidden rounded-xl no-underline transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#03A94D]"
+                onClick={async (e) => {
+                  if (e.button !== 0) return;
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                  e.preventDefault();
+                  if (loading) return;
+                  setLoading(true);
+                  setLoadingProvider("naver");
+                  setError(null);
+                  persistSessionPreference();
+                  await clearLocalAuthBeforeOAuth();
+                  window.location.assign("/api/auth/naver/start");
+                }}
+                className={[
+                  "relative block w-full overflow-hidden rounded-xl no-underline transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#03A94D]",
+                  loading
+                    ? "pointer-events-none opacity-50"
+                    : "hover:opacity-90",
+                ].join(" ")}
+                aria-busy={loadingProvider === "naver"}
               >
                 <Image
                   src="/images/naver-login-kr.jpg"
                   alt="네이버 로그인"
                   width={1024}
                   height={155}
-                  className="h-auto w-full"
+                  className={[
+                    "h-auto w-full",
+                    loadingProvider === "naver" ? "invisible" : "",
+                  ].join(" ")}
                   sizes="(max-width: 448px) 100vw, 448px"
                 />
+                {loadingProvider === "naver" && (
+                  <div
+                    className="absolute inset-0 flex items-center justify-center bg-black/35"
+                    aria-live="polite"
+                  >
+                    <span
+                      className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-white/60 border-t-white"
+                      aria-hidden
+                    />
+                  </div>
+                )}
               </Link>
             )}
           </div>

@@ -154,7 +154,7 @@ export async function POST(request: Request) {
     : null;
 
   if (cachedRun) {
-    const balanceAfter = appUser.nat_balance ?? 0;
+    const balanceAfter = appUser.coin_balance ?? 0;
     const { data: lastTwo } = await supabase
       .from("analysis_results")
       .select("score, feedback, nat_consumed, created_at")
@@ -197,7 +197,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const balance = appUser.nat_balance ?? 0;
+  const balance = appUser.coin_balance ?? 0;
   if (balance < cost) {
     return NextResponse.json(
       {

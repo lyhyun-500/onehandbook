@@ -30,7 +30,7 @@ export default async function WorkSettingsPage({
     notFound();
   }
 
-  const natBalance = appUser.nat_balance ?? 0;
+  const natBalance = appUser.coin_balance ?? 0;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">

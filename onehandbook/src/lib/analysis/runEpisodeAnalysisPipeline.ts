@@ -35,6 +35,7 @@ import {
 } from "@/lib/analysis/analysisResultsWorkContextSupport";
 import type { AppUser } from "@/lib/supabase/appUser";
 import { AnalysisProviderExhaustedError } from "@/lib/analysis/analysisErrors";
+import { insertTrainingLogPair } from "@/lib/training/trainingLogs";
 
 type ConsumeNatRpcResult = {
   ok?: boolean;
@@ -121,7 +122,7 @@ export async function runEpisodeAnalysisPipeline(
     );
   }
 
-  const balance = appUser.nat_balance ?? 0;
+  const balance = appUser.coin_balance ?? 0;
   if (balance < cost) {
     const err = new Error("NAT가 부족합니다.");
     (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
@@ -187,6 +188,8 @@ export async function runEpisodeAnalysisPipeline(
 
   let result;
   let version;
+  let trendsContextBlock: string | null = null;
+  let trendsReferences: unknown[] = [];
   try {
     const out = await runAnalysis(
       {
@@ -203,6 +206,8 @@ export async function runEpisodeAnalysisPipeline(
     );
     result = out.result;
     version = out.version;
+    trendsContextBlock = out.trendsContextBlock;
+    trendsReferences = out.trendsReferences;
   } catch (e) {
     if (e instanceof AnalysisProviderExhaustedError) {
       throw e;
@@ -298,6 +303,28 @@ export async function runEpisodeAnalysisPipeline(
     .eq("id", episode.id);
   if (epHashErr) {
     console.warn("episodes content_hash 반영 실패:", epHashErr.message);
+  }
+
+  // 파인튜닝/학습 데이터용 로그: [입력 원고 + 참고한 트렌드(RAG) + AI 답변(결과 JSON)]
+  // 실패해도 분석 결과 저장은 막지 않도록 best-effort로 처리합니다.
+  try {
+    await insertTrainingLogPair(supabase, appUser.id, {
+      userMessage: episode.content,
+      assistantMessage: JSON.stringify(result),
+      context: {
+        kind: "episode_analysis",
+        work_id: work.id,
+        episode_id: episode.id,
+        analysis_run_id: row.id,
+        agent_version: version.id,
+        rag: {
+          block: trendsContextBlock,
+          references: trendsReferences,
+        },
+      },
+    });
+  } catch (e) {
+    console.warn("training_logs 저장 실패(무시):", e);
   }
 
   return {

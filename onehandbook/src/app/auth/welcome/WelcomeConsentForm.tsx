@@ -57,7 +57,7 @@ export function WelcomeConsentForm() {
           typeof data.error === "string" ? data.error : "저장에 실패했습니다."
         );
       }
-      router.push("/dashboard");
+      router.push("/studio");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "오류가 발생했습니다.");

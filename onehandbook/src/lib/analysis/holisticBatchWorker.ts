@@ -33,6 +33,69 @@ import {
   logHolisticPipeline,
   type HolisticPipelineDbLogInput,
 } from "@/lib/analysis/holisticPipelineLog";
+import { insertTrainingLogPair } from "@/lib/training/trainingLogs";
+
+function buildHolisticReportMarkdown(args: {
+  workTitle: string | null;
+  genre: string | null;
+  orderedEpisodeIds: number[];
+  result: HolisticAnalysisResult;
+}): string {
+  const { workTitle, genre, orderedEpisodeIds, result } = args;
+  const lines: string[] = [];
+  lines.push(`# 통합 분석 리포트`);
+  if (workTitle) lines.push(`- 작품: ${workTitle}`);
+  if (genre) lines.push(`- 장르: ${genre}`);
+  lines.push(`- 대상 회차 수: ${orderedEpisodeIds.length}`);
+  lines.push(`- 종합 점수: ${result.overall_score} / 100`);
+  lines.push("");
+
+  lines.push("## Executive Summary");
+  lines.push(result.executive_summary?.trim() || "(요약 없음)");
+  lines.push("");
+
+  if (Array.isArray(result.episode_scores) && result.episode_scores.length > 0) {
+    lines.push("## 회차별 점수");
+    for (const s of result.episode_scores.slice(0, 200)) {
+      const t = s.episode_title ? ` — ${s.episode_title}` : "";
+      lines.push(`- ${s.episode_number}화${t}: ${s.score}`);
+    }
+    lines.push("");
+  }
+
+  lines.push("## 항목별 점수/코멘트");
+  for (const [k, v] of Object.entries(result.dimensions ?? {})) {
+    lines.push(`### ${k} (${v.score}/100)`);
+    lines.push(String(v.comment ?? "").trim() || "(코멘트 없음)");
+    lines.push("");
+  }
+
+  if (Array.isArray(result.strengths) && result.strengths.length > 0) {
+    lines.push("## 강점");
+    for (const s of result.strengths.slice(0, 200)) lines.push(`- ${s}`);
+    lines.push("");
+  }
+
+  if (Array.isArray(result.improvements) && result.improvements.length > 0) {
+    lines.push("## 개선 포인트");
+    for (const s of result.improvements.slice(0, 200)) lines.push(`- ${s}`);
+    lines.push("");
+  }
+
+  if (result.tag_trend_fit) {
+    lines.push("## 트렌드 적합도/차별화");
+    lines.push(`- 적합도: ${result.tag_trend_fit.alignment}`);
+    lines.push(`- 차별화: ${result.tag_trend_fit.differentiation}`);
+    if (Array.isArray(result.tag_trend_fit.suggested_trend_tags)) {
+      lines.push(
+        `- 추천 태그: ${result.tag_trend_fit.suggested_trend_tags.join(", ")}`
+      );
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n").trim() + "\n";
+}
 
 function holisticPipelineDbCtx(
   base: HolisticPipelineDbLogInput | undefined,
@@ -217,7 +280,10 @@ export async function runHolisticBatchPipeline(
     : [];
 
   const analysisInputBase = {
-    manuscript: "",
+    manuscript: ordered
+      .map((e) => `# ${e.episode_number}화 ${e.title ?? ""}\n\n${e.content ?? ""}`)
+      .join("\n\n---\n\n")
+      .trim(),
     genre: work.genre ?? "",
     work_title: work.title ?? undefined,
     tags: Array.isArray(work.tags) ? work.tags : undefined,
@@ -269,7 +335,7 @@ export async function runHolisticBatchPipeline(
           0
         );
         const cost = computeHolisticNatCost(totalCombinedChars, opts);
-        const balance = refreshed.nat_balance ?? 0;
+        const balance = refreshed.coin_balance ?? 0;
         if (balance < cost) {
           const err = new Error(
             `NAT가 부족합니다. 이번 배치에는 ${cost} NAT가 필요합니다.`
@@ -357,7 +423,7 @@ export async function runHolisticBatchPipeline(
   if (!refreshed) throw new Error("사용자 정보를 찾을 수 없습니다.");
 
   const mergeCost = computeHolisticMergeNatCost();
-  const balance = refreshed.nat_balance ?? 0;
+  const balance = refreshed.coin_balance ?? 0;
   if (balance < mergeCost) {
     const err = new Error(`NAT가 부족합니다. 병합에는 ${mergeCost} NAT가 필요합니다.`);
     (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
@@ -385,7 +451,8 @@ export async function runHolisticBatchPipeline(
     charCount: countManuscriptChars(e.content ?? ""),
   }));
 
-  const { result: rawMerged, version } = await runHolisticMergeAnalysis(
+  const { result: rawMerged, version, trendsContextBlock, trendsReferences } =
+    await runHolisticMergeAnalysis(
     work.genre ?? "",
     mergePayloads,
     episodeWeights,
@@ -500,6 +567,68 @@ export async function runHolisticBatchPipeline(
     throw err;
   }
 
+  // 최종 통합 리포트 저장(best-effort): reports 테이블
+  try {
+    const reportBody = buildHolisticReportMarkdown({
+      workTitle: work.title ?? null,
+      genre: work.genre ?? null,
+      orderedEpisodeIds,
+      result,
+    });
+    await supabase.from("reports").insert({
+      app_user_id: work.author_id,
+      work_id: work.id,
+      holistic_run_id: row.id,
+      title: `${work.title ?? "작품"} · 통합 분석 리포트`,
+      body: reportBody,
+      result_json: result,
+      rag_context: { block: trendsContextBlock, references: trendsReferences },
+    });
+  } catch (e) {
+    console.warn("reports 저장 실패(무시):", e);
+  }
+
+  // 최종 통합 리포트 저장(best-effort): reports 테이블
+  try {
+    const reportBody = buildHolisticReportMarkdown({
+      workTitle: work.title ?? null,
+      genre: work.genre ?? null,
+      orderedEpisodeIds,
+      result,
+    });
+    await supabase.from("reports").insert({
+      app_user_id: work.author_id,
+      work_id: work.id,
+      holistic_run_id: row.id,
+      title: `${work.title ?? "작품"} · 통합 분석 리포트`,
+      body: reportBody,
+      result_json: result,
+      rag_context: { block: trendsContextBlock, references: trendsReferences },
+    });
+  } catch (e) {
+    console.warn("reports 저장 실패(무시):", e);
+  }
+
+  // 파인튜닝/학습 데이터용 로그(best-effort): [원고 + RAG + 최종 답변]
+  try {
+    const MAX = 200_000;
+    const manuscript = analysisInputBase.manuscript.slice(0, MAX);
+    await insertTrainingLogPair(supabase, work.author_id, {
+      userMessage: manuscript,
+      assistantMessage: JSON.stringify(result).slice(0, MAX),
+      context: {
+        kind: "holistic_analysis",
+        work_id: work.id,
+        holistic_run_id: row.id,
+        episode_ids: orderedEpisodeIds,
+        agent_version: version.id,
+        rag: { block: trendsContextBlock, references: trendsReferences },
+      },
+    });
+  } catch (e) {
+    console.warn("training_logs 저장 실패(무시):", e);
+  }
+
   let totalNatSpent = mergeCost;
   for (const ch of chunkResults) {
     const eps = ch.episodeIds.map((id) => byId.get(id)!);
@@ -576,11 +705,8 @@ async function finalizeSingleHolisticRun(args: {
     charCount: countManuscriptChars(e.content ?? ""),
   }));
 
-  const { result: rawResult, version } = await runHolisticAnalysis(
-    analysisInputBase,
-    segments,
-    effectiveVersion
-  );
+  const { result: rawResult, version, trendsContextBlock, trendsReferences } =
+    await runHolisticAnalysis(analysisInputBase, segments, effectiveVersion);
 
   const orderedForWeight = ordered.map((e) => ({
     episode_number: e.episode_number,
@@ -705,6 +831,26 @@ async function finalizeSingleHolisticRun(args: {
     );
     (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
     throw err;
+  }
+
+  // 파인튜닝/학습 데이터용 로그(best-effort): [원고 + RAG + 최종 답변]
+  try {
+    const MAX = 200_000;
+    const manuscript = analysisInputBase.manuscript.slice(0, MAX);
+    await insertTrainingLogPair(supabase, work.author_id, {
+      userMessage: manuscript,
+      assistantMessage: JSON.stringify(result).slice(0, MAX),
+      context: {
+        kind: "holistic_analysis",
+        work_id: work.id,
+        holistic_run_id: row.id,
+        episode_ids: orderedEpisodeIds,
+        agent_version: version.id,
+        rag: { block: trendsContextBlock, references: trendsReferences },
+      },
+    });
+  } catch (e) {
+    console.warn("training_logs 저장 실패(무시):", e);
   }
 
   return {

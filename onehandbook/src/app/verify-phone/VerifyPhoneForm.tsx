@@ -58,11 +58,11 @@ export function VerifyPhoneForm() {
         typeof data.natGranted === "number" ? data.natGranted : 0;
       setMessage(
         granted > 0
-          ? `인증이 완료되었습니다. 베타 NAT ${granted}개가 지급되었습니다.`
+          ? `인증이 완료되었습니다. ${granted}코인이 지급되었습니다.`
           : "인증이 완료되었습니다."
       );
       router.refresh();
-      setTimeout(() => router.push("/dashboard"), 1200);
+      setTimeout(() => router.push("/studio"), 1200);
     } catch (e) {
       setError(e instanceof Error ? e.message : "오류가 발생했습니다.");
     } finally {
@@ -163,8 +163,8 @@ export function VerifyPhoneForm() {
       )}
 
       <p className="text-center text-xs text-zinc-500">
-        <Link href="/dashboard" className="text-cyan-400 hover:text-cyan-300">
-          ← 대시보드로
+        <Link href="/studio" className="text-cyan-400 hover:text-cyan-300">
+          ← 스튜디오로
         </Link>
       </p>
     </div>

@@ -7,7 +7,15 @@ import {
   clearClientPersistencePreferenceCookie,
 } from "@/lib/supabase/authPersistence";
 
-const PHRASE = "탈퇴합니다";
+const REASONS = [
+  { value: "비용이 부담돼요", label: "💰 비용이 부담돼요" },
+  { value: "원하는 기능이 없어요", label: "🔍 원하는 기능이 없어요" },
+  { value: "분석 품질이 기대에 못 미쳐요", label: "🤖 분석 품질이 기대에 못 미쳐요" },
+  { value: "더 좋은 서비스를 찾았어요", label: "⚡ 더 좋은 서비스를 찾았어요" },
+  { value: "당분간 쓸 일이 없어요", label: "🕐 당분간 쓸 일이 없어요" },
+  { value: "기타", label: "📝 기타 (직접 입력)" },
+] as const;
+type WithdrawReason = (typeof REASONS)[number]["value"];
 
 type WithdrawAccountModalProps = {
   open: boolean;
@@ -16,16 +24,24 @@ type WithdrawAccountModalProps = {
 
 export function WithdrawAccountModal({ open, onClose }: WithdrawAccountModalProps) {
   const labelId = useId();
-  const inputId = useId();
-  const [phrase, setPhrase] = useState("");
+  const detailId = useId();
+  const agreeId = useId();
+  const [step, setStep] = useState<1 | 2>(1);
+  const [reason, setReason] = useState<WithdrawReason | "">("");
+  const [reasonDetail, setReasonDetail] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = phrase.trim() === PHRASE && !submitting;
+  const canNext = reason !== "" && (reason !== "기타" || reasonDetail.trim().length >= 2);
+  const canSubmit = agreed && !submitting;
 
   useEffect(() => {
     if (!open) {
-      setPhrase("");
+      setStep(1);
+      setReason("");
+      setReasonDetail("");
+      setAgreed(false);
       setError(null);
       setSubmitting(false);
     }
@@ -49,7 +65,11 @@ export function WithdrawAccountModal({ open, onClose }: WithdrawAccountModalProp
       const res = await fetch("/api/account/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmPhrase: phrase.trim() }),
+        body: JSON.stringify({
+          reason,
+          reasonDetail: reason === "기타" ? reasonDetail.trim() : "",
+          confirmed: agreed,
+        }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
@@ -92,23 +112,73 @@ export function WithdrawAccountModal({ open, onClose }: WithdrawAccountModalProp
           이 삭제되며 복구할 수 없습니다.
         </p>
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <div>
-            <label htmlFor={inputId} className="mb-1.5 block text-sm text-zinc-300">
-              아래 문구를 그대로 입력해 주세요.
-            </label>
-            <p className="mb-2 rounded-lg border border-amber-500/20 bg-amber-950/20 px-3 py-2 font-mono text-sm text-amber-100/90">
-              {PHRASE}
-            </p>
-            <input
-              id={inputId}
-              type="text"
-              value={phrase}
-              onChange={(e) => setPhrase(e.target.value)}
-              autoComplete="off"
-              className="w-full rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-red-500/60 focus:outline-none focus:ring-1 focus:ring-red-500/40"
-              placeholder={PHRASE}
-            />
-          </div>
+          {step === 1 ? (
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-zinc-200">탈퇴 이유를 선택해 주세요.</p>
+              <div className="space-y-2">
+                {REASONS.map((r) => {
+                  const checked = reason === r.value;
+                  return (
+                    <label
+                      key={r.value}
+                      className={[
+                        "flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors",
+                        checked
+                          ? "border-red-500/50 bg-red-500/10 text-zinc-100"
+                          : "border-zinc-700 bg-zinc-950/10 text-zinc-200 hover:bg-zinc-800/50",
+                      ].join(" ")}
+                    >
+                      <input
+                        type="radio"
+                        name="withdraw_reason"
+                        value={r.value}
+                        checked={checked}
+                        onChange={() => setReason(r.value)}
+                        className="h-4 w-4 accent-red-500"
+                      />
+                      <span>{r.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {reason === "기타" && (
+                <div className="pt-1">
+                  <label htmlFor={detailId} className="mb-1.5 block text-sm text-zinc-300">
+                    기타 사유를 입력해 주세요.
+                  </label>
+                  <textarea
+                    id={detailId}
+                    value={reasonDetail}
+                    onChange={(e) => setReasonDetail(e.target.value)}
+                    rows={3}
+                    className="w-full resize-none rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-red-500/60 focus:outline-none focus:ring-1 focus:ring-red-500/40"
+                    placeholder="예) 기능이 부족해서요"
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-zinc-200">마지막으로 확인해 주세요.</p>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-400">
+                <li>탈퇴 시 작품/회차/분석 결과/NAT 코인이 삭제되며 복구할 수 없습니다.</li>
+                <li>탈퇴 후 동일 계정으로 재가입하더라도 이전 데이터는 복구되지 않습니다.</li>
+              </ul>
+              <label
+                htmlFor={agreeId}
+                className="mt-2 flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-700 bg-zinc-950/10 px-3 py-3 text-sm text-zinc-200 hover:bg-zinc-800/50"
+              >
+                <input
+                  id={agreeId}
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-red-500"
+                />
+                <span>위 사항을 확인했으며 탈퇴에 동의합니다</span>
+              </label>
+            </div>
+          )}
           {error && (
             <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
               <CopyWithBreaks as="span">{error}</CopyWithBreaks>
@@ -117,17 +187,33 @@ export function WithdrawAccountModal({ open, onClose }: WithdrawAccountModalProp
           <div className="flex gap-2 pt-1">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                if (step === 2) {
+                  setStep(1);
+                  setAgreed(false);
+                  setError(null);
+                  setSubmitting(false);
+                } else {
+                  onClose();
+                }
+              }}
               className="flex-1 rounded-lg border border-zinc-600 bg-zinc-800/80 py-2.5 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
             >
-              취소
+              {step === 2 ? "이전" : "취소"}
             </button>
             <button
-              type="submit"
-              disabled={!canSubmit}
+              type={step === 2 ? "submit" : "button"}
+              disabled={step === 1 ? !canNext : !canSubmit}
+              onClick={() => {
+                if (step === 1) {
+                  if (!canNext) return;
+                  setStep(2);
+                  setError(null);
+                }
+              }}
               className="flex-1 rounded-lg bg-red-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {submitting ? "처리 중…" : "탈퇴하기"}
+              {step === 1 ? "다음" : submitting ? "처리 중…" : "탈퇴하기"}
             </button>
           </div>
         </form>

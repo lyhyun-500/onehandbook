@@ -51,14 +51,9 @@ function loopbackTrendsSearchBaseUrl(): string | null {
 async function fetchTrendsContextForAnalysisMaybe(
   genre: string,
   workTitle: string,
-  tags: string[] | undefined
+  tags: string[] | undefined,
+  themeHint?: string
 ): Promise<TrendsContextPack> {
-  // Vercel serverless 번들 크기(250MB) 초과를 피하기 위해
-  // 프로덕션 빌드에서는 로컬 Chroma(@chroma-core/default-embed 포함)를 아예 포함하지 않습니다.
-  if (process.env.NODE_ENV === "production") {
-    return { block: null, references: [] };
-  }
-
   const secret = process.env.TRENDS_RAG_API_SECRET?.trim();
   const base = loopbackTrendsSearchBaseUrl();
   if (!secret || !base) return { block: null, references: [] };
@@ -70,6 +65,10 @@ async function fetchTrendsContextForAnalysisMaybe(
         .slice(0, 10)
     : [];
   const tagsLine = tagsNorm.length > 0 ? ` 태그: ${tagsNorm.join(", ")}.` : "";
+  const themeLine =
+    typeof themeHint === "string" && themeHint.trim()
+      ? ` 핵심 테마: ${themeHint.trim().slice(0, 120)}.`
+      : "";
 
   try {
     const res = await fetch(`${base}/api/rag/trends/search`, {
@@ -79,7 +78,7 @@ async function fetchTrendsContextForAnalysisMaybe(
         Authorization: `Bearer ${secret}`,
       },
       body: JSON.stringify({
-        query: `장르: ${genre}. 작품 제목: ${workTitle}.${tagsLine}`,
+        query: `장르: ${genre}. 작품 제목: ${workTitle}.${tagsLine}${themeLine}`,
         n: 8,
         genre,
         ...(tagsNorm.length > 0 ? { tags: tagsNorm } : {}),
@@ -99,7 +98,7 @@ async function fetchTrendsContextForAnalysisMaybe(
       .filter((r) => Boolean(r.source) && Boolean(r.date));
     const block =
       hits.length > 0
-        ? `## 최신 웹소설 트렌드 참고 자료 (RAG)\n(개발 모드 루프백)\n\n${hits
+        ? `## 최신 웹소설 트렌드 참고 자료 (RAG)\n\n${hits
             .slice(0, 8)
             .map((h, i) => `### 스니펫 ${i + 1}\n${String(h.document ?? "").trim()}`)
             .join("\n\n")}`
@@ -108,6 +107,49 @@ async function fetchTrendsContextForAnalysisMaybe(
   } catch {
     return { block: null, references: [] };
   }
+}
+
+function extractThemeHintFromManuscript(manuscript: string): string | null {
+  const text = manuscript.replace(/\r\n/g, "\n");
+  const tags = (text.match(/#[^\s#]{1,20}/g) ?? [])
+    .map((t) => t.replace(/^#+/, "").trim())
+    .filter(Boolean)
+    .slice(0, 8);
+  if (tags.length > 0) return tags.join(", ");
+
+  const words = text
+    .slice(0, 4000)
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 2 && w.length <= 12);
+
+  const stop = new Set([
+    "그리고",
+    "하지만",
+    "그래서",
+    "그런데",
+    "그러나",
+    "나는",
+    "그는",
+    "그녀는",
+    "한다",
+    "했다",
+    "된다",
+    "있다",
+    "없다",
+  ]);
+
+  const freq = new Map<string, number>();
+  for (const w of words) {
+    if (stop.has(w)) continue;
+    freq.set(w, (freq.get(w) ?? 0) + 1);
+  }
+  const top = [...freq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([w]) => w);
+  return top.length > 0 ? top.join(", ") : null;
 }
 
 function formatJsonParseFailures(first: unknown, second: unknown): string {
@@ -173,7 +215,14 @@ async function completeAndParseModelJson<T>(
 export async function runAnalysis(
   input: AnalysisInput,
   versionId: string = ANALYSIS_PROFILES[0]!.id
-): Promise<{ result: AnalysisResult; version: AgentVersionConfig }> {
+): Promise<{
+  result: AnalysisResult;
+  version: AgentVersionConfig;
+  /** LLM 프롬프트에 포함된 RAG 스니펫(없으면 null) */
+  trendsContextBlock: string | null;
+  /** 표시용 출처/날짜만 남긴 레퍼런스 목록 */
+  trendsReferences: TrendReferenceItem[];
+}> {
   const profile = getProfileConfig(versionId);
   if (!profile) {
     throw new Error(`알 수 없는 분석 프로필: ${versionId}`);
@@ -183,7 +232,8 @@ export async function runAnalysis(
     await fetchTrendsContextForAnalysisMaybe(
       input.genre,
       input.work_title ?? "",
-      input.tags
+      input.tags,
+      extractThemeHintFromManuscript(input.manuscript) ?? undefined
     );
   const system = buildSystemPrompt(input.genre, profile, trendsBlock);
   const user = buildUserPrompt(input);
@@ -200,7 +250,12 @@ export async function runAnalysis(
     provider: profile.provider,
     model: profile.model,
   };
-  return { result, version };
+  return {
+    result,
+    version,
+    trendsContextBlock: trendsBlock,
+    trendsReferences: trendRefs,
+  };
 }
 
 export async function runHolisticAnalysis(
@@ -210,6 +265,8 @@ export async function runHolisticAnalysis(
 ): Promise<{
   result: HolisticAnalysisResult;
   version: AgentVersionConfig;
+  trendsContextBlock: string | null;
+  trendsReferences: TrendReferenceItem[];
 }> {
   const profile = getProfileConfig(versionId);
   if (!profile) {
@@ -220,7 +277,8 @@ export async function runHolisticAnalysis(
     await fetchTrendsContextForAnalysisMaybe(
       input.genre,
       input.work_title ?? "",
-      input.tags
+      input.tags,
+      extractThemeHintFromManuscript(input.manuscript) ?? undefined
     );
   const system = buildHolisticSystemPrompt(input.genre, profile, trendsBlock);
   const user = buildHolisticUserPrompt(input.genre, input, segments);
@@ -242,7 +300,12 @@ export async function runHolisticAnalysis(
     provider: profile.provider,
     model: profile.model,
   };
-  return { result, version };
+  return {
+    result,
+    version,
+    trendsContextBlock: trendsBlock,
+    trendsReferences: trendRefs,
+  };
 }
 
 export async function runHolisticMergeAnalysis(
@@ -255,6 +318,8 @@ export async function runHolisticMergeAnalysis(
 ): Promise<{
   result: HolisticAnalysisResult;
   version: AgentVersionConfig;
+  trendsContextBlock: string | null;
+  trendsReferences: TrendReferenceItem[];
 }> {
   const profile = getProfileConfig(versionId);
   if (!profile) {
@@ -283,7 +348,12 @@ export async function runHolisticMergeAnalysis(
     provider: profile.provider,
     model: profile.model,
   };
-  return { result, version };
+  return {
+    result,
+    version,
+    trendsContextBlock: trendsBlock,
+    trendsReferences: trendRefs,
+  };
 }
 
 /** UI/API용: 키가 있는 프로바이더만 사용 가능한 버전으로 표시 */

@@ -97,7 +97,7 @@ export async function GET(request: Request) {
         : parseInt(String(r.episode_id), 10);
     if (Number.isNaN(episode_id)) continue;
 
-    let work_id =
+    const work_id =
       typeof r.work_id === "number"
         ? r.work_id
         : r.work_id != null

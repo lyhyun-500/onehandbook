@@ -13,7 +13,7 @@ Novel Agent는 웹소설 작가가 원고를 업로드하면,
 
 | 단계 | 방향 |
 |------|------|
-| **MVP (1차)** | AI 분석·리포트·작가 대시보드 — **개인용 스튜디오** (본인 원고만, Supabase) |
+| **MVP (1차)** | AI 분석·리포트·작가 스튜디오 — **개인용 창작 도구** (본인 원고만, Supabase) |
 | **확장** | 블록체인·지갑·토큰·독자 연결·분산 저장(IPFS 등) — **MVP 이후** 과제로 진행 |
 
 MVP에서 가치·반복 사용을 검증한 뒤, 필요할 때 체인·정산·소유권 쪽을 붙이는 순서로 작업합니다.
@@ -40,11 +40,11 @@ MVP에서 가치·반복 사용을 검증한 뒤, 필요할 때 체인·정산·
 - 개선 포인트 제안
 - 유사 흥행작 비교 분석
 
-### 3. 작가 대시보드
+### 3. 작가 스튜디오 (`/studio`)
 
 - 원고(회차) 업로드 및 작품 관리
 - AI 분석 실행·히스토리 (`analysis_runs`)
-- 대시보드·분석 화면에서 **NAT 잔액** 확인, `/billing`에서 충전 안내(유료 연동은 예정)
+- 스튜디오·분석 화면에서 **NAT 잔액** 확인, `/billing`에서 충전 안내(유료 연동은 예정)
 
 ### 분석 연속성·대용량 일괄 통합 (구현)
 
@@ -168,7 +168,7 @@ npm run dev
 
 **Vercel 배포:** `.env.local`은 자동 반영되지 않습니다. `docs/VERCEL-ENV.md`·`docs/vercel-env-template.env`를 보고 Production(필요 시 Preview)에 변수를 넣은 뒤 재배포하세요. 네이버 로그인은 **`NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET`** 가 없으면 `/api/auth/naver/start`가 실패합니다.
 
-접속: `/` 랜딩, 공개 탐색 `/explore`. 작가: `/login` → `/dashboard`, 분석·NAT 잔액·충전 안내 `/billing`.
+접속: `/` 랜딩, 공개 탐색 `/explore`. 작가: `/login` → `/studio`, 분석·NAT 잔액·충전 안내 `/billing`.
 
 **구현 현황·기술:** [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)  
 **제품 요구사항(PRD):** [docs/PRD.md](docs/PRD.md)  

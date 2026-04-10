@@ -381,7 +381,7 @@ export async function POST(request: Request) {
   });
 
   const mergeCost = computeHolisticMergeNatCost();
-  const balance = appUser.nat_balance ?? 0;
+  const balance = appUser.coin_balance ?? 0;
   if (balance < mergeCost) {
     return NextResponse.json(
       {

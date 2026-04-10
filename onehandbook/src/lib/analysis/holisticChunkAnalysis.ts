@@ -159,7 +159,7 @@ export async function runHolisticChunkAnalysis(
 
   const refreshed = await syncAppUser(supabase);
   if (!refreshed) throw new Error("사용자 정보를 찾을 수 없습니다.");
-  const balance = refreshed.nat_balance ?? 0;
+  const balance = refreshed.coin_balance ?? 0;
   if (balance < cost) {
     const err = new Error(
       `NAT가 부족합니다. 이번 배치에는 ${cost} NAT가 필요합니다.`

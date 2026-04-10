@@ -3,6 +3,12 @@ import { DefaultEmbeddingFunction } from "@chroma-core/default-embed";
 import type { EmbeddingFunction } from "chromadb";
 import { TRENDS_COLLECTION_NAME } from "./constants";
 
+export type ChromaConnectionOverrides = {
+  host?: string;
+  port?: number;
+  ssl?: boolean;
+};
+
 export function getChromaHost(): string {
   // Prefer explicit "server" variables (AWS 등 외부 Chroma)
   return (
@@ -17,11 +23,16 @@ export function getChromaPort(): number {
   return p ? Number.parseInt(p, 10) || 8000 : 8000;
 }
 
-export function createChromaClient(): ChromaClient {
+function resolveChromaSsl(override?: boolean): boolean {
+  if (override !== undefined) return override;
+  return process.env.CHROMA_SSL === "1" || process.env.CHROMA_SSL === "true";
+}
+
+export function createChromaClient(overrides?: ChromaConnectionOverrides): ChromaClient {
   return new ChromaClient({
-    host: getChromaHost(),
-    port: getChromaPort(),
-    ssl: process.env.CHROMA_SSL === "1" || process.env.CHROMA_SSL === "true",
+    host: overrides?.host ?? getChromaHost(),
+    port: overrides?.port ?? getChromaPort(),
+    ssl: resolveChromaSsl(overrides?.ssl),
   });
 }
 

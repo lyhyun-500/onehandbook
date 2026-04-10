@@ -1,4 +1,4 @@
-// Edge (middleware 등)용 Sentry — Slack 알림은 서버와 동일 로직
+// Edge / 네트워크 경계(Sentry가 잡는 영역)용 — Slack 알림은 서버와 동일 로직
 
 import * as Sentry from "@sentry/nextjs";
 import { notifySlackForSentryEvent } from "./src/lib/sentry/notifySlack";

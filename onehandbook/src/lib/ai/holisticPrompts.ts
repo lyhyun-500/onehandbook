@@ -95,7 +95,7 @@ export function buildHolisticUserPrompt(
 
   for (const seg of segments) {
     const header = `\n\n=== ${seg.episode_number}화 · ${seg.title} (약 ${seg.charCount.toLocaleString()}자) ===\n`;
-    let room = HOLISTIC_MAX_COMBINED_CHARS - used - header.length;
+    const room = HOLISTIC_MAX_COMBINED_CHARS - used - header.length;
 
     if (room <= 0) {
       truncated = true;

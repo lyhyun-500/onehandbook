@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
+import { createSupabaseServiceRole } from "@/lib/supabase/serviceRole";
 import { syncAppUser } from "@/lib/supabase/appUser";
 import { normalizeKrPhone } from "@/lib/phone";
 import { hashOtpCode, MAX_ATTEMPTS } from "@/lib/sms/otp";
 import { NextResponse } from "next/server";
-
-const BONUS_NAT = 30;
+import { PHONE_SIGNUP_REWARD_COINS } from "@/config/phoneSignupReward";
 
 export async function POST(request: Request) {
   const secret = process.env.SMS_OTP_SECRET;
@@ -120,37 +120,61 @@ export async function POST(request: Request) {
 
   const { data: meRow } = await supabase
     .from("users")
-    .select("nat_balance, phone_verification_bonus_granted_at")
+    .select("is_rewarded")
     .eq("id", appUser.id)
     .single();
 
-  const grantBonus = !meRow?.phone_verification_bonus_granted_at;
-  const baseNat = meRow?.nat_balance ?? 0;
-  const nextBalance = baseNat + (grantBonus ? BONUS_NAT : 0);
+  const grantBonus = meRow?.is_rewarded !== true;
 
-  const { error: updErr } = await supabase
-    .from("users")
-    .update({
-      phone_e164: normalized,
-      phone_verified_at: nowIso,
-      ...(grantBonus
-        ? {
-            nat_balance: nextBalance,
-            phone_verification_bonus_granted_at: nowIso,
-          }
-        : {}),
-    })
-    .eq("id", appUser.id)
-    .is("phone_verified_at", null);
+  let admin;
+  try {
+    admin = createSupabaseServiceRole();
+  } catch {
+    return NextResponse.json(
+      { error: "서버 설정(SUPABASE_SERVICE_ROLE_KEY)이 필요합니다." },
+      { status: 500 }
+    );
+  }
 
-  if (updErr) {
-    if (updErr.code === "23505") {
+  const { data: rpcData, error: rpcErr } = await admin.rpc(
+    "apply_phone_verification_success",
+    {
+      p_user_id: appUser.id,
+      p_phone_e164: normalized,
+      p_grant_bonus: grantBonus,
+      p_bonus_amount: grantBonus ? PHONE_SIGNUP_REWARD_COINS : 0,
+    }
+  );
+
+  const rpc = rpcData as { ok?: boolean; error?: string; coin_balance?: number; granted?: number } | null;
+
+  if (rpcErr || !rpc || rpc.ok !== true) {
+    const code = rpc?.error ?? rpcErr?.message ?? "rpc_failed";
+    if (code === "already_verified_or_missing") {
+      return NextResponse.json(
+        { error: "이미 휴대폰 인증이 완료된 계정입니다." },
+        { status: 400 }
+      );
+    }
+    if (code === "phone_blacklisted") {
+      return NextResponse.json(
+        { error: "탈퇴 이력이 있는 번호는 재가입·인증이 제한됩니다." },
+        { status: 403 }
+      );
+    }
+    if (code === "phone_already_registered") {
       return NextResponse.json(
         { error: "이 번호는 이미 다른 계정에서 인증되었습니다." },
         { status: 409 }
       );
     }
-    console.error(updErr);
+    if (code === "invalid_bonus") {
+      return NextResponse.json(
+        { error: "가입 보상 지급 조건을 만족하지 않습니다." },
+        { status: 400 }
+      );
+    }
+    console.error("apply_phone_verification_success:", rpcErr ?? rpc);
     return NextResponse.json(
       { error: "인증 저장에 실패했습니다." },
       { status: 500 }
@@ -164,7 +188,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    natGranted: grantBonus ? BONUS_NAT : 0,
-    natBalance: nextBalance,
+    natGranted: rpc.granted ?? 0,
+    natBalance: rpc.coin_balance ?? 0,
   });
 }

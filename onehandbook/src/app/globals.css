@@ -28,8 +28,7 @@ body {
 }
 
 /* Agent Score 카드 / NAT 확인 모달 — 스캔 라인(가로 광선) */
-.ohb-scan-beam,
-.ohb-dashboard-scan-beam {
+.ohb-scan-beam {
   position: absolute;
   left: 0;
   right: 0;
@@ -44,10 +43,10 @@ body {
     transparent 100%
   );
   box-shadow: 0 0 32px 4px rgba(34, 211, 238, 0.35);
-  animation: ohb-dashboard-scan-y 1.5s ease-in-out infinite;
+  animation: ohb-studio-scan-y 1.5s ease-in-out infinite;
 }
 
-@keyframes ohb-dashboard-scan-y {
+@keyframes ohb-studio-scan-y {
   0% {
     top: -3.5rem;
     opacity: 0.55;
@@ -69,8 +68,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ohb-scan-beam,
-  .ohb-dashboard-scan-beam {
+  .ohb-scan-beam {
     animation: none;
     top: 40%;
     opacity: 0.2;

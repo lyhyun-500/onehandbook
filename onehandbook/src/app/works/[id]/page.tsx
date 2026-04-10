@@ -49,7 +49,7 @@ export default async function WorkDetailPage({
   const runs = (analysisRuns ?? []) as AnalysisRunRow[];
   const latestByEpisode = latestAnalysisPerEpisode(runs);
   const workAverage = averageOverallScore(latestByEpisode);
-  const natBalance = appUser.nat_balance ?? 0;
+  const natBalance = appUser.coin_balance ?? 0;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -60,10 +60,10 @@ export default async function WorkDetailPage({
 
       <main className="mx-auto max-w-4xl px-6 py-12">
         <Link
-          href="/dashboard"
+          href="/studio"
           className="mb-6 inline-block text-sm text-zinc-400 hover:text-zinc-100"
         >
-          ← 대시보드로 돌아가기
+          ← 스튜디오로 돌아가기
         </Link>
 
         <div className="mb-8 flex items-center justify-between">

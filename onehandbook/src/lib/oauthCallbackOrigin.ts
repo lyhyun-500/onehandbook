@@ -1,6 +1,10 @@
 import { headers } from "next/headers";
 
 /**
+ * 서버에서 OAuth `redirectTo` 베이스 URL을 만들 때만 사용한다.
+ * Google 로그인 버튼은 클라이언트에서 `window.location.origin`을 쓴다
+ * (`src/app/login/LoginPageClient.tsx`).
+ *
  * Google 등 OAuth 완료 후 돌아올 앱의 origin (`redirectTo` = `{이 값}/auth/callback`).
  *
  * **로컬 분기:** 브라우저가 `localhost` / `127.0.0.1`(등)으로 접속한 경우,

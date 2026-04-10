@@ -29,7 +29,7 @@ const ANNOUNCEMENTS: {
 export default async function NoticesPage() {
   const supabase = await createClient();
   const appUser = await requireAppUser(supabase);
-  const natBalance = appUser.nat_balance ?? 0;
+  const natBalance = appUser.coin_balance ?? 0;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -71,10 +71,10 @@ export default async function NoticesPage() {
         </ul>
 
         <Link
-          href="/dashboard"
+          href="/studio"
           className="mt-10 inline-flex text-sm text-zinc-500 transition-colors hover:text-cyan-300"
         >
-          ← 대시보드로
+          ← 스튜디오로
         </Link>
       </main>
     </div>

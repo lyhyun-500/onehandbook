@@ -8,7 +8,7 @@ export default async function BillingPage() {
   const supabase = await createClient();
   const appUser = await requireAppUser(supabase);
 
-  const balance = appUser.nat_balance ?? 0;
+  const balance = appUser.coin_balance ?? 0;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -51,10 +51,10 @@ export default async function BillingPage() {
         </div>
 
         <Link
-          href="/dashboard"
+          href="/studio"
           className="mt-8 inline-flex rounded-lg border border-zinc-600 px-4 py-2 text-sm text-zinc-200 hover:border-zinc-500 hover:bg-zinc-900/60"
         >
-          ← 대시보드로
+          ← 스튜디오로
         </Link>
       </main>
     </div>

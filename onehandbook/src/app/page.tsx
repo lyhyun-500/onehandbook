@@ -88,7 +88,7 @@ export default async function HomePage() {
               <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">
                 장르별 최근 분석 점수
               </p>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 [&>*:nth-child(5)]:col-span-2 [&>*:nth-child(5)]:max-w-[min(100%,17rem)] [&>*:nth-child(5)]:justify-self-center sm:[&>*:nth-child(5)]:col-span-1 sm:[&>*:nth-child(5)]:max-w-none sm:[&>*:nth-child(5)]:justify-self-stretch">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 [&>*:nth-child(5)]:col-span-2 sm:[&>*:nth-child(5)]:col-span-1">
                 {genreCards.map(({ genre, score, hint }) => (
                   <div
                     key={genre}

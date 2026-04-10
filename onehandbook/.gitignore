@@ -42,3 +42,12 @@ next-env.d.ts
 
 # Chroma 로컬 서버 영속 데이터
 /data/chroma_db/
+
+# ingestData 원격 실패 시 로컬 JSON 백업
+/data/trends-ingest-pending/
+
+# 자동 생성 트렌드 리포트/스냅샷/락/마커 (커밋 금지)
+/data/trends/
+
+# Playwright 로그인 쿠키 (직접 넣지 말 것)
+/data/cookies.json

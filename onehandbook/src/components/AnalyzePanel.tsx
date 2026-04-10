@@ -26,6 +26,7 @@ import { useAnalysisJobs } from "@/contexts/AnalysisJobsContext";
 import type { AnalyzeJobPollBody } from "@/lib/analysis/buildAnalyzeJobPollResponse";
 import { ANALYSIS_JOB_FAILURE_CONTENT_UNCHANGED } from "@/lib/analysis/analysisJobFailureCodes";
 import { isContentUnchangedFailure } from "@/lib/analysis/analysisJobFailureHeuristics";
+import { PHONE_SIGNUP_REWARD_COINS } from "@/config/phoneSignupReward";
 import { formatDimensionLabel } from "@/lib/analysis/dimensionLabel";
 import type { PreviousAnalysisResultPayload } from "@/lib/analysisResultCache";
 
@@ -377,7 +378,7 @@ export function AnalyzePanel({
           throw new Error(
             typeof data.error === "string"
               ? data.error
-              : "휴대폰 인증 후 이용 가능합니다."
+              : `휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인을 드립니다. 인증 후 이용할 수 있습니다.`
           );
         }
         if (data.code === "INSUFFICIENT_NAT") {
@@ -520,7 +521,9 @@ export function AnalyzePanel({
 
       {!phoneVerified && (
         <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-950/25 px-3 py-2 text-sm text-amber-100/95">
-          <CopyWithBreaks as="span">휴대폰 인증 후 이용 가능합니다.</CopyWithBreaks>{" "}
+          <CopyWithBreaks as="span">
+            {`휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인을 드립니다. 인증 후 이용할 수 있습니다.`}
+          </CopyWithBreaks>{" "}
           <Link
             href="/verify-phone"
             className="font-medium text-cyan-400 underline-offset-2 hover:text-cyan-300 hover:underline"
@@ -571,7 +574,7 @@ export function AnalyzePanel({
             <span className="text-cyan-400/80">(+1 NAT)</span>
             <span className="mt-0.5 block text-xs text-zinc-500">
               <CopyWithBreaks as="span" className="block">
-                끄면 카카오·문피아 등 구분 없이 일반 점검으로 진행합니다. (같은 AI 모델)
+                끄면 카카오·문피아·네이버 시리즈 등 구분 없이 일반 점검으로 진행합니다. (같은 AI 모델)
               </CopyWithBreaks>
             </span>
           </span>

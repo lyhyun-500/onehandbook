@@ -26,10 +26,10 @@ export default async function ExploreLayout({
             {user ? (
               <>
                 <Link
-                  href="/dashboard"
+                  href="/studio"
                   className="text-cyan-300/90 transition-colors hover:text-cyan-200"
                 >
-                  대시보드
+                  스튜디오
                 </Link>
                 <span className="hidden max-w-[200px] truncate text-zinc-400 md:inline">
                   {user.email}

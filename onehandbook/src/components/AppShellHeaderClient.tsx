@@ -86,10 +86,10 @@ export function AppShellHeaderClient({
               {SITE_NAME}
             </Link>
             <Link
-              href="/dashboard"
+              href="/studio"
               className="hidden shrink-0 text-sm font-medium text-cyan-200 sm:inline"
             >
-              대시보드
+              스튜디오
             </Link>
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
@@ -167,6 +167,13 @@ export function AppShellHeaderClient({
                 {email}
               </p>
               <nav className="mt-4 flex flex-col gap-1 border-t border-zinc-800 pt-4">
+                <Link
+                  href="/studio"
+                  onClick={() => setMenuOpen(false)}
+                  className="rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"
+                >
+                  스튜디오
+                </Link>
                 <Link
                   href="/notices"
                   onClick={() => setMenuOpen(false)}

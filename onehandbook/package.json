@@ -3,13 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "WATCHPACK_POLLING=true next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "db:push": "supabase db push",
     "chroma:run": "npx chroma run --path ./data/chroma_db --host localhost --port 8000",
-    "trends:ingest": "tsx scripts/ingest-trends.ts"
+    "trends:ingest": "tsx scripts/ingest-trends.ts",
+    "trends:automate": "tsx scripts/automate_trends.ts",
+    "trends:automate:cron": "tsx scripts/automate_trends.ts --cron",
+    "trends:automate:dry": "tsx scripts/automate_trends.ts --dry-run",
+    "trends:munpia-scrape": "tsx scripts/automate_trends.ts --munpia-scrape",
+    "trends:munpia-scrape:dry": "tsx scripts/automate_trends.ts --munpia-scrape --dry-run",
+    "trends:ingest-free-episodes": "tsx scripts/ingest_free_episode_summaries.ts",
+    "trends:ingest-free-episodes:dry": "tsx scripts/ingest_free_episode_summaries.ts --dry-run",
+    "cookies:munpia": "tsx scripts/save_munpia_storage_state.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -25,6 +33,8 @@
     "dotenv": "^17.4.1",
     "md5": "^2.3.0",
     "next": "16.1.7",
+    "node-cron": "^4.2.1",
+    "playwright": "^1.59.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "solapi": "^5.5.4"
@@ -33,6 +43,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/md5": "^2.3.6",
     "@types/node": "^20",
+    "@types/node-cron": "^3.0.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

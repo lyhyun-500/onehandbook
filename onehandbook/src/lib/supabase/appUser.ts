@@ -4,8 +4,8 @@ import type { User } from "@supabase/supabase-js";
 
 export type AppUser = {
   id: number;
-  /** `users.nat_balance` 컬럼이 없거나 조회 실패 시 null — UI는 `?? 0` 처리 */
-  nat_balance: number | null;
+  /** `users.coin_balance` 컬럼이 없거나 조회 실패 시 null — UI는 `?? 0` 처리 */
+  coin_balance: number | null;
   email: string;
   /** 휴대폰 인증 완료 여부 — 미인증 시 AI 분석 불가 */
   phone_verified: boolean;
@@ -18,6 +18,15 @@ function resolveAuthEmail(authUser: User): string {
   return `${prov}_${suffix}@oauth.novelagent.local`;
 }
 
+function resolvePreferredProfileEmail(authUser: User): string {
+  const maybe = authUser.user_metadata?.naver_email;
+  if (typeof maybe === "string") {
+    const t = maybe.trim();
+    if (t && t.includes("@")) return t;
+  }
+  return resolveAuthEmail(authUser);
+}
+
 async function loadAppUserRow(
   supabase: SupabaseClient,
   userId: number,
@@ -25,14 +34,14 @@ async function loadAppUserRow(
 ): Promise<AppUser> {
   const { data, error } = await supabase
     .from("users")
-    .select("nat_balance, phone_verified_at")
+    .select("coin_balance, phone_verified_at")
     .eq("id", userId)
     .maybeSingle();
 
   if (error) {
     return {
       id: userId,
-      nat_balance: null,
+      coin_balance: null,
       email,
       phone_verified: false,
     };
@@ -40,14 +49,14 @@ async function loadAppUserRow(
 
   return {
     id: userId,
-    nat_balance: data?.nat_balance ?? null,
+    coin_balance: data?.coin_balance ?? null,
     email,
     phone_verified: data?.phone_verified_at != null,
   };
 }
 
 /**
- * auth.users 와 public.users 를 맞춥니다. 대시보드를 거치지 않고 /works 등으로 들어와도
+ * auth.users 와 public.users 를 맞춥니다. 스튜디오를 거치지 않고 /works 등으로 들어와도
  * 행이 없으면 여기서 생성합니다.
  */
 export async function syncAppUser(
@@ -61,7 +70,7 @@ export async function syncAppUser(
     return null;
   }
 
-  const email = resolveAuthEmail(authUser);
+  const email = resolvePreferredProfileEmail(authUser);
 
   const { data: existingUser } = await supabase
     .from("users")
@@ -70,6 +79,14 @@ export async function syncAppUser(
     .maybeSingle();
 
   if (existingUser) {
+    // 기존 유저도 네이버 실제 이메일이 있으면 덮어써서 최신화
+    const { error: updErr } = await supabase
+      .from("users")
+      .update({ email })
+      .eq("id", existingUser.id);
+    if (updErr) {
+      // ignore: 표시용 이메일 업데이트 실패는 치명적이지 않음
+    }
     return loadAppUserRow(supabase, existingUser.id, email);
   }
 
@@ -77,11 +94,14 @@ export async function syncAppUser(
 
   const { data: newUser, error } = await supabase
     .from("users")
-    .insert({
-      auth_id: authUser.id,
-      email,
-      nickname,
-    })
+    .upsert(
+      {
+        auth_id: authUser.id,
+        email,
+        nickname,
+      },
+      { onConflict: "auth_id" }
+    )
     .select("id")
     .single();
 

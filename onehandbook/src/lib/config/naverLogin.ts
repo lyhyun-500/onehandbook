@@ -1,9 +1,3 @@
-function truthyEnv(raw: string | undefined | null): boolean {
-  if (raw == null) return false;
-  const t = String(raw).trim().toLowerCase();
-  return t === "true" || t === "1" || t === "yes";
-}
-
 function falsyEnv(raw: string | undefined | null): boolean {
   if (raw == null) return false;
   const t = String(raw).trim().toLowerCase();

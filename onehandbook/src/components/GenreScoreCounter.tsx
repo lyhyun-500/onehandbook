@@ -19,6 +19,7 @@ export function GenreScoreCounter({ target }: { target: number }) {
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     if (reduced) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setValue(target);
       return;
     }
