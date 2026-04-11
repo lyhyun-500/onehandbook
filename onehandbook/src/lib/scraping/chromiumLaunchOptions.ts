@@ -1,9 +1,12 @@
 import { chromium, type LaunchOptions } from "playwright";
 
 /**
- * Playwright 1.50+ 는 headless 기본이 chromium-headless-shell(별도 다운로드)입니다.
- * EC2 등에서 해당 바이너리 ZIP 다운로드가 실패하면 `.env`에
- * PLAYWRIGHT_USE_FULL_CHROMIUM=1 을 두어 이미 설치된 풀 Chromium으로 headless 실행합니다.
+ * Playwright 1.50+ 는 headless 기본이 chromium-headless-shell(별도 ZIP)입니다.
+ * EC2에서 그 바이너리만 없거나 다운로드 실패 시 launch가 바로 죽는 경우가 많아,
+ * Linux에서는 기본으로 **풀 Chromium**(`npx playwright install chromium`)으로 headless 실행합니다.
+ *
+ * - 강제로 headless shell 쓰려면: `PLAYWRIGHT_USE_HEADLESS_SHELL=1`
+ * - Linux가 아닌데 풀 Chromium 쓰려면: `PLAYWRIGHT_USE_FULL_CHROMIUM=1`
  */
 export function chromiumLaunchOptions(
   headless: boolean,
@@ -19,10 +22,15 @@ export function chromiumLaunchOptions(
     ],
     ...extra,
   };
-  if (
-    headless &&
-    process.env.PLAYWRIGHT_USE_FULL_CHROMIUM?.trim() === "1"
-  ) {
+
+  const wantHeadlessShell =
+    process.env.PLAYWRIGHT_USE_HEADLESS_SHELL?.trim() === "1";
+  const forceFull =
+    process.env.PLAYWRIGHT_USE_FULL_CHROMIUM?.trim() === "1";
+  const linuxDefaultFull =
+    process.platform === "linux" && headless && !wantHeadlessShell;
+
+  if (headless && (forceFull || linuxDefaultFull)) {
     opts.executablePath = chromium.executablePath();
   }
   return opts;
