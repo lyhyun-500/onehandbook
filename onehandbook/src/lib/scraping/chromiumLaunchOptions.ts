@@ -11,7 +11,12 @@ export function chromiumLaunchOptions(
 ): LaunchOptions {
   const opts: LaunchOptions = {
     headless,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    // EC2/리눅스: /dev/shm 기본 64MB 등에서 Chromium이 바로 죽는 경우 방지
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+    ],
     ...extra,
   };
   if (
