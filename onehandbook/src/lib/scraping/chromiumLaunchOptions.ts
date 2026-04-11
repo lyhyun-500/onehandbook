@@ -12,15 +12,22 @@ export function chromiumLaunchOptions(
   headless: boolean,
   extra?: Partial<LaunchOptions>
 ): LaunchOptions {
+  const { args: extraArgs, ...restExtra } = extra ?? {};
+  const baseArgs = [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    // VM/소형 인스턴스에서 GPU·백그라운드 경로가 불안정할 때 완화
+    "--disable-gpu",
+    "--disable-software-rasterizer",
+    "--disable-background-networking",
+  ];
+
   const opts: LaunchOptions = {
     headless,
-    // EC2/리눅스: /dev/shm 기본 64MB 등에서 Chromium이 바로 죽는 경우 방지
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-    ],
-    ...extra,
+    ...restExtra,
+    args: [...baseArgs, ...(extraArgs ?? [])],
+    chromiumSandbox: false,
   };
 
   const wantHeadlessShell =
