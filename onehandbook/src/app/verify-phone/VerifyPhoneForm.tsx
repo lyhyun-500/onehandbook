@@ -1,11 +1,35 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { normalizeKrPhone } from "@/lib/phone";
+
+const fetchAuth = (url: string, body: unknown) =>
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+
+function isAbortOrNetworkError(e: unknown): boolean {
+  if (e instanceof DOMException && e.name === "AbortError") return true;
+  if (!(e instanceof Error)) return false;
+  const m = e.message.toLowerCase();
+  return (
+    m.includes("failed to fetch") ||
+    m.includes("networkerror") ||
+    m.includes("load failed") ||
+    m.includes("aborted")
+  );
+}
+
+function networkErrorMessage(): string {
+  return "연결이 끊겼거나 요청이 취소되었습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.";
+}
 
 export function VerifyPhoneForm() {
-  const router = useRouter();
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
@@ -17,14 +41,16 @@ export function VerifyPhoneForm() {
     setLoading(true);
     setError(null);
     setMessage(null);
+    const normalized = normalizeKrPhone(phone);
+    if (!normalized) {
+      setError("올바른 휴대폰 번호를 입력해 주세요. (예: 01012345678)");
+      setLoading(false);
+      return;
+    }
     // UX: 버튼을 누르면 즉시 인증번호 입력칸을 노출 (전송 지연/실패 시에도 재시도 가능)
     setSent(true);
     try {
-      const res = await fetch("/api/auth/sms/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
-      });
+      const res = await fetchAuth("/api/auth/sms/send", { phone: normalized });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(
@@ -35,7 +61,13 @@ export function VerifyPhoneForm() {
         "인증번호를 발송했습니다. 문자 전송이 지연될 수 있습니다(최대 5분)."
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "오류가 발생했습니다.");
+      setError(
+        isAbortOrNetworkError(e)
+          ? networkErrorMessage()
+          : e instanceof Error
+            ? e.message
+            : "오류가 발생했습니다."
+      );
     } finally {
       setLoading(false);
     }
@@ -45,11 +77,16 @@ export function VerifyPhoneForm() {
     setLoading(true);
     setError(null);
     setMessage(null);
+    const normalized = normalizeKrPhone(phone);
+    if (!normalized) {
+      setError("올바른 휴대폰 번호를 입력해 주세요.");
+      setLoading(false);
+      return;
+    }
     try {
-      const res = await fetch("/api/auth/sms/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code: code.replace(/\D/g, "") }),
+      const res = await fetchAuth("/api/auth/sms/verify", {
+        phone: normalized,
+        code: code.replace(/\D/g, ""),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -59,15 +96,18 @@ export function VerifyPhoneForm() {
       }
       const granted =
         typeof data.natGranted === "number" ? data.natGranted : 0;
-      setMessage(
-        granted > 0
-          ? `인증이 완료되었습니다. ${granted}코인이 지급되었습니다.`
-          : "인증이 완료되었습니다."
+      const phoneReward = granted > 0 ? "1" : "0";
+      window.location.assign(
+        `/studio?phoneVerified=1&phoneReward=${phoneReward}`
       );
-      router.refresh();
-      setTimeout(() => router.push("/studio"), 1200);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "오류가 발생했습니다.");
+      setError(
+        isAbortOrNetworkError(e)
+          ? networkErrorMessage()
+          : e instanceof Error
+            ? e.message
+            : "오류가 발생했습니다."
+      );
     } finally {
       setLoading(false);
     }
@@ -94,8 +134,8 @@ export function VerifyPhoneForm() {
           className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
         />
         <p className="mt-1 text-xs text-zinc-500">
-          하이픈 없이 입력해도 됩니다. 인증된 번호는 계정당 1회만 사용할 수
-          있습니다.
+          하이픈 없이 입력해도 됩니다. 가입 축하 코인은 번호당 최초 1회입니다. 이미 다른
+          계정에서 해당 번호로 혜택을 쓴 경우 인증만 됩니다.
         </p>
       </div>
 

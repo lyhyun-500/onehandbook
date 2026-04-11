@@ -6,6 +6,15 @@ import { hashOtpCode, MAX_ATTEMPTS } from "@/lib/sms/otp";
 import { NextResponse } from "next/server";
 import { PHONE_SIGNUP_REWARD_COINS } from "@/config/phoneSignupReward";
 
+/** PostgREST/Postgres unique_violation — 메시지 휴리스틱은 보조용 */
+function isPostgresUniqueViolation(err: unknown): boolean {
+  const e = err as { code?: string; message?: string } | null | undefined;
+  if (!e) return false;
+  if (e.code === "23505") return true;
+  const m = (e.message ?? "").toLowerCase();
+  return m.includes("duplicate key") && m.includes("unique");
+}
+
 export async function POST(request: Request) {
   const secret = process.env.SMS_OTP_SECRET;
   if (!secret || secret.length < 16) {
@@ -61,21 +70,6 @@ export async function POST(request: Request) {
     }
   }
 
-  const { data: taken } = await supabase
-    .from("users")
-    .select("id")
-    .eq("phone_e164", normalized)
-    .not("phone_verified_at", "is", null)
-    .neq("id", appUser.id)
-    .maybeSingle();
-
-  if (taken) {
-    return NextResponse.json(
-      { error: "이 번호는 이미 다른 계정에서 인증되었습니다." },
-      { status: 409 }
-    );
-  }
-
   const { data: row, error: findErr } = await supabase
     .from("sms_otp_challenges")
     .select("id, code_hash, expires_at, consumed_at, attempts")
@@ -87,8 +81,16 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (findErr || !row) {
+    if (findErr) {
+      console.error("sms/verify: sms_otp_challenges 조회 실패", findErr.message);
+    }
     return NextResponse.json(
-      { error: "유효한 인증 요청이 없습니다. 인증번호를 다시 요청해 주세요." },
+      {
+        error: "유효한 인증 요청이 없습니다. 인증번호를 다시 요청해 주세요.",
+        ...(process.env.NODE_ENV !== "production" && findErr
+          ? { debug: findErr.message }
+          : {}),
+      },
       { status: 400 }
     );
   }
@@ -139,6 +141,7 @@ export async function POST(request: Request) {
       ok: true,
       natGranted: 0,
       natBalance: appUser.coin_balance ?? 0,
+      signupBonusSkipped: false,
     });
   }
 
@@ -170,7 +173,13 @@ export async function POST(request: Request) {
     }
   );
 
-  const rpc = rpcData as { ok?: boolean; error?: string; coin_balance?: number; granted?: number } | null;
+  const rpc = rpcData as {
+    ok?: boolean;
+    error?: string;
+    coin_balance?: number;
+    granted?: number;
+    bonus_skipped?: boolean;
+  } | null;
 
   if (rpcErr || !rpc || rpc.ok !== true) {
     const code = rpc?.error ?? rpcErr?.message ?? "rpc_failed";
@@ -220,6 +229,7 @@ export async function POST(request: Request) {
           ok: true,
           natGranted: 0,
           natBalance: fresh?.coin_balance ?? appUser.coin_balance ?? 0,
+          signupBonusSkipped: false,
         });
       }
       return NextResponse.json(
@@ -233,16 +243,53 @@ export async function POST(request: Request) {
         { status: 403 }
       );
     }
-    if (code === "phone_already_registered") {
-      return NextResponse.json(
-        { error: "이 번호는 이미 다른 계정에서 인증되었습니다.", ...(devDebug ? { debug: devDebug } : {}) },
-        { status: 409 }
-      );
-    }
     if (code === "invalid_bonus") {
       return NextResponse.json(
         { error: "가입 보상 지급 조건을 만족하지 않습니다.", ...(devDebug ? { debug: devDebug } : {}) },
         { status: 400 }
+      );
+    }
+    // 구버전 RPC (마이그레이션 전) 응답
+    if (code === "phone_already_registered") {
+      return NextResponse.json(
+        {
+          error:
+            "이 번호는 이미 다른 계정에서 인증되었습니다. 최신 DB 마이그레이션을 적용하면 동일 번호로도 인증 저장이 가능합니다.",
+          ...(devDebug ? { debug: devDebug } : {}),
+        },
+        { status: 409 }
+      );
+    }
+    // 23505: 예) public.users 의 users_one_verified_phone(부분 유니크 인덱스)가 남아 있으면
+    // 20260411120000 RPC(동일 번호 다계정 허용)와 충돌 → 20260411132000 마이그레이션으로 인덱스 제거.
+    if (rpcErr && isPostgresUniqueViolation(rpcErr)) {
+      const msg = String((rpcErr as { message?: string }).message ?? "");
+      const isUsersPhoneIdx =
+        msg.includes("users_one_verified_phone") || msg.includes("users_phone");
+      console.error(
+        "[sms/verify] unique_violation",
+        isUsersPhoneIdx
+          ? "— public.users 전화 인덱스와 RPC 정책 불일치 가능. supabase/migrations/20260411132000 적용 여부 확인."
+          : "— profiles/users 제약·인덱스 잔존 가능. diagnostics SQL 참고.",
+        rpcErr
+      );
+      if (isUsersPhoneIdx) {
+        return NextResponse.json(
+          {
+            error:
+              "휴대폰 인증 저장에 실패했습니다. 서버 DB 마이그레이션(전화 인덱스 제거)이 필요할 수 있으니 관리자에게 문의해 주세요.",
+            ...(devDebug ? { debug: devDebug } : {}),
+          },
+          { status: 503 }
+        );
+      }
+      return NextResponse.json(
+        {
+          error:
+            "인증 처리 중 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+          ...(devDebug ? { debug: devDebug } : {}),
+        },
+        { status: 500 }
       );
     }
     console.error("apply_phone_verification_success:", rpcErr ?? rpc);
@@ -264,5 +311,6 @@ export async function POST(request: Request) {
     ok: true,
     natGranted: rpc.granted ?? 0,
     natBalance: rpc.coin_balance ?? 0,
+    signupBonusSkipped: rpc.bonus_skipped === true,
   });
 }

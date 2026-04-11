@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { PHONE_SIGNUP_REWARD_COINS } from "@/config/phoneSignupReward";
 import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import { CopyWithBreaks } from "@/components/CopyWithBreaks";
+import { StudioPhoneVerifySuccessModal } from "@/components/StudioPhoneVerifySuccessModal";
 import Link from "next/link";
 import { AppShellHeader } from "@/components/AppShellHeader";
 import {
@@ -53,6 +55,9 @@ export default async function StudioPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
+      <Suspense fallback={null}>
+        <StudioPhoneVerifySuccessModal />
+      </Suspense>
       <AppShellHeader email={userEmail} natBalance={natBalance} />
 
       <main className="mx-auto max-w-4xl px-6 py-10 sm:py-12">
