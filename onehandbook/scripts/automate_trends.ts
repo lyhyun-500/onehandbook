@@ -5,7 +5,8 @@
  * - Claude: 마크다운 리포트 생성 → data/trends/
  * - 이중 인제스트: ingestData → Supabase trends + 시드니 Chroma
  * - trend_reports_legacy: 데일리 리포트 메타(구 reports 트렌드용 테이블)
- * - node-cron: 매일 04:00 (Asia/Seoul) — `--cron` 일 때만
+ * - node-cron: 매일 04:00 데일리 + 04:05 코인통계 (Asia/Seoul) — `--cron` 일 때만
+ *   문피아 심층은 MUNPIA_READER_CRON_ENABLED=1 일 때만 04:10~ 스케줄 등록
  *
  * 실행: npx tsx scripts/automate_trends.ts
  *       npx tsx scripts/automate_trends.ts --cron
@@ -56,6 +57,12 @@ dotenv.config({ path: ".env.local" });
 const LOG = "[automate-trends]";
 const CRON_MARKERS_DIR = join(process.cwd(), "data", "trends", "cron-markers");
 const LOCK_DIR = join(process.cwd(), "data", "trends", "locks");
+
+/** `npm run trends:automate:cron` 안의 문피아 심층 스케줄만 제어. `1`/`true`일 때만 등록. 미설정·0 = 비활성 */
+function munpiaReaderCronEnabled(): boolean {
+  const v = process.env.MUNPIA_READER_CRON_ENABLED?.trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
+}
 
 async function refreshCoinStatsForTodayUtc(): Promise<void> {
   let admin;
@@ -1669,7 +1676,7 @@ function main() {
 
   if (cronMode) {
     console.info(
-      `${LOG} cron 등록: 데일리(04:00) + 문피아 심층(04:10) Asia/Seoul`
+      `${LOG} cron 등록: 데일리(04:00) + 코인통계(04:05) + 문피아심층(${munpiaReaderCronEnabled() ? "04:10~" : "OFF"}) Asia/Seoul`
     );
     nodeCron.schedule(
       "0 4 * * *",
@@ -1690,46 +1697,52 @@ function main() {
       },
       { timezone: "Asia/Seoul" }
     );
-    nodeCron.schedule(
-      "10 4 * * *",
-      async () => {
-        const ymd = getYmdInTimeZone(new Date(), "Asia/Seoul");
-        const ok = await waitForDailyDoneMarker(ymd, {
-          // 04:10~06:00 윈도우 안에서만 대기
-          timeoutMs: 110 * 60_000,
-          pollMs: 10_000,
-        }).catch(() => false);
-        if (!ok) {
-          console.warn(
-            `${LOG} [munpia-reader] 데일리 마커 대기 타임아웃 — 그래도 실행 계속`
-          );
-        }
-        // 04:10~06:00 랜덤 시작(순서 보장: 데일리 마커 대기 후)
-        const base = nextCronTimeTodaySeoul(4, 10).getTime();
-        const deadline = nextCronTimeTodaySeoul(6, 0).getTime();
-        const delay = randomMunpiaStartDelayMs();
-        const scheduled = base + delay;
-        const now = Date.now();
-        const target = Math.max(now, scheduled);
-        if (target > deadline) {
-          console.warn(
-            `${LOG} [munpia-reader] 랜덤 시작 시간이 06:00을 초과 — 오늘 실행 스킵`
-          );
-          return;
-        }
-        const waitMs = Math.max(0, target - now);
-        if (waitMs > 0) {
-          console.info(
-            `${LOG} [munpia-reader] 랜덤 시작까지 대기 ${waitMs}ms (윈도우 04:10~06:00)`
-          );
-          await sleep(waitMs);
-        }
-        await runMunpiaReaderScrapePipeline({ dryRun: false }).catch((e) => {
-          console.error(`${LOG} munpia cron 실행 실패`, e);
-        });
-      },
-      { timezone: "Asia/Seoul" }
-    );
+    if (munpiaReaderCronEnabled()) {
+      nodeCron.schedule(
+        "10 4 * * *",
+        async () => {
+          const ymd = getYmdInTimeZone(new Date(), "Asia/Seoul");
+          const ok = await waitForDailyDoneMarker(ymd, {
+            // 04:10~06:00 윈도우 안에서만 대기
+            timeoutMs: 110 * 60_000,
+            pollMs: 10_000,
+          }).catch(() => false);
+          if (!ok) {
+            console.warn(
+              `${LOG} [munpia-reader] 데일리 마커 대기 타임아웃 — 그래도 실행 계속`
+            );
+          }
+          // 04:10~06:00 랜덤 시작(순서 보장: 데일리 마커 대기 후)
+          const base = nextCronTimeTodaySeoul(4, 10).getTime();
+          const deadline = nextCronTimeTodaySeoul(6, 0).getTime();
+          const delay = randomMunpiaStartDelayMs();
+          const scheduled = base + delay;
+          const now = Date.now();
+          const target = Math.max(now, scheduled);
+          if (target > deadline) {
+            console.warn(
+              `${LOG} [munpia-reader] 랜덤 시작 시간이 06:00을 초과 — 오늘 실행 스킵`
+            );
+            return;
+          }
+          const waitMs = Math.max(0, target - now);
+          if (waitMs > 0) {
+            console.info(
+              `${LOG} [munpia-reader] 랜덤 시작까지 대기 ${waitMs}ms (윈도우 04:10~06:00)`
+            );
+            await sleep(waitMs);
+          }
+          await runMunpiaReaderScrapePipeline({ dryRun: false }).catch((e) => {
+            console.error(`${LOG} munpia cron 실행 실패`, e);
+          });
+        },
+        { timezone: "Asia/Seoul" }
+      );
+    } else {
+      console.info(
+        `${LOG} [munpia-reader] 심층 크론 비활성 — MUNPIA_READER_CRON_ENABLED=1 일 때만 등록`
+      );
+    }
     process.on("SIGINT", () => process.exit(0));
     process.on("SIGTERM", () => process.exit(0));
     return;
