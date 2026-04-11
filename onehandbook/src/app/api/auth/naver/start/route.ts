@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getOAuthOriginFromRequest } from "@/lib/oauthCallbackOrigin";
 
 const STATE_COOKIE = "naver_oauth_state";
 
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const origin = new URL(request.url).origin;
+  const origin = getOAuthOriginFromRequest(request);
   const redirectUri = `${origin}/auth/callback/naver`;
   const state = crypto.randomUUID();
 

@@ -1,6 +1,23 @@
 import { headers } from "next/headers";
 
 /**
+ * API Route 등 `Request`만 있을 때. 로컬이 아니면 `NEXT_PUBLIC_SITE_URL`을 우선해
+ * 라이브에서 www / 비-www · 프록시 호스트가 섞여 redirect_uri·쿠키 도메인이 어긋나는 것을 줄인다.
+ */
+export function getOAuthOriginFromRequest(request: Request): string {
+  const url = new URL(request.url);
+  const host = url.hostname.toLowerCase();
+  const isLocal =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "[::1]";
+  const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  if (fromEnv && !isLocal) return fromEnv;
+  return url.origin;
+}
+
+/**
  * 서버에서 OAuth `redirectTo` 베이스 URL을 만들 때만 사용한다.
  * Google 로그인 버튼은 클라이언트에서 `window.location.origin`을 쓴다
  * (`src/app/login/LoginPageClient.tsx`).

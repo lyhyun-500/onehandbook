@@ -14,10 +14,13 @@ import { getOAuthRedirectBaseForBrowser } from "@/lib/oauthRedirectBase";
 
 export type LoginPageClientProps = {
   naverLoginEnabled: boolean;
+  /** 서버가 정한 공개 URL 베이스 — 라이브에서 www/비-www·env와 구글 redirectTo 를 맞춤 */
+  oauthRedirectBase: string;
 };
 
 export function LoginPageClient({
   naverLoginEnabled,
+  oauthRedirectBase,
 }: LoginPageClientProps) {
   const [loading, setLoading] = useState(false);
   const [loadingProvider, setLoadingProvider] = useState<"google" | "naver" | null>(null);
@@ -28,13 +31,24 @@ export function LoginPageClient({
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("error") !== "naver") return;
-    const detail = params.get("detail");
-    setError(
-      detail
-        ? decodeURIComponent(detail)
-        : "네이버 로그인에 실패했습니다."
-    );
+    const err = params.get("error");
+    if (err === "naver") {
+      const detail = params.get("detail");
+      setError(
+        detail
+          ? decodeURIComponent(detail)
+          : "네이버 로그인에 실패했습니다."
+      );
+      return;
+    }
+    if (err === "oauth") {
+      const detail = params.get("detail");
+      setError(
+        detail
+          ? decodeURIComponent(detail)
+          : "소셜 로그인 처리에 실패했습니다."
+      );
+    }
   }, []);
 
   const persistSessionPreference = () => {
@@ -58,12 +72,12 @@ export function LoginPageClient({
     try {
       persistSessionPreference();
       await clearLocalAuthBeforeOAuth();
-      // Supabase 허용 목록과 맞추기 위해 개발 시 127.0.0.1 → localhost 통일 (`oauthRedirectBase`).
-      const callbackBase = getOAuthRedirectBaseForBrowser();
+      const callbackBase =
+        oauthRedirectBase.trim() || getOAuthRedirectBaseForBrowser();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${callbackBase}/auth/callback?provider=google`,
+          redirectTo: `${callbackBase}/api/auth/oauth-complete?provider=google`,
         },
       });
       if (error) throw error;

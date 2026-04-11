@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { SITE_NAME } from "@/config/site";
 
@@ -22,7 +22,6 @@ function Spinner() {
 }
 
 function AuthCallbackLoadingPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [idx, setIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -38,43 +37,15 @@ function AuthCallbackLoadingPage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      if (!code) {
-        setError("로그인 코드가 없습니다. 다시 시도해 주세요.");
-        return;
-      }
-      try {
-        const q = new URLSearchParams({ code });
-        if (provider) q.set("provider", provider);
-        const res = await fetch(`/api/auth/exchange?${q.toString()}`, {
-          method: "POST",
-          cache: "no-store",
-        });
-        const data = (await res.json().catch(() => ({}))) as {
-          ok?: boolean;
-          error?: string;
-        };
-        if (!res.ok || data.ok !== true) {
-          throw new Error(
-            typeof data.error === "string"
-              ? data.error
-              : "로그인 처리에 실패했습니다."
-          );
-        }
-        if (cancelled) return;
-        router.replace("/studio");
-        router.refresh();
-      } catch (e) {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : "로그인 처리에 실패했습니다.");
-      }
+    if (!code) {
+      setError("로그인 코드가 없습니다. 다시 시도해 주세요.");
+      return;
     }
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [code, provider, router]);
+    const q = new URLSearchParams({ code });
+    if (provider) q.set("provider", provider);
+    // PKCE 쿠키가 fetch POST 에서 누락되는 경우가 있어, 동일 origin GET 으로 서버에서 교환
+    window.location.replace(`/api/auth/oauth-complete?${q.toString()}`);
+  }, [code, provider]);
 
   return (
     <div className="flex h-screen w-full flex-col items-center justify-center bg-zinc-950 px-6 text-zinc-100">

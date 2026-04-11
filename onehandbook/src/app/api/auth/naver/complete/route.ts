@@ -9,6 +9,7 @@ import {
   fetchNaverProfile,
   naverSyntheticEmail,
 } from "@/lib/auth/naverOAuth";
+import { getOAuthOriginFromRequest } from "@/lib/oauthCallbackOrigin";
 
 const STATE_COOKIE = "naver_oauth_state";
 const OHB_SESSION_HINT_COOKIE = "ohb_session_hint";
@@ -18,7 +19,7 @@ function normEmail(email: string): string {
 }
 
 export async function POST(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const state = searchParams.get("state");
 
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_state" }, { status: 400 });
   }
 
+  const origin = getOAuthOriginFromRequest(request);
   const redirectUri = `${origin}/auth/callback/naver`;
 
   let profile;
