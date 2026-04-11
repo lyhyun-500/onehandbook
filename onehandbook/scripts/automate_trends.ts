@@ -496,36 +496,43 @@ async function collectRankings(): Promise<{
         chromium.launch(chromiumLaunchOptions(true)),
       { maxAttempts: 2, baseDelayMs: 1500 }
     );
-    const [munpiaMobile, munpiaToday, kakao, naverSeries] = await Promise.all([
-      scrapeTopTitles(browser, MUNPIA_RANK_URL, "문피아(모바일 베스트)", 20).catch(
-        (e) => {
-          console.error(`${LOG} 문피아 모바일 랭킹 스킵:`, e);
-          return [] as string[];
-        }
-      ),
-      scrapeTopTitles(
-        browser,
-        MUNPIA_TODAY_BEST_URL,
-        "문피아(PC 투데이 베스트)",
-        20
-      ).catch((e) => {
-        console.error(`${LOG} 문피아 PC 투데이 스킵:`, e);
-        return [] as string[];
-      }),
-      scrapeTopTitles(browser, KAKAO_RANK_URL, "카카오페이지", 20).catch((e) => {
-        console.error(`${LOG} 카카오 랭킹 스킵:`, e);
-        return [] as string[];
-      }),
-      scrapeTopTitles(
-        browser,
-        NAVER_SERIES_RANK_URL,
-        "네이버 시리즈 TOP100",
-        20
-      ).catch((e) => {
-        console.error(`${LOG} 네이버 시리즈 랭킹 스킵:`, e);
-        return [] as string[];
-      }),
-    ]);
+    // EC2 소형 인스턴스 등: Promise.all(4탭) 동시 오픈 시 RAM 피크로 Page crashed 빈번 → 순차 수집
+    const munpiaMobile = await scrapeTopTitles(
+      browser,
+      MUNPIA_RANK_URL,
+      "문피아(모바일 베스트)",
+      20
+    ).catch((e) => {
+      console.error(`${LOG} 문피아 모바일 랭킹 스킵:`, e);
+      return [] as string[];
+    });
+    const munpiaToday = await scrapeTopTitles(
+      browser,
+      MUNPIA_TODAY_BEST_URL,
+      "문피아(PC 투데이 베스트)",
+      20
+    ).catch((e) => {
+      console.error(`${LOG} 문피아 PC 투데이 스킵:`, e);
+      return [] as string[];
+    });
+    const kakao = await scrapeTopTitles(
+      browser,
+      KAKAO_RANK_URL,
+      "카카오페이지",
+      20
+    ).catch((e) => {
+      console.error(`${LOG} 카카오 랭킹 스킵:`, e);
+      return [] as string[];
+    });
+    const naverSeries = await scrapeTopTitles(
+      browser,
+      NAVER_SERIES_RANK_URL,
+      "네이버 시리즈 TOP100",
+      20
+    ).catch((e) => {
+      console.error(`${LOG} 네이버 시리즈 랭킹 스킵:`, e);
+      return [] as string[];
+    });
     const munpia = dedupeTitles([...munpiaMobile, ...munpiaToday]).slice(0, 40);
     return { munpia, kakao, naverSeries };
   } finally {
