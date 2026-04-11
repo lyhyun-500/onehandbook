@@ -13,6 +13,7 @@
 import { join } from "path";
 import dotenv from "dotenv";
 import { chromium } from "playwright";
+import { chromiumLaunchOptions } from "@/lib/scraping/chromiumLaunchOptions";
 import { ANALYSIS_CLAUDE_MODEL } from "@/config/analysis-profiles";
 import { completeAnthropic } from "@/lib/ai/providers/anthropic";
 import { ingestData } from "@/lib/trends/ingestData";
@@ -119,10 +120,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const browser = await chromium.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+  const browser = await chromium.launch(chromiumLaunchOptions(true));
 
   let context: import("playwright").BrowserContext;
   try {

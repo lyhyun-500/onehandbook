@@ -17,6 +17,7 @@ import { mkdir } from "fs/promises";
 import { dirname, join } from "path";
 import dotenv from "dotenv";
 import { chromium } from "playwright";
+import { chromiumLaunchOptions } from "@/lib/scraping/chromiumLaunchOptions";
 
 dotenv.config({ path: ".env.local" });
 
@@ -46,7 +47,7 @@ async function main() {
 
   await mkdir(dirname(outPath), { recursive: true });
 
-  const browser = await chromium.launch({ headless });
+  const browser = await chromium.launch(chromiumLaunchOptions(headless));
   const context = await browser.newContext({ userAgent: UA });
   const page = await context.newPage();
 

@@ -17,7 +17,8 @@
     "trends:munpia-scrape:dry": "tsx scripts/automate_trends.ts --munpia-scrape --dry-run",
     "trends:ingest-free-episodes": "tsx scripts/ingest_free_episode_summaries.ts",
     "trends:ingest-free-episodes:dry": "tsx scripts/ingest_free_episode_summaries.ts --dry-run",
-    "cookies:munpia": "tsx scripts/save_munpia_storage_state.ts"
+    "cookies:munpia": "tsx scripts/save_munpia_storage_state.ts",
+    "coins:stats:refresh": "tsx scripts/refresh-coin-stats.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

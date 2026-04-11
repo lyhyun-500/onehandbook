@@ -17,6 +17,8 @@ export function VerifyPhoneForm() {
     setLoading(true);
     setError(null);
     setMessage(null);
+    // UX: 버튼을 누르면 즉시 인증번호 입력칸을 노출 (전송 지연/실패 시에도 재시도 가능)
+    setSent(true);
     try {
       const res = await fetch("/api/auth/sms/send", {
         method: "POST",
@@ -29,8 +31,9 @@ export function VerifyPhoneForm() {
           typeof data.error === "string" ? data.error : "요청에 실패했습니다."
         );
       }
-      setSent(true);
-      setMessage("인증번호를 발송했습니다. 문자를 확인해 주세요.");
+      setMessage(
+        "인증번호를 발송했습니다. 문자 전송이 지연될 수 있습니다(최대 5분)."
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "오류가 발생했습니다.");
     } finally {
@@ -127,6 +130,9 @@ export function VerifyPhoneForm() {
               disabled={loading}
               className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-3 text-center text-lg tracking-[0.3em] text-zinc-100 placeholder-zinc-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
             />
+            <p className="mt-1 text-xs text-zinc-500">
+              문자 전송이 지연될 수 있습니다. 최대 5분까지 기다려 주세요.
+            </p>
           </div>
           <button
             type="button"

@@ -32,6 +32,7 @@ import { completeAnthropic } from "@/lib/ai/providers/anthropic";
 import { ingestData } from "@/lib/trends/ingestData";
 import { createSupabaseServiceRole } from "@/lib/supabase/serviceRole";
 import { newContextWithCookiesJson } from "@/lib/scraping/playwrightCookies";
+import { chromiumLaunchOptions } from "@/lib/scraping/chromiumLaunchOptions";
 import { extractMunpiaReaderMainText } from "@/lib/scraping/freeEpisodeExtract";
 import {
   buildMunpiaBestListExtractorExpression,
@@ -55,6 +56,43 @@ dotenv.config({ path: ".env.local" });
 const LOG = "[automate-trends]";
 const CRON_MARKERS_DIR = join(process.cwd(), "data", "trends", "cron-markers");
 const LOCK_DIR = join(process.cwd(), "data", "trends", "locks");
+
+async function refreshCoinStatsForTodayUtc(): Promise<void> {
+  let admin;
+  try {
+    admin = createSupabaseServiceRole();
+  } catch {
+    console.warn(
+      `${LOG} [coin-stats] SUPABASE_SERVICE_ROLE_KEY 미설정 — 스킵`
+    );
+    return;
+  }
+
+  const d = new Date();
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const ymd = `${y}-${m}-${day}`;
+
+  const { data, error } = await admin.rpc("refresh_coin_stats", {
+    p_from: ymd,
+    p_to: ymd,
+  });
+
+  if (error) {
+    console.error(`${LOG} [coin-stats] refresh_coin_stats 실패:`, error.message);
+    return;
+  }
+  const json = data as { ok?: boolean; error?: string } | null;
+  if (!json || json.ok !== true) {
+    console.error(
+      `${LOG} [coin-stats] refresh_coin_stats 실패:`,
+      json?.error ?? "unknown_error"
+    );
+    return;
+  }
+  console.info(`${LOG} [coin-stats] 배치 적재 완료 (UTC=${ymd})`);
+}
 
 function commanderAlertWebhookUrl(): string | null {
   const v =
@@ -455,10 +493,7 @@ async function collectRankings(): Promise<{
     browser = await withRetry(
       "Playwright launch",
       () =>
-        chromium.launch({
-          headless: true,
-          args: ["--no-sandbox", "--disable-setuid-sandbox"],
-        }),
+        chromium.launch(chromiumLaunchOptions(true)),
       { maxAttempts: 2, baseDelayMs: 1500 }
     );
     const [munpiaMobile, munpiaToday, kakao, naverSeries] = await Promise.all([
@@ -1175,10 +1210,9 @@ export async function runMunpiaReaderScrapePipeline(options?: {
     `${LOG} [munpia-reader] 모드=${manualGroups.length > 0 ? "수동(JSON)" : "자동(베스트)"} max=${maxW} date=${ymdSeoul} cookies=${cookiesPath} dryRun=${dry}`
   );
 
-  const browser = await chromium.launch({
-    headless: process.env.HEADLESS !== "0",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+  const browser = await chromium.launch(
+    chromiumLaunchOptions(process.env.HEADLESS !== "0")
+  );
 
   let context: import("playwright").BrowserContext;
   try {
@@ -1415,7 +1449,7 @@ export async function runMunpiaReaderScrapePipeline(options?: {
         risingReason: task.risingReason,
         munpiaRank: task.munpiaRank,
       };
-      let analysisMd = await buildMunpiaReaderMarkdownWithClaude(
+      const analysisMd = await buildMunpiaReaderMarkdownWithClaude(
         raw,
         task.title,
         ymdSeoul,
@@ -1603,10 +1637,8 @@ export async function runDailyTrendPipeline(options?: {
 
     console.info(`${LOG} 파이프라인 정상 종료`);
 
-  // cron 파이프라인에서 후속 작업(04:10 문피아 심층 분석) 순서 보장용
-    if (process.argv.includes("--cron")) {
-      await writeDailyDoneMarker(targetDateYmd).catch(() => {});
-    }
+  // 후속 작업(문피아 심층 등) 순서 보장용 — EC2 system cron처럼 `--cron` 없이 데일리만 돌려도 마커 기록
+    await writeDailyDoneMarker(targetDateYmd).catch(() => {});
   } finally {
     await releaseLock(lock);
   }
@@ -1637,6 +1669,16 @@ function main() {
       () => {
         runDailyTrendPipeline({ dryRun: false }).catch((e) => {
           console.error(`${LOG} cron 실행 실패`, e);
+        });
+      },
+      { timezone: "Asia/Seoul" }
+    );
+    nodeCron.schedule(
+      // 데일리 이후, 문피아 심층 실행 전 (04:05)
+      "5 4 * * *",
+      () => {
+        refreshCoinStatsForTodayUtc().catch((e) => {
+          console.error(`${LOG} [coin-stats] cron 실행 실패`, e);
         });
       },
       { timezone: "Asia/Seoul" }
