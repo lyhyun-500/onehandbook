@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** 이 화 분석: processing 상태가 이 시간을 넘기면 실패 처리 (updated_at 기준) */
-export const ANALYSIS_JOB_PROCESSING_STALE_MS = 10 * 60 * 1000;
+/** 이 화 분석: processing 상태가 이 시간을 넘기면 실패 처리 (updated_at 기준). 서버 타임아웃 등으로 멈춘 작업을 너무 오래 두지 않도록 5분으로 둔다. */
+export const ANALYSIS_JOB_PROCESSING_STALE_MS = 5 * 60 * 1000;
 
 /**
  * 통합 분석: LLM 구간에서 `updated_at`이 안 바뀌는 시간이 길어 10분 만료에 걸리면

@@ -305,14 +305,9 @@ export async function POST(request: Request) {
   const jobId = jobRow.id as string;
 
   if (!isClientChunked) {
-    if (process.env.NODE_ENV !== "production") {
-      // dev에서는 after()가 실행되지 않는 경우가 있어 즉시 트리거한다.
-      void runAnalysisProcessAfterResponse(jobId, session.access_token);
-    } else {
-      after(() => {
-        void runAnalysisProcessAfterResponse(jobId, session.access_token);
-      });
-    }
+    after(async () => {
+      await runAnalysisProcessAfterResponse(jobId, session.access_token);
+    });
   }
 
   if (isClientChunked && chunkSessionId != null && chunkPlan != null) {

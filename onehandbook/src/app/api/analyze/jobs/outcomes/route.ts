@@ -75,6 +75,19 @@ export async function GET(request: Request) {
   const workIds = [
     ...new Set(rows.map((r) => r.work_id).filter((id): id is number => id != null)),
   ];
+  const episodeIds = [
+    ...new Set(
+      rows
+        .map((r) => {
+          const eid =
+            typeof r.episode_id === "number"
+              ? r.episode_id
+              : parseInt(String(r.episode_id), 10);
+          return Number.isNaN(eid) ? null : eid;
+        })
+        .filter((id): id is number => id != null)
+    ),
+  ];
 
   const workTitleById = new Map<number, string | null>();
   if (workIds.length > 0) {
@@ -84,6 +97,31 @@ export async function GET(request: Request) {
       .in("id", workIds);
     for (const w of works ?? []) {
       workTitleById.set(w.id, w.title ?? null);
+    }
+  }
+
+  const episodeMetaById = new Map<
+    number,
+    { title: string | null; episode_number: number | null }
+  >();
+  if (episodeIds.length > 0) {
+    const { data: eps } = await supabase
+      .from("episodes")
+      .select("id, title, episode_number")
+      .in("id", episodeIds);
+    for (const e of eps ?? []) {
+      const id = typeof e.id === "number" ? e.id : parseInt(String(e.id), 10);
+      if (Number.isNaN(id)) continue;
+      const en =
+        typeof e.episode_number === "number"
+          ? e.episode_number
+          : e.episode_number != null
+            ? parseInt(String(e.episode_number), 10)
+            : null;
+      episodeMetaById.set(id, {
+        title: typeof e.title === "string" ? e.title : null,
+        episode_number: en != null && !Number.isNaN(en) ? en : null,
+      });
     }
   }
 
@@ -151,11 +189,16 @@ export async function GET(request: Request) {
           ? String(parentRaw)
           : null;
 
+    const epMeta = episodeMetaById.get(episode_id);
     list.push({
       id: String(r.id),
       episode_id,
       work_id,
       work_title: workTitleById.get(work_id) ?? null,
+      episode_title:
+        job_kind === "episode" ? (epMeta?.title ?? null) : null,
+      episode_number:
+        job_kind === "episode" ? (epMeta?.episode_number ?? null) : null,
       status: st,
       updated_at: r.updated_at,
       created_at,

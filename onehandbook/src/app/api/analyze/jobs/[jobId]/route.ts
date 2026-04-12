@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildAnalyzeJobPollResponse } from "@/lib/analysis/buildAnalyzeJobPollResponse";
+import { kickStalePendingAnalysisJobIfNeeded } from "@/lib/analysis/kickStalePendingAnalysisJob";
 
 export async function GET(
   _request: Request,
@@ -18,6 +19,12 @@ export async function GET(
   const { jobId } = await context.params;
   if (!jobId) {
     return NextResponse.json({ error: "jobId가 필요합니다." }, { status: 400 });
+  }
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (accessToken) {
+    await kickStalePendingAnalysisJobIfNeeded(supabase, jobId, accessToken);
   }
 
   const body = await buildAnalyzeJobPollResponse(supabase, jobId);

@@ -1,101 +1,24 @@
-import { createClient } from "@/lib/supabase/server";
 import { executeAnalysisJob } from "@/lib/analysis/executeAnalysisJob";
-import { getAnalyzeProcessBaseUrl } from "@/lib/siteBaseUrl";
-
-type ProcessBody = {
-  ok?: boolean;
-  code?: string;
-  error?: string;
-  skipped?: boolean;
-};
 
 /**
- * after() 안에서 호출. 세션 쿠키로 토큰을 다시 읽고(getUser로 갱신),
- * process 실패 시 refreshSession 후 한 번 더 시도.
+ * 분석 job 실행 트리거. POST /api/analyze 응답 후 `after()` 안에서 호출된다.
+ *
+ * 과거에는 `ANALYZE_PROCESS_SECRET`이 있을 때 먼저 `/api/analyze/process`로 **셀프 HTTP**를 했는데,
+ * 프로덕션에서 fetch가 지연·무응답이면 `executeAnalysisJob`까지 도달하지 못해 job이 **영구 pending**이 될 수 있다.
+ * 따라서 **항상 같은 프로세스에서 `executeAnalysisJob`을 직접** 호출한다.
+ * (`/api/analyze/process` 라우트는 수동·외부 호출·디버깅용으로 유지)
  */
 export async function runAnalysisProcessAfterResponse(
   jobId: string,
   fallbackAccessToken: string
 ): Promise<void> {
-  console.info("[analysis/process] trigger start", { jobId });
-  const secret = process.env.ANALYZE_PROCESS_SECRET;
-  if (!secret) {
-    console.warn(
-      "ANALYZE_PROCESS_SECRET 미설정 — /api/analyze/process 대신 executeAnalysisJob 직접 실행 (통합 분석 등 작업이 대기에서 멈추지 않도록)"
-    );
-    try {
-      console.info("[analysis/process] direct executeAnalysisJob", { jobId });
-      await executeAnalysisJob(jobId, fallbackAccessToken);
-      console.info("[analysis/process] direct executeAnalysisJob done", { jobId });
-    } catch (e) {
-      console.error("executeAnalysisJob 직접 실행 실패:", e);
-    }
-    return;
-  }
-
-  const base = getAnalyzeProcessBaseUrl();
-
-  const doFetch = (accessToken: string) =>
-    fetch(`${base}/api/analyze/process`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${secret}`,
-        "X-Supabase-Access-Token": accessToken,
-      },
-      body: JSON.stringify({ jobId }),
-    });
-
-  const parseBody = async (res: Response): Promise<ProcessBody> => {
-    try {
-      return (await res.json()) as ProcessBody;
-    } catch {
-      return {};
-    }
-  };
-
+  console.info("[analysis/process] trigger start (direct executeAnalysisJob)", {
+    jobId,
+  });
   try {
-    const supabase = await createClient();
-    await supabase.auth.getUser();
-    const { data: sess0 } = await supabase.auth.getSession();
-    let accessToken = sess0.session?.access_token ?? fallbackAccessToken;
-
-    let res = await doFetch(accessToken);
-    let body = await parseBody(res);
-    console.info("[analysis/process] http", {
-      jobId,
-      status: res.status,
-      ok: res.ok,
-      body,
-    });
-
-    const looksUnauthorized =
-      res.status === 401 ||
-      body?.code === "UNAUTHORIZED" ||
-      (body?.ok === false &&
-        (body?.code === "UNAUTHORIZED" ||
-          (typeof body?.error === "string" && body.error.includes("로그인"))));
-
-    if (looksUnauthorized) {
-      const { data: ref, error } = await supabase.auth.refreshSession();
-      if (!error && ref.session?.access_token) {
-        accessToken = ref.session.access_token;
-        res = await doFetch(accessToken);
-        body = await parseBody(res);
-      }
-    }
-
-    if (!res.ok) {
-      console.warn("analyze/process HTTP", res.status, body);
-      await executeAnalysisJob(jobId, accessToken);
-      return;
-    }
-
-    if (body?.ok === false) {
-      await executeAnalysisJob(jobId, accessToken);
-    }
+    const result = await executeAnalysisJob(jobId, fallbackAccessToken);
+    console.info("[analysis/process] executeAnalysisJob done", { jobId, result });
   } catch (e) {
-    console.warn("analyze/process fetch 실패, executeAnalysisJob으로 재시도", e);
-    await executeAnalysisJob(jobId, fallbackAccessToken);
+    console.error("[analysis/process] executeAnalysisJob 실패:", e);
   }
 }

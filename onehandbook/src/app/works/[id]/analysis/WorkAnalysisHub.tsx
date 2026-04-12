@@ -38,6 +38,7 @@ import {
   MIN_ANALYSIS_CHARS,
 } from "@/lib/manuscriptEligibility";
 import { HOLISTIC_CLIENT_CHUNK_SIZE } from "@/lib/analysis/holisticEpisodeChunks";
+import { AnalysisJobInlineProgress } from "@/components/AnalysisJobInlineProgress";
 
 type EpisodeRow = {
   id: number;
@@ -45,6 +46,33 @@ type EpisodeRow = {
   title: string;
   charCount: number;
 };
+
+function holisticRunRangeLabel(
+  h: HolisticRunRow,
+  episodes: EpisodeRow[]
+): string {
+  const byId = new Map(episodes.map((e) => [e.id, e]));
+  const nums = h.episode_ids
+    .map((id) => byId.get(Number(id))?.episode_number)
+    .filter((n): n is number => typeof n === "number")
+    .sort((a, b) => a - b);
+  if (nums.length === 0) return "회차 정보 없음";
+  if (nums.length === 1) return `${nums[0]}화`;
+  return `${nums[0]}~${nums[nums.length - 1]}화 (${nums.length}개)`;
+}
+
+function formatShortKst(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}
 
 function WorkAnalysisHubInner({
   workId,
@@ -78,7 +106,11 @@ function WorkAnalysisHubInner({
     null
   );
   const [serverRuns, setServerRuns] = useState<AnalysisRunRow[] | null>(null);
-  const [serverHolistic, setServerHolistic] = useState<HolisticRunRow | null>(
+  const [serverHolisticList, setServerHolisticList] = useState<
+    HolisticRunRow[] | null
+  >(null);
+  /** null이면 `holisticHistoryList[0]`(최신) 표시 */
+  const [selectedHolisticId, setSelectedHolisticId] = useState<number | null>(
     null
   );
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -86,8 +118,42 @@ function WorkAnalysisHubInner({
 
   const effectiveEpisodes = serverEpisodes ?? episodes;
   const effectiveRuns = serverRuns ?? runs;
-  const effectiveLatestHolistic =
-    serverHolistic !== null ? serverHolistic : latestHolistic;
+
+  const reloadAnalysisData = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/works/${workId}/analysis-data`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        episodes?: EpisodeRow[];
+        runs?: AnalysisRunRow[];
+        latestHolistic?: HolisticRunRow | null;
+        holisticHistory?: HolisticRunRow[];
+      };
+      if (Array.isArray(data.episodes)) setServerEpisodes(data.episodes);
+      if (Array.isArray(data.runs)) setServerRuns(data.runs);
+      const hist = Array.isArray(data.holisticHistory)
+        ? data.holisticHistory
+        : data.latestHolistic && typeof data.latestHolistic.id === "number"
+          ? [data.latestHolistic]
+          : [];
+      setServerHolisticList(hist.length > 0 ? hist : null);
+      setSelectedHolisticId(null);
+    } catch (e) {
+      setServerLoadError(e instanceof Error ? e.message : "데이터 로딩 실패");
+    }
+  }, [workId]);
+
+  const holisticHistoryList = useMemo((): HolisticRunRow[] => {
+    if (serverHolisticList && serverHolisticList.length > 0) {
+      return serverHolisticList;
+    }
+    if (latestHolistic && typeof latestHolistic.id === "number") {
+      return [latestHolistic];
+    }
+    return [];
+  }, [serverHolisticList, latestHolistic]);
 
   const latest = useMemo(
     () => latestAnalysisPerEpisode(effectiveRuns),
@@ -125,35 +191,14 @@ function WorkAnalysisHubInner({
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      try {
-        const res = await fetch(`/api/works/${workId}/analysis-data`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          episodes?: EpisodeRow[];
-          runs?: AnalysisRunRow[];
-          latestHolistic?: HolisticRunRow | null;
-        };
-        if (cancelled) return;
-        if (Array.isArray(data.episodes)) setServerEpisodes(data.episodes);
-        if (Array.isArray(data.runs)) setServerRuns(data.runs);
-        setServerHolistic(
-          data.latestHolistic && typeof data.latestHolistic.id === "number"
-            ? data.latestHolistic
-            : null
-        );
-      } catch (e) {
-        if (cancelled) return;
-        setServerLoadError(e instanceof Error ? e.message : "데이터 로딩 실패");
-      }
-    }
-    void load();
+    void (async () => {
+      await reloadAnalysisData();
+      if (cancelled) return;
+    })();
     return () => {
       cancelled = true;
     };
-  }, [workId]);
+  }, [workId, reloadAnalysisData]);
 
   const urlTab: "single" | "batch" =
     searchParams.get("tab") === "batch" ? "batch" : "single";
@@ -179,10 +224,19 @@ function WorkAnalysisHubInner({
     [pathname, router, searchParams]
   );
 
+  const displayHolisticBase = useMemo(() => {
+    if (holisticHistoryList.length === 0) return null;
+    if (selectedHolisticId != null) {
+      const hit = holisticHistoryList.find((h) => h.id === selectedHolisticId);
+      if (hit) return hit;
+    }
+    return holisticHistoryList[0] ?? null;
+  }, [holisticHistoryList, selectedHolisticId]);
+
   const effectiveHolisticClient =
     holisticClient &&
-    effectiveLatestHolistic &&
-    effectiveLatestHolistic.id === holisticClient.id
+    displayHolisticBase &&
+    holisticClient.id === displayHolisticBase.id
       ? null
       : holisticClient;
 
@@ -288,7 +342,7 @@ function WorkAnalysisHubInner({
     return { lines, total: est.total };
   }, [orderedSelectedIds, effectiveEpisodes, batchIncludeLore, batchIncludePlatform]);
 
-  const activeHolistic = effectiveHolisticClient ?? effectiveLatestHolistic;
+  const activeHolistic = effectiveHolisticClient ?? displayHolisticBase;
 
   const holisticReportEpisodes = useMemo(() => {
     if (!activeHolistic) return null;
@@ -326,6 +380,24 @@ function WorkAnalysisHubInner({
       return c >= MIN_ANALYSIS_CHARS && c < 1000;
     });
   }, [orderedSelectedIds, effectiveEpisodes, batchHasBlockedEpisode]);
+
+  /** 10화 이하 등 서버 단일 인보케이션 통합 분석 — 청크 UI 없을 때 페이지 내 진행 표시 */
+  const batchHolisticServerJob = useMemo(() => {
+    if (orderedSelectedIds.length > HOLISTIC_CLIENT_CHUNK_SIZE) return null;
+    if (!analysisJobsCtx || orderedSelectedIds.length === 0) return null;
+    const j = analysisJobsCtx.getActiveJobCoveringEpisode(
+      orderedSelectedIds[0]!,
+      workIdNum
+    );
+    if (
+      !j ||
+      j.job_kind !== "holistic_batch" ||
+      (j.status !== "pending" && j.status !== "processing")
+    ) {
+      return null;
+    }
+    return j;
+  }, [analysisJobsCtx, orderedSelectedIds, workIdNum]);
 
   const toggle = (id: number) => {
     setSelectedIds((prev) => {
@@ -545,6 +617,8 @@ function WorkAnalysisHubInner({
             episode_id: orderedSelectedIds[0]!,
             work_id: workIdNum,
             work_title: workTitle.trim() || null,
+            episode_title: null,
+            episode_number: null,
             status: "processing",
             updated_at: now,
             created_at: now,
@@ -664,6 +738,8 @@ function WorkAnalysisHubInner({
             setHolisticClient(hol);
           }
           router.refresh();
+          await reloadAnalysisData();
+          setHolisticClient(null);
         } catch (err) {
           setHolisticClientProgress(null);
           setBatchError(
@@ -681,6 +757,8 @@ function WorkAnalysisHubInner({
           episode_id: orderedSelectedIds[0]!,
           work_id: workIdNum,
           work_title: workTitle.trim() || null,
+          episode_title: null,
+          episode_number: null,
           status: "pending",
           updated_at: now,
           created_at: now,
@@ -729,7 +807,7 @@ function WorkAnalysisHubInner({
               : "text-zinc-500 hover:bg-zinc-900/80 hover:text-zinc-300"
           }`}
         >
-          이 화 분석
+          개별 분석
         </button>
         <button
           type="button"
@@ -754,7 +832,7 @@ function WorkAnalysisHubInner({
             </h2>
             <p className="mb-6 text-sm text-zinc-500">
               <CopyWithBreaks as="span" className="block">
-                아래 목록은 1화부터 오름차순입니다. 분석할 회차에서 「이 화 분석」을 누르면 아래에 AI 분석 패널이 열립니다.
+                아래 목록은 1화부터 오름차순입니다. 분석할 회차에서 「개별 분석」을 누르면 아래에 AI 분석 패널이 열립니다.
               </CopyWithBreaks>
             </p>
 
@@ -822,7 +900,7 @@ function WorkAnalysisHubInner({
                               }}
                               className="text-cyan-400/90 hover:text-cyan-300"
                             >
-                              이 화 분석
+                              개별 분석
                             </button>
                           </td>
                         </tr>
@@ -849,6 +927,8 @@ function WorkAnalysisHubInner({
                 workId={workIdNum}
                 episodeId={panelEpisodeId}
                 workTitle={workTitle}
+                episodeTitle={panelEpisode.title}
+                episodeNumber={panelEpisode.episode_number}
                 episodeLabel={`${panelEpisode.episode_number}화 · ${panelEpisode.title} · ${workTitle}`}
                 versions={versions}
                 initialAnalyses={panelAnalyses}
@@ -875,7 +955,7 @@ function WorkAnalysisHubInner({
           as="p"
           className="mb-6 rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-sm text-amber-200/90"
         >
-          체크박스로 분석할 회차를 고른 뒤, 선택한 원고를 한 번에 합쳐 통합 리포트를 받습니다. 회차별 개별 점수가 아니라 작품 흐름 기준 종합 분석입니다. 한 화만 보려면 상단 「이 화 분석」을 이용하세요.
+          체크박스로 분석할 회차를 고른 뒤, 선택한 원고를 한 번에 합쳐 통합 리포트를 받습니다. 회차별 개별 점수가 아니라 작품 흐름 기준 종합 분석입니다. 한 화만 보려면 상단 「개별 분석」을 이용하세요.
         </CopyWithBreaks>
 
         <div className="mb-6 flex flex-wrap items-end gap-3">
@@ -1096,6 +1176,14 @@ function WorkAnalysisHubInner({
                 </CopyWithBreaks>
               </p>
             )}
+            {!holisticClientProgress && batchHolisticServerJob && (
+              <div className="mb-4">
+                <AnalysisJobInlineProgress
+                  job={batchHolisticServerJob}
+                  title="통합 분석 진행 중"
+                />
+              </div>
+            )}
             {holisticClientProgress && (
               <div className="rounded-lg border border-cyan-500/25 bg-cyan-950/20 px-4 py-3">
                 <p className="text-sm font-medium text-cyan-100/95">
@@ -1254,7 +1342,7 @@ function WorkAnalysisHubInner({
                           }}
                           className="text-cyan-400/90 hover:text-cyan-300"
                         >
-                          이 화 분석
+                          개별 분석
                         </button>
                       </td>
                     </tr>
@@ -1266,7 +1354,7 @@ function WorkAnalysisHubInner({
         )}
 
         {activeHolistic && holisticReportEpisodes && (
-          <div className="mt-10">
+          <div className="mt-10 space-y-4">
             <BatchHolisticReport
               result={activeHolistic.result_json}
               agentVersion={activeHolistic.agent_version}
@@ -1274,6 +1362,53 @@ function WorkAnalysisHubInner({
               analyzedAt={activeHolistic.created_at}
               orderedEpisodes={holisticReportEpisodes}
             />
+            {holisticHistoryList.length > 0 && (
+              <details className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
+                <summary className="cursor-pointer select-none text-sm font-medium text-zinc-300">
+                  통합 분석 기록 ({holisticHistoryList.length}건)
+                  <span className="ml-2 font-normal text-zinc-500">
+                    — 항목을 눌러 이전 리포트를 볼 수 있습니다
+                  </span>
+                </summary>
+                <ul className="mt-3 max-h-[min(50vh,22rem)] space-y-2 overflow-y-auto pr-1">
+                  {holisticHistoryList.map((h, idx) => {
+                    const viewing = activeHolistic.id === h.id;
+                    const isLatest = idx === 0;
+                    const scoreNum =
+                      typeof h.result_json?.overall_score === "number"
+                        ? h.result_json.overall_score
+                        : null;
+                    return (
+                      <li key={h.id}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedHolisticId(h.id)}
+                          className={`flex w-full flex-col gap-0.5 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors sm:flex-row sm:items-center sm:justify-between ${
+                            viewing
+                              ? "border-cyan-500/45 bg-cyan-950/35 text-cyan-100"
+                              : "border-zinc-800 bg-zinc-950/50 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/80"
+                          }`}
+                        >
+                          <span className="font-medium">
+                            {holisticRunRangeLabel(h, effectiveEpisodes)}
+                            {isLatest && (
+                              <span className="ml-2 rounded bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-300/95">
+                                최신
+                              </span>
+                            )}
+                          </span>
+                          <span className="tabular-nums text-xs text-zinc-500 sm:text-right">
+                            종합 {scoreNum != null ? `${scoreNum}점` : "—"} ·{" "}
+                            {formatShortKst(h.created_at)} ·{" "}
+                            {getProfileLabel(h.agent_version)}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </details>
+            )}
           </div>
         )}
         </section>

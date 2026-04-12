@@ -18,9 +18,8 @@ export function getInternalSiteBaseUrl(): string {
 }
 
 /**
- * 로컬 `npm run dev`에서 `NEXT_PUBLIC_SITE_URL`이 프로덕션(예: novelagent.kr)이면
- * `runAnalysisProcessAfterResponse`가 원격 `/api/analyze/process`를 때려 **로컬 DB의 잡을 못 찾는** 문제가 납니다.
- * 개발 모드에서는 항상 현재 머신의 dev 서버로 self-call 합니다.
+ * (레거시) `/api/analyze/process`를 수동으로 호출할 때 베이스 URL.
+ * 단일 분석 트리거는 셀프 HTTP 없이 `executeAnalysisJob` 직접 호출을 쓴다.
  */
 export function getAnalyzeProcessBaseUrl(): string {
   if (process.env.NODE_ENV !== "production") {

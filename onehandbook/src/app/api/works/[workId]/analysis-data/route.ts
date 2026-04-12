@@ -52,16 +52,20 @@ export async function GET(
     )
     .eq("work_id", workId)
     .order("created_at", { ascending: false })
-    .limit(1);
+    .limit(40);
 
-  const latestHolistic = !holisticErr
-    ? ((holisticRows?.[0] ?? null) as HolisticRunRow | null)
-    : null;
+  const holisticHistory = !holisticErr
+    ? ((holisticRows ?? []) as HolisticRunRow[])
+    : [];
+
+  const latestHolistic =
+    holisticHistory.length > 0 ? holisticHistory[0]! : null;
 
   return NextResponse.json({
     episodes,
     runs,
     latestHolistic,
+    holisticHistory,
   });
 }
 

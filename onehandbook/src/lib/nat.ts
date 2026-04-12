@@ -17,16 +17,14 @@ export function countManuscriptChars(text: string): number {
 /** 본문 길이 구간별 기본 NAT (옵션 가산 전) */
 export function natBaseCostByLength(charCount: number): number {
   const n = Math.max(0, charCount);
-  if (n <= 3000) return 1;
-  if (n <= 6000) return 2;
-  if (n <= 10000) return 3;
+  if (n <= 6000) return 1;
+  if (n <= 10000) return 2;
   return 3;
 }
 
 export function natLengthTierLabel(charCount: number): string {
   const n = Math.max(0, charCount);
-  if (n <= 3000) return "3,000자 이하";
-  if (n <= 6000) return "3,001~6,000자";
+  if (n <= 6000) return "6,000자 이하";
   if (n <= 10000) return "6,001~10,000자";
   return "10,000자 초과 (상한 구간)";
 }

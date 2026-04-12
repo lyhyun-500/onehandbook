@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { parseDbInt } from "@/lib/supabase/parseDbInt";
 import { syncAppUser } from "@/lib/supabase/appUser";
 import { isMissingAnalysisJobsTableError } from "@/lib/db/analysisJobsTable";
+import { kickStalePendingAnalysisJobIfNeeded } from "@/lib/analysis/kickStalePendingAnalysisJob";
 
 export type JobProgressPhase =
   | "received"
@@ -15,6 +16,10 @@ export type AnalysisJobListItem = {
   episode_id: number;
   work_id: number;
   work_title: string | null;
+  /** 단일 회차 job 알림 제목용 — `episodes.title` */
+  episode_title: string | null;
+  /** 단일 회차 job 알림용 — `episodes.episode_number` */
+  episode_number: number | null;
   status: "pending" | "processing" | "completed" | "failed";
   updated_at: string;
   created_at: string;
@@ -71,7 +76,35 @@ export async function GET() {
   }
 
   const rows = jobs ?? [];
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (accessToken) {
+    const now = Date.now();
+    for (const r of rows) {
+      if (r.status !== "pending") continue;
+      const createdRaw =
+        typeof r.created_at === "string" ? r.created_at : r.updated_at;
+      if (typeof createdRaw !== "string") continue;
+      const createdMs = new Date(createdRaw).getTime();
+      if (Number.isNaN(createdMs) || now - createdMs < 12_000) continue;
+      await kickStalePendingAnalysisJobIfNeeded(
+        supabase,
+        String(r.id),
+        accessToken
+      );
+    }
+  }
+
   const workIds = [...new Set(rows.map((r) => r.work_id).filter((id): id is number => id != null))];
+  const episodeIdsRaw = rows.map((r) => {
+    const eid =
+      typeof r.episode_id === "number"
+        ? r.episode_id
+        : parseInt(String(r.episode_id), 10);
+    return Number.isNaN(eid) ? null : eid;
+  });
+  const episodeIds = [...new Set(episodeIdsRaw.filter((id): id is number => id != null))];
 
   const workTitleById = new Map<number, string | null>();
   if (workIds.length > 0) {
@@ -81,6 +114,31 @@ export async function GET() {
       .in("id", workIds);
     for (const w of works ?? []) {
       workTitleById.set(w.id, w.title ?? null);
+    }
+  }
+
+  const episodeMetaById = new Map<
+    number,
+    { title: string | null; episode_number: number | null }
+  >();
+  if (episodeIds.length > 0) {
+    const { data: eps } = await supabase
+      .from("episodes")
+      .select("id, title, episode_number")
+      .in("id", episodeIds);
+    for (const e of eps ?? []) {
+      const id = typeof e.id === "number" ? e.id : parseInt(String(e.id), 10);
+      if (Number.isNaN(id)) continue;
+      const en =
+        typeof e.episode_number === "number"
+          ? e.episode_number
+          : e.episode_number != null
+            ? parseInt(String(e.episode_number), 10)
+            : null;
+      episodeMetaById.set(id, {
+        title: typeof e.title === "string" ? e.title : null,
+        episode_number: en != null && !Number.isNaN(en) ? en : null,
+      });
     }
   }
 
@@ -166,11 +224,16 @@ export async function GET() {
           ? String(parentRaw)
           : null;
 
+    const epMeta = episodeMetaById.get(episode_id);
     list.push({
       id: String(r.id),
       episode_id,
       work_id,
       work_title: workTitleById.get(work_id) ?? null,
+      episode_title:
+        jobKind === "episode" ? (epMeta?.title ?? null) : null,
+      episode_number:
+        jobKind === "episode" ? (epMeta?.episode_number ?? null) : null,
       status: st,
       updated_at: r.updated_at,
       created_at,

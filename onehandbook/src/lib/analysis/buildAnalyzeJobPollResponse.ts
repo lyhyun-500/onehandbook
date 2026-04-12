@@ -6,7 +6,10 @@ import {
 import { buildNatBreakdown, countManuscriptChars, type NatAnalysisOptions } from "@/lib/nat";
 import { expireStaleProcessingJobIfNeeded, isStaleJobFailureMessage } from "@/lib/analysis/recoverStaleAnalysisJob";
 import { isMissingAnalysisJobsTableError } from "@/lib/db/analysisJobsTable";
-import { ANALYSIS_JOB_FAILURE_CONTENT_UNCHANGED } from "@/lib/analysis/analysisJobFailureCodes";
+import {
+  ANALYSIS_JOB_FAILURE_CONTENT_UNCHANGED,
+  ANALYSIS_JOB_FAILURE_SUPERSEDED_BY_FORCE,
+} from "@/lib/analysis/analysisJobFailureCodes";
 import { isContentUnchangedFailure } from "@/lib/analysis/analysisJobFailureHeuristics";
 import type { AnalysisJobPayload } from "@/lib/analysis/executeAnalysisJob";
 import type { HolisticAnalysisJobPayload } from "@/lib/analysis/executeHolisticAnalysisJob";
@@ -134,6 +137,16 @@ export async function buildAnalyzeJobPollResponse(
     const payload = job.payload as { failure_code?: string } | null;
     const failureCode = payload?.failure_code;
     const stale = isStaleJobFailureMessage(job.error_message);
+    if (failureCode === ANALYSIS_JOB_FAILURE_SUPERSEDED_BY_FORCE) {
+      return {
+        status: "failed",
+        code: ANALYSIS_JOB_FAILURE_SUPERSEDED_BY_FORCE,
+        error: msg,
+        retryable: false,
+        ...pollMeta,
+      };
+    }
+
     const unchanged = isContentUnchangedFailure({
       failure_code: failureCode ?? null,
       error_message: job.error_message,

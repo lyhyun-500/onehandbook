@@ -20,15 +20,21 @@ import {
 import { NatSpendConfirmModal } from "@/components/NatSpendConfirmModal";
 import { ManuscriptLowVolumeModal } from "@/components/ManuscriptLowVolumeModal";
 import { ContentUnchangedModal } from "@/components/ContentUnchangedModal";
+import { CachedAnalysisChoiceModal } from "@/components/CachedAnalysisChoiceModal";
 import { EpisodeInActiveAnalysisModal } from "@/components/EpisodeInActiveAnalysisModal";
 import { CopyWithBreaks } from "@/components/CopyWithBreaks";
 import { useAnalysisJobs } from "@/contexts/AnalysisJobsContext";
 import type { AnalyzeJobPollBody } from "@/lib/analysis/buildAnalyzeJobPollResponse";
-import { ANALYSIS_JOB_FAILURE_CONTENT_UNCHANGED } from "@/lib/analysis/analysisJobFailureCodes";
+import {
+  ANALYSIS_JOB_FAILURE_CONTENT_UNCHANGED,
+  ANALYSIS_JOB_FAILURE_SUPERSEDED_BY_FORCE,
+} from "@/lib/analysis/analysisJobFailureCodes";
 import { isContentUnchangedFailure } from "@/lib/analysis/analysisJobFailureHeuristics";
 import { PHONE_SIGNUP_REWARD_COINS } from "@/config/phoneSignupReward";
 import { formatDimensionLabel } from "@/lib/analysis/dimensionLabel";
 import type { PreviousAnalysisResultPayload } from "@/lib/analysisResultCache";
+import type { AnalysisJobListItem } from "@/app/api/analyze/jobs/route";
+import { AnalysisJobInlineProgress } from "@/components/AnalysisJobInlineProgress";
 
 export type VersionOption = {
   id: string;
@@ -163,6 +169,8 @@ export function AnalyzePanel({
   workId,
   episodeId,
   episodeLabel,
+  episodeTitle,
+  episodeNumber,
   workTitle,
   versions,
   initialAnalyses,
@@ -173,6 +181,10 @@ export function AnalyzePanel({
   workId: number;
   episodeId: number;
   episodeLabel?: string;
+  /** 알림 패널 제목용 — `episodes.title` */
+  episodeTitle?: string;
+  /** 알림 패널 제목용 — `episodes.episode_number` */
+  episodeNumber?: number;
   workTitle?: string;
   versions: VersionOption[];
   initialAnalyses: AnalysisRow[];
@@ -197,6 +209,7 @@ export function AnalyzePanel({
   const [lowVolumeOpen, setLowVolumeOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [unchangedOpen, setUnchangedOpen] = useState(false);
+  const [cachedChoiceOpen, setCachedChoiceOpen] = useState(false);
   /** 분석 API 요청 중 (모달·버튼 로딩용, 화면 전체는 막지 않음) */
   const [analyzing, setAnalyzing] = useState(false);
   const [pendingScrollToResult, setPendingScrollToResult] = useState(false);
@@ -210,6 +223,10 @@ export function AnalyzePanel({
   const [episodeBusyModalOpen, setEpisodeBusyModalOpen] = useState(false);
   const [cacheNotice, setCacheNotice] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState(initialAnalyses);
+  /** null이면 `analyses[0]`(최신) 기준으로 표시 */
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState<number | null>(
+    null
+  );
   const [rerunCompare, setRerunCompare] = useState<{
     previous: PreviousAnalysisResultPayload;
     currentScore: number;
@@ -222,6 +239,7 @@ export function AnalyzePanel({
 
   useEffect(() => {
     setAnalyses(initialAnalyses);
+    setSelectedAnalysisId(null);
     setRerunCompare(null);
     setPendingScrollToResult(false);
     setJobFailedBanner(null);
@@ -234,6 +252,25 @@ export function AnalyzePanel({
   }, [includePlatformOptimization]);
 
   const latestJobForEp = getLatestJobForEpisode(episodeId);
+
+  const singleInlineProgress = useMemo(() => {
+    const active = getActiveJobCoveringEpisode(episodeId, workId);
+    let job: AnalysisJobListItem | null = null;
+    if (
+      active?.job_kind === "episode" &&
+      active.episode_id === episodeId &&
+      (active.status === "pending" || active.status === "processing")
+    ) {
+      job = active;
+    }
+    const bootstrapping = pollJobId != null && job == null;
+    return {
+      job,
+      bootstrapping,
+      show: job != null || bootstrapping,
+    };
+  }, [episodeId, workId, pollJobId, getActiveJobCoveringEpisode]);
+
   const prevEpJobStatus = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -257,6 +294,7 @@ export function AnalyzePanel({
           const row = analysisRowFromApi(pj.analysis);
           return [row, ...prev.filter((a) => a.id !== row.id)];
         });
+        setSelectedAnalysisId(null);
         setPendingScrollToResult(true);
         const prev = pj.previousResult as
           | PreviousAnalysisResultPayload
@@ -283,6 +321,9 @@ export function AnalyzePanel({
       const pj = (await pr.json().catch(() => ({}))) as AnalyzeJobPollBody;
       if (!pr.ok) return;
       if (pj.status === "failed") {
+        if (pj.code === ANALYSIS_JOB_FAILURE_SUPERSEDED_BY_FORCE) {
+          return;
+        }
         const unchanged =
           pj.code === ANALYSIS_JOB_FAILURE_CONTENT_UNCHANGED ||
           isContentUnchangedFailure({
@@ -365,6 +406,7 @@ export function AnalyzePanel({
             const id = row.id;
             return [row, ...prev.filter((a) => a.id !== id)];
           });
+          setSelectedAnalysisId(null);
           setPendingScrollToResult(true);
           setCacheNotice(null);
           const prev = body.previousResult ?? null;
@@ -387,6 +429,10 @@ export function AnalyzePanel({
         }
 
         if (body.status === "failed") {
+          if (body.code === ANALYSIS_JOB_FAILURE_SUPERSEDED_BY_FORCE) {
+            if (!cancelled) setPollJobId(null);
+            return;
+          }
           const unchanged =
             body.code === ANALYSIS_JOB_FAILURE_CONTENT_UNCHANGED ||
             isContentUnchangedFailure({
@@ -458,8 +504,20 @@ export function AnalyzePanel({
     [charCount, includeLore, includePlatformOptimization]
   );
 
-  const requestAnalyze = async (force?: boolean) => {
-    if (getActiveJobCoveringEpisode(episodeId, workId)) {
+  const requestAnalyze = async (opts?: {
+    force?: boolean;
+    acceptCached?: boolean;
+  }) => {
+    const force = opts?.force === true;
+    const acceptCached = opts?.acceptCached === true;
+    if (force) {
+      setPollJobId(null);
+    }
+    // 강제 재분석: 서버가 같은 회차의 기존 단일 job을 대체 종료하므로 클라이언트 '진행 중' 가드는 건너뜀
+    if (
+      !force &&
+      getActiveJobCoveringEpisode(episodeId, workId)
+    ) {
       setEpisodeBusyModalOpen(true);
       return;
     }
@@ -477,6 +535,7 @@ export function AnalyzePanel({
           includeLore,
           includePlatformOptimization,
           ...(force ? { force: true } : {}),
+          ...(acceptCached ? { acceptCached: true } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -484,6 +543,11 @@ export function AnalyzePanel({
         if (data.code === "EPISODE_ANALYSIS_IN_PROGRESS") {
           setAnalyzing(false);
           setEpisodeBusyModalOpen(true);
+          return;
+        }
+        if (data.code === "CACHED_ANALYSIS_AVAILABLE") {
+          setAnalyzing(false);
+          setCachedChoiceOpen(true);
           return;
         }
         if (data.code === "CONTENT_UNCHANGED") {
@@ -537,6 +601,11 @@ export function AnalyzePanel({
           episode_id: episodeId,
           work_id: workId,
           work_title: workTitle?.trim() || null,
+          episode_title: episodeTitle?.trim() || null,
+          episode_number:
+            typeof episodeNumber === "number" && !Number.isNaN(episodeNumber)
+              ? episodeNumber
+              : null,
           status: "pending",
           updated_at: now,
           created_at: now,
@@ -562,6 +631,7 @@ export function AnalyzePanel({
           );
           return [row, ...prev.filter((a) => a.id !== row.id)];
         });
+        setSelectedAnalysisId(null);
         setPendingScrollToResult(true);
       }
       if (data.cached === true) {
@@ -592,7 +662,7 @@ export function AnalyzePanel({
 
   const onConfirmUnchangedAnalyze = () => {
     setUnchangedOpen(false);
-    void requestAnalyze(true);
+    void requestAnalyze({ force: true });
   };
 
   const onClickAnalyze = () => {
@@ -613,7 +683,20 @@ export function AnalyzePanel({
     setConfirmOpen(true);
   };
 
-  const latest = analyses[0];
+  const displayedAnalysis = useMemo(() => {
+    if (analyses.length === 0) return null;
+    if (selectedAnalysisId != null) {
+      const hit = analyses.find((a) => a.id === selectedAnalysisId);
+      if (hit) return hit;
+    }
+    return analyses[0] ?? null;
+  }, [analyses, selectedAnalysisId]);
+
+  const latestRun = analyses[0];
+  const viewingLatest =
+    displayedAnalysis != null &&
+    latestRun != null &&
+    displayedAnalysis.id === latestRun.id;
 
   return (
     <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
@@ -736,6 +819,16 @@ export function AnalyzePanel({
         </p>
       )}
 
+      {singleInlineProgress.show && (
+        <div className="mb-4">
+          <AnalysisJobInlineProgress
+            job={singleInlineProgress.job}
+            bootstrapping={singleInlineProgress.bootstrapping}
+            title="AI 분석 진행 중"
+          />
+        </div>
+      )}
+
       {cacheNotice && (
         <p className="mb-4 rounded-lg border border-emerald-500/25 bg-emerald-950/25 px-3 py-2 text-sm text-emerald-100/95">
           <CopyWithBreaks as="span">{cacheNotice}</CopyWithBreaks>
@@ -807,17 +900,31 @@ export function AnalyzePanel({
         onConfirm={onConfirmUnchangedAnalyze}
       />
 
+      <CachedAnalysisChoiceModal
+        open={cachedChoiceOpen}
+        loading={analyzing}
+        onCancel={() => setCachedChoiceOpen(false)}
+        onLoadCached={() => {
+          setCachedChoiceOpen(false);
+          void requestAnalyze({ acceptCached: true });
+        }}
+        onReanalyze={() => {
+          setCachedChoiceOpen(false);
+          void requestAnalyze({ force: true });
+        }}
+      />
+
       <EpisodeInActiveAnalysisModal
         open={episodeBusyModalOpen}
         onClose={() => setEpisodeBusyModalOpen(false)}
       />
 
-      {latest && (
+      {displayedAnalysis && (
         <div
           id="analysis-result-anchor"
           className="space-y-4 scroll-mt-24 border-t border-zinc-800 pt-6"
         >
-          {rerunCompare && (
+          {rerunCompare && viewingLatest && (
             <div className="rounded-lg border border-cyan-500/25 bg-cyan-950/20 px-4 py-3">
               <h3 className="text-sm font-semibold text-cyan-200/95">
                 재분석 · 이전 결과와 비교
@@ -878,7 +985,7 @@ export function AnalyzePanel({
               </div>
             </div>
           )}
-          {latest.holistic_derived && (
+          {displayedAnalysis.holistic_derived && (
             <div className="rounded-lg border border-amber-500/30 bg-amber-950/25 px-4 py-3 text-sm text-amber-100/95">
               <p className="font-medium text-amber-100">
                 통합 일괄 분석에서 가져온 요약입니다
@@ -908,11 +1015,18 @@ export function AnalyzePanel({
           )}
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <div>
-              <p className="text-sm text-zinc-500">
-                최근 분석 · {getProfileLabel(latest.agent_version)} ·{" "}
-                {formatKoreanDateTime(latest.created_at)}
+              <p
+                className={
+                  viewingLatest
+                    ? "text-sm text-zinc-500"
+                    : "text-sm text-amber-200/90"
+                }
+              >
+                {viewingLatest ? "최신 분석" : "이전 결과 보기"} ·{" "}
+                {getProfileLabel(displayedAnalysis.agent_version)} ·{" "}
+                {formatKoreanDateTime(displayedAnalysis.created_at)}
               </p>
-              {latest.holistic_derived && (
+              {displayedAnalysis.holistic_derived && (
                 <p className="mt-1 text-xs text-zinc-500">
                   종합 점수만 이 회차에 맞춰 두었고, 상세 문안은 통합 리포트와
                   동일합니다.
@@ -920,39 +1034,65 @@ export function AnalyzePanel({
               )}
             </div>
             <p className="text-3xl font-bold text-cyan-400">
-              {latest.result_json.overall_score}
+              {displayedAnalysis.result_json.overall_score}
               <span className="text-lg font-normal text-zinc-500">/100</span>
             </p>
           </div>
 
-          {latest.holistic_derived ? (
+          {displayedAnalysis.holistic_derived ? (
             <details className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-4 py-3">
               <summary className="cursor-pointer text-sm text-zinc-400">
                 통합 리포트와 동일한 상세 텍스트 보기 (항목별 · 개선 · 트렌드)
               </summary>
               <div className="mt-4 space-y-4 border-t border-zinc-800/80 pt-4">
-                <AnalysisResultDetailBody latest={latest} />
+                <AnalysisResultDetailBody latest={displayedAnalysis} />
               </div>
             </details>
           ) : (
-            <AnalysisResultDetailBody latest={latest} />
+            <AnalysisResultDetailBody latest={displayedAnalysis} />
           )}
         </div>
       )}
 
       {analyses.length > 1 && (
-        <details className="mt-6 border-t border-zinc-800 pt-4">
-          <summary className="cursor-pointer text-sm text-zinc-500">
-            이전 분석 {analyses.length - 1}건
+        <details className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
+          <summary className="cursor-pointer select-none text-sm font-medium text-zinc-300">
+            개별 분석 기록 ({analyses.length}건)
+            <span className="ml-2 font-normal text-zinc-500">
+              — 항목을 눌러 이전 결과를 볼 수 있습니다
+            </span>
           </summary>
-          <ul className="mt-2 space-y-2 text-sm text-zinc-500">
-            {analyses.slice(1).map((a) => (
-              <li key={a.id}>
-                {formatKoreanDateTime(a.created_at)} ·{" "}
-                {getProfileLabel(a.agent_version)} · 종합{" "}
-                {a.result_json.overall_score}점
-              </li>
-            ))}
+          <ul className="mt-3 max-h-[min(50vh,22rem)] space-y-2 overflow-y-auto pr-1">
+            {analyses.map((a, idx) => {
+              const viewing = displayedAnalysis?.id === a.id;
+              const isLatest = idx === 0;
+              return (
+                <li key={a.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAnalysisId(a.id)}
+                    className={`flex w-full flex-col gap-0.5 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors sm:flex-row sm:items-center sm:justify-between ${
+                      viewing
+                        ? "border-cyan-500/45 bg-cyan-950/35 text-cyan-100"
+                        : "border-zinc-800 bg-zinc-950/50 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900/80"
+                    }`}
+                  >
+                    <span className="font-medium">
+                      종합 {a.result_json.overall_score}점
+                      {isLatest && (
+                        <span className="ml-2 rounded bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-300/95">
+                          최신
+                        </span>
+                      )}
+                    </span>
+                    <span className="tabular-nums text-xs text-zinc-500 sm:text-right">
+                      {formatKoreanDateTime(a.created_at)} ·{" "}
+                      {getProfileLabel(a.agent_version)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </details>
       )}

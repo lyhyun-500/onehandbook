@@ -192,11 +192,35 @@ async function analysisJobRowToListItem(
     .eq("id", resolvedWorkId)
     .maybeSingle();
 
+  const { data: epRow } = await supabase
+    .from("episodes")
+    .select("title, episode_number")
+    .eq("id", episode_id)
+    .maybeSingle();
+
+  const epNumRaw = epRow?.episode_number;
+  const episode_number_ep =
+    typeof epNumRaw === "number"
+      ? epNumRaw
+      : epNumRaw != null
+        ? parseInt(String(epNumRaw), 10)
+        : null;
+
   return {
     id,
     episode_id,
     work_id: resolvedWorkId,
     work_title: wk?.title ?? null,
+    episode_title:
+      job_kind === "episode" && typeof epRow?.title === "string"
+        ? epRow.title
+        : null,
+    episode_number:
+      job_kind === "episode" &&
+      episode_number_ep != null &&
+      !Number.isNaN(episode_number_ep)
+        ? episode_number_ep
+        : null,
     status,
     updated_at,
     created_at,
@@ -831,6 +855,20 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
+  /** 진행 중 작업이 있을 때 목록을 주기적으로 다시 불러 pending 재기동(kick)·상태 동기화 */
+  useEffect(() => {
+    const hasActive = mergedJobs.some(
+      (j) =>
+        j.parent_job_id == null &&
+        (j.status === "pending" || j.status === "processing")
+    );
+    if (!hasActive) return;
+    const id = window.setInterval(() => {
+      void refreshAnalysisJobs();
+    }, 12_000);
+    return () => window.clearInterval(id);
+  }, [mergedJobs, refreshAnalysisJobs]);
+
   const workHasAnalyzingEpisode = useCallback(
     (workId: number) => {
       for (const j of mergedJobs) {
@@ -1058,7 +1096,11 @@ function jobCardTitle(j: AnalysisJobListItem): string {
     const n = j.ordered_episode_ids?.length ?? 0;
     return `${wt} · 통합 ${n}개 회차`;
   }
-  return `${wt} · 이 화 분석`;
+  const num = j.episode_number;
+  if (typeof num === "number" && !Number.isNaN(num)) {
+    return `${wt} · ${num}화`;
+  }
+  return `${wt} · 개별 분석`;
 }
 
 function formatKstYYMMDD(iso: string): string | null {

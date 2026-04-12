@@ -30,12 +30,16 @@ import { checkAnalyzeRateLimit } from "@/lib/rateLimit/analyzeRateLimit";
 import { isMissingAnalysisJobsTableError } from "@/lib/db/analysisJobsTable";
 import { runAnalysisProcessAfterResponse } from "@/lib/analysis/scheduleAnalysisProcess";
 import { conflictingEpisodeIdsForActiveJobs } from "@/lib/analysis/activeAnalysisJobConflict";
+import { ANALYSIS_JOB_FAILURE_SUPERSEDED_BY_FORCE } from "@/lib/analysis/analysisJobFailureCodes";
 
 function parseNatOptions(body: Record<string, unknown>): NatAnalysisOptions {
   const includeLore = body.includeLore !== false;
   const includePlatformOptimization = body.includePlatformOptimization !== false;
   return { includeLore, includePlatformOptimization };
 }
+
+/** `after()` 안에서 LLM 분석이 돌아가므로 process 라우트와 동일한 상한을 둔다. */
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -73,6 +77,7 @@ export async function POST(request: Request) {
   }
 
   const force = body.force === true;
+  const acceptCached = body.acceptCached === true;
 
   const opts = parseNatOptions(body);
   const requestedVersion =
@@ -153,7 +158,18 @@ export async function POST(request: Request) {
       )
     : null;
 
-  if (cachedRun) {
+  if (cachedRun && !acceptCached) {
+    return NextResponse.json(
+      {
+        error:
+          "동일 조건의 저장된 분석 결과가 있습니다. 불러오거나 NAT를 차감해 다시 분석할 수 있습니다.",
+        code: "CACHED_ANALYSIS_AVAILABLE" as const,
+      },
+      { status: 409 }
+    );
+  }
+
+  if (cachedRun && acceptCached) {
     const balanceAfter = appUser.coin_balance ?? 0;
     const { data: lastTwo } = await supabase
       .from("analysis_results")
@@ -248,6 +264,52 @@ export async function POST(request: Request) {
     );
   }
 
+  /**
+   * 강제 재분석: 같은 회차에 남아 있는 pending|processing 단일 job이 있으면
+   * conflictingEpisodeIdsForActiveJobs 가 막아 새 job을 만들지 못함(무한 폴링처럼 보임).
+   * 기존 단일 job만 대체 종료하고 통합(holistic_batch) 진행 중 작업은 건드리지 않음.
+   */
+  if (force) {
+    const { data: supersedeRows, error: supErr } = await supabase
+      .from("analysis_jobs")
+      .select("id, payload")
+      .eq("app_user_id", appUser.id)
+      .eq("episode_id", episodeId)
+      .eq("job_kind", "episode")
+      .in("status", ["pending", "processing"]);
+    if (supErr) {
+      console.warn("force: list episode jobs to supersede:", supErr.message);
+    } else {
+      const nowIso = new Date().toISOString();
+      for (const row of supersedeRows ?? []) {
+        const rid = row.id as string;
+        const base =
+          row.payload && typeof row.payload === "object"
+            ? (row.payload as Record<string, unknown>)
+            : {};
+        const { error: upErr } = await supabase
+          .from("analysis_jobs")
+          .update({
+            status: "failed",
+            error_message:
+              "같은 회차에서 강제 재분석이 요청되어 이 작업은 종료되었습니다.",
+            progress_phase: null,
+            payload: {
+              ...base,
+              failure_code: ANALYSIS_JOB_FAILURE_SUPERSEDED_BY_FORCE,
+            },
+            updated_at: nowIso,
+          })
+          .eq("id", rid)
+          .eq("app_user_id", appUser.id)
+          .in("status", ["pending", "processing"]);
+        if (upErr) {
+          console.warn("force: supersede job", rid, upErr.message);
+        }
+      }
+    }
+  }
+
   const busy = await conflictingEpisodeIdsForActiveJobs(
     supabase,
     appUser.id,
@@ -305,14 +367,11 @@ export async function POST(request: Request) {
 
   const jobId = jobRow.id as string;
 
-  if (process.env.NODE_ENV !== "production") {
-    // dev에서는 after()가 실행되지 않는 경우가 있어 즉시 트리거한다.
-    void runAnalysisProcessAfterResponse(jobId, session.access_token);
-  } else {
-    after(() => {
-      void runAnalysisProcessAfterResponse(jobId, session.access_token);
-    });
-  }
+  // 반드시 async + await: `after(() => { void ... })`는 Promise를 기다리지 않아 분석이 시작되기 전에
+  // 서버리스 인보케이션이 끝나 job이 영구 pending으로 남을 수 있음.
+  after(async () => {
+    await runAnalysisProcessAfterResponse(jobId, session.access_token);
+  });
 
   return NextResponse.json({
     job_id: jobId,
