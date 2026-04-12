@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { SITE_NAME, SUPPORT_HOURS_LINE } from "@/config/site";
+import { createClient } from "@/lib/supabase/client";
 import {
-  SITE_NAME,
-  CONTACT_EMAIL,
-  SUPPORT_HOURS_LINE,
-  buildInquiryMailtoHref,
-} from "@/config/site";
+  isLikelyNonRoutableAuthEmail,
+  isValidReplyRecipientEmail,
+} from "@/lib/inquiryReplyEmail";
+
+type ToastState = { kind: "ok" | "err"; message: string };
 
 export function FloatingInquiryButton() {
   const [open, setOpen] = useState(false);
@@ -15,6 +17,9 @@ export function FloatingInquiryButton() {
   const [content, setContent] = useState("");
   const [consent, setConsent] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [replyEmail, setReplyEmail] = useState("");
 
   const onClose = useCallback(() => {
     setOpen(false);
@@ -30,7 +35,30 @@ export function FloatingInquiryButton() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 4200);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void (async () => {
+      const {
+        data: { user },
+      } = await createClient().auth.getUser();
+      if (cancelled || !user?.email) return;
+      if (!isLikelyNonRoutableAuthEmail(user.email)) {
+        setReplyEmail((prev) => (prev.trim() === "" ? user.email! : prev));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
     if (!title.trim() || !content.trim()) {
@@ -41,12 +69,68 @@ export function FloatingInquiryButton() {
       setSubmitError("문의 저장·상담을 위해 수집·이용에 동의해 주세요.");
       return;
     }
-    const href = buildInquiryMailtoHref(title.trim(), content.trim());
-    if (!href) {
-      setSubmitError("문의 메일 주소가 설정되지 않았습니다. 이용약관의 문의 안내를 확인해 주세요.");
+
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setSubmitError("문의를 보내려면 로그인해 주세요.");
       return;
     }
-    window.location.href = href;
+
+    const replyTrim = replyEmail.trim();
+    const sessionEmailOk =
+      !!user.email && !isLikelyNonRoutableAuthEmail(user.email);
+
+    if (replyTrim) {
+      if (!isValidReplyRecipientEmail(replyTrim)) {
+        setSubmitError("답변 받을 이메일 형식을 확인해 주세요.");
+        return;
+      }
+    } else if (!sessionEmailOk) {
+      setSubmitError(
+        "답변 받을 이메일을 입력해 주세요. SNS 로그인만 사용 중이면 실제로 받는 주소를 적어 주세요."
+      );
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/contact/inquiry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          content: content.trim(),
+          replyEmail: replyTrim,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+
+      if (!res.ok) {
+        const msg =
+          typeof data.error === "string" && data.error.length > 0
+            ? data.error
+            : "전송에 실패했습니다.";
+        setToast({ kind: "err", message: msg });
+        return;
+      }
+
+      setTitle("");
+      setContent("");
+      setReplyEmail("");
+      setConsent(false);
+      setToast({ kind: "ok", message: "문의가 접수됐습니다." });
+      onClose();
+    } catch {
+      setToast({
+        kind: "err",
+        message: "네트워크 오류로 전송하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   /** z-50: AppShellHeaderClient 스튜디오 메뉴(z-[55]) 아래에 두어 메뉴 열릴 때 FAB가 위로 튀지 않게 */
@@ -68,6 +152,19 @@ export function FloatingInquiryButton() {
 
   return (
     <>
+      {toast ? (
+        <div
+          role="status"
+          className={`fixed bottom-6 left-1/2 z-[80] max-w-[min(calc(100vw-2rem),20rem)] -translate-x-1/2 rounded-xl border px-4 py-3 text-center text-sm font-medium shadow-lg ${
+            toast.kind === "ok"
+              ? "border-emerald-500/30 bg-emerald-950/95 text-emerald-100"
+              : "border-red-500/35 bg-red-950/95 text-red-100"
+          }`}
+        >
+          {toast.message}
+        </div>
+      ) : null}
+
       <button
         type="button"
         className={fabClassName}
@@ -130,8 +227,8 @@ export function FloatingInquiryButton() {
               <p className="text-xs font-medium text-cyan-200/95">운영 시간</p>
               <p className="mt-0.5 text-sm text-zinc-300">{SUPPORT_HOURS_LINE}</p>
               <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-                영업일 기준 순차적으로 답변 드립니다. 메일 클라이언트가 열리면
-                발송만 완료해 주세요.
+                로그인 후 제출하면 운영 메일로 전달됩니다. 영업일 기준 순차적으로
+                답변 드립니다.
               </p>
             </div>
 
@@ -149,6 +246,28 @@ export function FloatingInquiryButton() {
                   maxLength={200}
                   className="mt-1.5 w-full rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/40"
                 />
+              </label>
+
+              <label className="mt-4 block">
+                <span className="text-sm font-medium text-zinc-300">
+                  답변 받을 이메일
+                </span>
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  value={replyEmail}
+                  onChange={(e) => setReplyEmail(e.target.value)}
+                  placeholder="실제로 받을 수 있는 주소"
+                  maxLength={320}
+                  className="mt-1.5 w-full rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/40"
+                />
+                <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
+                  이메일 로그인이면 자동 입력됩니다. 네이버·카카오 등 SNS만 연결된
+                  경우에는 <span className="text-zinc-400">꼭 받을 수 있는 주소</span>
+                  를 적어 주세요. (로그인 계정 이메일이 가짜 주소로 보일 수
+                  있습니다.)
+                </p>
               </label>
 
               <label className="mt-4 block flex-1">
@@ -191,16 +310,6 @@ export function FloatingInquiryButton() {
                 </p>
               </div>
 
-              {!CONTACT_EMAIL && (
-                <p className="mt-3 rounded-lg border border-amber-500/25 bg-amber-950/30 px-3 py-2 text-xs text-amber-200/90">
-                  <code className="text-amber-100/80">
-                    NEXT_PUBLIC_CONTACT_EMAIL
-                  </code>
-                  이 비어 있으면 메일 전송 단계로 넘어가지 않습니다. 설정 후
-                  다시 시도해 주세요.
-                </p>
-              )}
-
               {submitError && (
                 <p className="mt-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
                   {submitError}
@@ -218,9 +327,9 @@ export function FloatingInquiryButton() {
                 <button
                   type="submit"
                   className="rounded-lg bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 shadow-md shadow-cyan-500/15 hover:bg-cyan-400 disabled:opacity-50"
-                  disabled={!CONTACT_EMAIL}
+                  disabled={submitting}
                 >
-                  문의하기
+                  {submitting ? "전송 중…" : "문의하기"}
                 </button>
               </div>
             </form>
