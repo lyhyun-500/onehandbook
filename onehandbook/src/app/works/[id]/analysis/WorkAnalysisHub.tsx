@@ -37,6 +37,7 @@ import {
   MANUSCRIPT_TOO_SHORT_MESSAGE,
   MIN_ANALYSIS_CHARS,
 } from "@/lib/manuscriptEligibility";
+import { HOLISTIC_CLIENT_CHUNK_SIZE } from "@/lib/analysis/holisticEpisodeChunks";
 
 type EpisodeRow = {
   id: number;
@@ -284,8 +285,8 @@ function WorkAnalysisHubInner({
       opts
     );
     const lines: { label: string; nat: number }[] = [
-        {
-        label: `10화 단위 배치 ${est.chunkCount}회`,
+      {
+        label: `${orderedSelectedIds.length}화 통합 · ${HOLISTIC_CLIENT_CHUNK_SIZE}화씩 ${est.chunkCount}회 분석`,
         nat: est.batchNat,
       },
     ];

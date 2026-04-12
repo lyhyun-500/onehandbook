@@ -117,12 +117,35 @@ export function buildBatchNatBreakdown(
   return { lines, total, episodeCount };
 }
 
-/** 통합 일괄 분석 1회: 합산 글자 수 기준 구간 + 로어·플랫폼 각 1회 가산 */
+/**
+ * 통합 일괄 분석 1회(선택 회차 한 번에 묶음): **회차당 1 NAT** + 로어·플랫폼 각 통합 1회 가산.
+ * (단일 회차·통합 모두 글자 구간이 아닌 회차 수 기준)
+ */
 export function computeHolisticNatCost(
-  totalCombinedChars: number,
+  episodeCount: number,
   opts: NatAnalysisOptions
 ): number {
-  return computeNatCost(totalCombinedChars, opts);
+  let total = Math.max(0, episodeCount);
+  if (opts.includeLore) total += 1;
+  if (opts.includePlatformOptimization) total += 1;
+  return total;
+}
+
+/**
+ * 다청크 통합(10화 초과): 각 청크 기본 = **해당 청크 회차 수만큼 1 NAT/회차**,
+ * 로어·플랫폼은 **전체 작업당 1회**로 첫 청크에만 가산.
+ */
+export function computeHolisticChunkNatCost(
+  episodeCountInChunk: number,
+  chunkIndexZeroBased: number,
+  opts: NatAnalysisOptions
+): number {
+  let total = Math.max(0, episodeCountInChunk);
+  if (chunkIndexZeroBased === 0) {
+    if (opts.includeLore) total += 1;
+    if (opts.includePlatformOptimization) total += 1;
+  }
+  return total;
 }
 
 export function buildHolisticNatBreakdown(
@@ -130,13 +153,13 @@ export function buildHolisticNatBreakdown(
   episodeCount: number,
   opts: NatAnalysisOptions
 ): { lines: NatBreakdownLine[]; total: number } {
-  const base = natBaseCostByLength(totalCombinedChars);
+  const base = Math.max(0, episodeCount);
   const lines: NatBreakdownLine[] = [
     {
       label:
         episodeCount > 0
-          ? `기반 (통합 ${episodeCount}개 회차 합산, ${natLengthTierLabel(totalCombinedChars)})`
-          : `기반 (${natLengthTierLabel(totalCombinedChars)})`,
+          ? `기본 (회차당 1 NAT × ${episodeCount}화 · 합산 원고 ${natLengthTierLabel(totalCombinedChars)})`
+          : `기본 (${natLengthTierLabel(totalCombinedChars)})`,
       nat: base,
     },
   ];
@@ -170,13 +193,11 @@ export function estimateHolisticBatchTotalNat(
   const ids = orderedEpisodeIds;
   const chunkCount = Math.ceil(ids.length / chunkSize) || 0;
   let batchNat = 0;
+  let chunkIdx = 0;
   for (let i = 0; i < ids.length; i += chunkSize) {
     const slice = ids.slice(i, i + chunkSize);
-    const chars = slice.reduce((s, id) => {
-      const e = episodes.find((x) => x.id === id);
-      return s + (e?.charCount ?? 0);
-    }, 0);
-    batchNat += computeHolisticNatCost(chars, opts);
+    batchNat += computeHolisticChunkNatCost(slice.length, chunkIdx, opts);
+    chunkIdx += 1;
   }
   const mergeNat = chunkCount > 1 ? computeHolisticMergeNatCost() : 0;
   return {

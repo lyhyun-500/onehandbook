@@ -157,6 +157,7 @@ export async function POST(request: Request) {
     const { result } = await runHolisticChunkAnalysis(supabase, appUser, {
       workId,
       chunkEpisodeIds: episodeIds,
+      chunkIndex,
       requestedVersion,
       opts,
       pipelineDbLog: {

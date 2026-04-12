@@ -8,7 +8,7 @@ import type {
 } from "@/lib/ai/types";
 import { isProviderConfigured } from "@/lib/ai/availability";
 import {
-  computeHolisticNatCost,
+  computeHolisticChunkNatCost,
   countManuscriptChars,
   resolveAnalysisAgentVersion,
   type NatAnalysisOptions,
@@ -52,12 +52,14 @@ export async function runHolisticChunkAnalysis(
   params: {
     workId: number;
     chunkEpisodeIds: number[];
+    /** 다청크 통합 시 0부터. 첫 구간에만 로어·플랫폼 옵션 요금 가산 */
+    chunkIndex: number;
     requestedVersion: string;
     opts: NatAnalysisOptions;
     pipelineDbLog?: HolisticPipelineDbLogInput;
   }
 ): Promise<{ episodeIds: number[]; result: HolisticAnalysisResult }> {
-  const { workId, chunkEpisodeIds, requestedVersion, opts, pipelineDbLog } =
+  const { workId, chunkEpisodeIds, chunkIndex, requestedVersion, opts, pipelineDbLog } =
     params;
   if (chunkEpisodeIds.length === 0 || chunkEpisodeIds.length > 10) {
     throw new Error("청크 회차는 1~10개여야 합니다.");
@@ -151,11 +153,11 @@ export async function runHolisticChunkAnalysis(
     charCount: countManuscriptChars(e.content ?? ""),
   }));
 
-  const totalCombinedChars = ordered.reduce(
-    (s, e) => s + countManuscriptChars(e.content ?? ""),
-    0
+  const cost = computeHolisticChunkNatCost(
+    ordered.length,
+    Math.max(0, Math.floor(chunkIndex)),
+    opts
   );
-  const cost = computeHolisticNatCost(totalCombinedChars, opts);
 
   const refreshed = await syncAppUser(supabase);
   if (!refreshed) throw new Error("사용자 정보를 찾을 수 없습니다.");

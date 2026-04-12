@@ -7,6 +7,7 @@ import type { HolisticChunkPayload } from "@/lib/ai/holisticMergePrompts";
 import { isProviderConfigured } from "@/lib/ai/availability";
 import {
   computeHolisticMergeNatCost,
+  computeHolisticChunkNatCost,
   computeHolisticNatCost,
   countManuscriptChars,
   resolveAnalysisAgentVersion,
@@ -312,6 +313,7 @@ export async function runHolisticBatchPipeline(
   const chunkResults: Array<{ episodeIds: number[]; result: HolisticAnalysisResult }> =
     [];
 
+  let serverChunkIdx = 0;
   for (let i = 0; i < orderedEpisodeIds.length; i += HOLISTIC_CLIENT_CHUNK_SIZE) {
     const chunkIds = orderedEpisodeIds.slice(i, i + HOLISTIC_CLIENT_CHUNK_SIZE);
     const chunkEps = chunkIds.map((id) => byId.get(id)!);
@@ -334,7 +336,11 @@ export async function runHolisticBatchPipeline(
           (s, e) => s + countManuscriptChars(e.content ?? ""),
           0
         );
-        const cost = computeHolisticNatCost(totalCombinedChars, opts);
+        const cost = computeHolisticChunkNatCost(
+          chunkEps.length,
+          serverChunkIdx,
+          opts
+        );
         const balance = refreshed.coin_balance ?? 0;
         if (balance < cost) {
           const err = new Error(
@@ -415,6 +421,7 @@ export async function runHolisticBatchPipeline(
     if (!ok) {
       throw new Error(lastErr);
     }
+    serverChunkIdx += 1;
   }
 
   await onPhase("report_writing");
@@ -630,14 +637,10 @@ export async function runHolisticBatchPipeline(
   }
 
   let totalNatSpent = mergeCost;
-  for (const ch of chunkResults) {
-    const eps = ch.episodeIds.map((id) => byId.get(id)!);
-    const c = computeHolisticNatCost(
-      eps.reduce((s, e) => s + countManuscriptChars(e.content ?? ""), 0),
-      opts
-    );
+  chunkResults.forEach((ch, idx) => {
+    const c = computeHolisticChunkNatCost(ch.episodeIds.length, idx, opts);
     totalNatSpent += c;
-  }
+  });
 
   return {
     holisticRow: row as HolisticBatchWorkerResult["holisticRow"],
@@ -740,7 +743,7 @@ async function finalizeSingleHolisticRun(args: {
     (s, e) => s + countManuscriptChars(e.content ?? ""),
     0
   );
-  const cost = computeHolisticNatCost(totalCombinedChars, opts);
+  const cost = computeHolisticNatCost(ordered.length, opts);
   const contents = ordered.map((e) => e.content ?? "");
   const contentHash = holisticContentHash(
     orderedEpisodeIds,
