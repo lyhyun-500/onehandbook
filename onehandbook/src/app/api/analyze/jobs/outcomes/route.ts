@@ -47,9 +47,10 @@ export async function GET(request: Request) {
   let q = supabase
     .from("analysis_jobs")
     .select(
-      "id, episode_id, work_id, job_kind, progress_phase, status, updated_at, created_at, payload, holistic_run_id, error_message"
+      "id, episode_id, work_id, job_kind, progress_phase, status, updated_at, created_at, payload, holistic_run_id, error_message, parent_job_id"
     )
     .eq("app_user_id", appUser.id)
+    .is("parent_job_id", null)
     .in("status", ["completed", "failed"])
     .order("updated_at", { ascending: false })
     .limit(limit);
@@ -142,6 +143,14 @@ export async function GET(request: Request) {
     const holistic_run_id = parseDbInt(r.holistic_run_id);
     const created_at = typeof r.created_at === "string" ? r.created_at : r.updated_at;
 
+    const parentRaw = (r as { parent_job_id?: unknown }).parent_job_id;
+    const parent_job_id =
+      typeof parentRaw === "string"
+        ? parentRaw
+        : parentRaw != null
+          ? String(parentRaw)
+          : null;
+
     list.push({
       id: String(r.id),
       episode_id,
@@ -154,6 +163,7 @@ export async function GET(request: Request) {
       progress_phase,
       holistic_run_id,
       ordered_episode_ids,
+      parent_job_id,
       error_message: typeof r.error_message === "string" ? r.error_message : null,
       estimated_seconds,
       failure_code,

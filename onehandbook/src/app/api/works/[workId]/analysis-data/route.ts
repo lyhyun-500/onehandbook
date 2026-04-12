@@ -39,7 +39,7 @@ export async function GET(
 
   const { data: analysisRuns } = await supabase
     .from("analysis_runs")
-    .select("id, episode_id, agent_version, result_json, created_at")
+    .select("id, episode_id, agent_version, result_json, created_at, options_json")
     .eq("work_id", workId)
     .order("created_at", { ascending: false });
 

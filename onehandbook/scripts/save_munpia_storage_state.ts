@@ -18,11 +18,12 @@ import { dirname, join } from "path";
 import dotenv from "dotenv";
 import { chromium } from "playwright";
 import { chromiumLaunchOptions } from "@/lib/scraping/chromiumLaunchOptions";
+import {
+  applyPlaywrightStealth,
+  resolveDesktopChromeUserAgent,
+} from "@/lib/scraping/playwrightStealth";
 
 dotenv.config({ path: ".env.local" });
-
-const UA =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 const DEFAULT_LOGIN_URL =
   "https://nssl.munpia.com/login?redirectUrl=https%3A%2F%2Fwww.munpia.com%2F";
@@ -48,7 +49,10 @@ async function main() {
   await mkdir(dirname(outPath), { recursive: true });
 
   const browser = await chromium.launch(chromiumLaunchOptions(headless));
-  const context = await browser.newContext({ userAgent: UA });
+  const context = await browser.newContext({
+    userAgent: resolveDesktopChromeUserAgent(),
+  });
+  await applyPlaywrightStealth(context);
   const page = await context.newPage();
 
   try {

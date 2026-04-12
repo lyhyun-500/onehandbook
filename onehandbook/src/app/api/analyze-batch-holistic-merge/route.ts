@@ -15,11 +15,7 @@ import { NextResponse } from "next/server";
 import { syncAppUser } from "@/lib/supabase/appUser";
 import { md5Hex } from "@/lib/contentHash";
 import { isMissingHolisticChunkResultsTableError } from "@/lib/db/holisticChunkResultsTable";
-import {
-  deleteHolisticSyncedAnalysisRunIds,
-  syncPerEpisodeAnalysisFromHolisticRun,
-} from "@/lib/analysis/syncPerEpisodeAnalysisFromHolisticRun";
-import { computeWorkAnalysisContextHash } from "@/lib/analysis/workAnalysisContextHash";
+import { runBundledEpisodesForHolisticSelection } from "@/lib/analysis/runEpisodeAnalysisBundledInHolistic";
 import {
   holisticEpisodeScoreCoverage,
   logHolisticPipeline,
@@ -403,6 +399,19 @@ export async function POST(request: Request) {
     );
   }
 
+  if (jobIdForUpdate) {
+    const jfb = jobPayloadBase as { force?: boolean } | null;
+    await runBundledEpisodesForHolisticSelection(
+      supabase,
+      appUser,
+      orderedEps.map((e) => ({ id: Number(e.id) })),
+      requestedVersion,
+      opts,
+      jobIdForUpdate,
+      jfb?.force === true
+    );
+  }
+
   if (useDbSession && jobIdForUpdate && jobPayloadBase) {
     await supabase
       .from("analysis_jobs")
@@ -530,33 +539,6 @@ export async function POST(request: Request) {
       }
     };
 
-    let syncedRunIds: number[] = [];
-    try {
-      syncedRunIds = await syncPerEpisodeAnalysisFromHolisticRun(supabase, {
-        workId: work.id,
-        holisticRunId: row.id,
-        agentVersion: version.id,
-        holisticResult: result,
-        episodes: orderedEps,
-        optionsJson: optionsRecord,
-        workContextHash: computeWorkAnalysisContextHash(work, opts.includeLore),
-        pipelineDbLog: {
-          supabase,
-          appUserId: appUser.id,
-          analysisJobId: jobIdForUpdate,
-        },
-      });
-    } catch (syncErr) {
-      console.error("holistic merge route: 회차 동기화 실패", syncErr);
-      await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
-      const msg =
-        syncErr instanceof Error
-          ? syncErr.message
-          : "통합 분석 회차 반영에 실패했습니다.";
-      await markMergeJobFailed(msg);
-      return NextResponse.json({ error: msg }, { status: 500 });
-    }
-
     const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
       p_amount: mergeCost,
       p_ref_type: "holistic_analysis_run",
@@ -570,7 +552,6 @@ export async function POST(request: Request) {
 
     if (rpcErr) {
       console.error(rpcErr);
-      await deleteHolisticSyncedAnalysisRunIds(supabase, syncedRunIds);
       await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
       await markMergeJobFailed("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
       return NextResponse.json(
@@ -581,7 +562,6 @@ export async function POST(request: Request) {
 
     const rpc = rpcData as ConsumeNatRpcResult;
     if (!rpc?.ok) {
-      await deleteHolisticSyncedAnalysisRunIds(supabase, syncedRunIds);
       await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
       await markMergeJobFailed(
         `NAT가 부족합니다. 병합에는 ${mergeCost} NAT가 필요합니다.`

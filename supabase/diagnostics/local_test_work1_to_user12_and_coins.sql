@@ -1,0 +1,3 @@
+-- 이전 버전(작품 소유 이전)은 사용하지 마세요.
+-- 복제본 생성은 아래 파일을 쓰세요:
+--   supabase/diagnostics/local_clone_work1_for_user12.sql

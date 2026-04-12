@@ -42,7 +42,122 @@ export type AnalysisRow = {
   agent_version: string;
   result_json: AnalysisResult;
   created_at: string;
+  /** 통합 일괄 분석 후 회차별로 복제된 행(`options_json.holistic_derived`) */
+  holistic_derived?: boolean;
 };
+
+function analysisRowFromApi(raw: {
+  id: number;
+  agent_version: string;
+  result_json: unknown;
+  created_at: string;
+  holistic_derived?: boolean;
+}): AnalysisRow {
+  return {
+    id: raw.id,
+    agent_version: raw.agent_version,
+    result_json: raw.result_json as AnalysisResult,
+    created_at: raw.created_at,
+    holistic_derived: raw.holistic_derived === true,
+  };
+}
+
+function AnalysisResultDetailBody({ latest }: { latest: AnalysisRow }) {
+  return (
+    <>
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium text-zinc-300">항목별</h3>
+        <ul className="space-y-2 text-sm">
+          {Object.entries(latest.result_json.dimensions).map(([name, d]) => (
+            <li
+              key={name}
+              className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2"
+            >
+              <span className="text-zinc-400">
+                {formatDimensionLabel(name)}
+              </span>{" "}
+              <span className="text-zinc-100">{d.score}점</span>
+              <p className="mt-1 text-zinc-500">
+                <CopyWithBreaks as="span">{d.comment}</CopyWithBreaks>
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-sm font-medium text-zinc-300">개선 포인트</h3>
+        <ul className="list-inside list-disc space-y-1 text-sm text-zinc-400">
+          {latest.result_json.improvement_points.map((p, i) => (
+            <li key={i}>
+              <CopyWithBreaks as="span">{p}</CopyWithBreaks>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {latest.result_json.tag_trend_fit && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-4 py-3">
+          <h3 className="text-sm font-medium text-zinc-300">
+            태그 · 플랫폼 트렌드 적합도
+          </h3>
+          <div className="mt-2 space-y-2 text-sm text-zinc-400">
+            <div>
+              <p className="text-xs font-medium text-zinc-500">일치</p>
+              <p className="mt-1 text-zinc-300">
+                <CopyWithBreaks as="span">
+                  {latest.result_json.tag_trend_fit.alignment}
+                </CopyWithBreaks>
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-zinc-500">차별화</p>
+              <p className="mt-1 text-zinc-300">
+                <CopyWithBreaks as="span">
+                  {latest.result_json.tag_trend_fit.differentiation}
+                </CopyWithBreaks>
+              </p>
+            </div>
+            {latest.result_json.tag_trend_fit.suggested_trend_tags &&
+              latest.result_json.tag_trend_fit.suggested_trend_tags.length >
+                0 && (
+                <div>
+                  <p className="text-xs font-medium text-zinc-500">
+                    추천 트렌드 태그
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {latest.result_json.tag_trend_fit.suggested_trend_tags.map(
+                      (t, i) => (
+                        <span
+                          key={`${t}-${i}`}
+                          className="rounded-full border border-zinc-700 bg-zinc-900/40 px-2.5 py-1 text-xs text-zinc-200"
+                        >
+                          #{t}
+                        </span>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+          </div>
+        </div>
+      )}
+
+      {latest.result_json.comparable_note && (
+        <p className="text-sm text-zinc-500">
+          비교:{" "}
+          <CopyWithBreaks as="span">
+            {latest.result_json.comparable_note}
+          </CopyWithBreaks>
+        </p>
+      )}
+
+      <TrendReferencesSection
+        references={latest.result_json.trends_references}
+      />
+    </>
+  );
+}
 
 export function AnalyzePanel({
   workId,
@@ -139,8 +254,8 @@ export function AnalyzePanel({
       if (!pr.ok) return;
       if (pj.status === "completed" && pj.analysis) {
         setAnalyses((prev) => {
-          const id = pj.analysis.id as number;
-          return [pj.analysis, ...prev.filter((a) => a.id !== id)];
+          const row = analysisRowFromApi(pj.analysis);
+          return [row, ...prev.filter((a) => a.id !== row.id)];
         });
         setPendingScrollToResult(true);
         const prev = pj.previousResult as
@@ -243,7 +358,9 @@ export function AnalyzePanel({
         }
 
         if (body.status === "completed" && body.analysis) {
-          const row = body.analysis as AnalysisRow;
+          const row = analysisRowFromApi(
+            body.analysis as Parameters<typeof analysisRowFromApi>[0]
+          );
           setAnalyses((prev) => {
             const id = row.id;
             return [row, ...prev.filter((a) => a.id !== id)];
@@ -426,6 +543,7 @@ export function AnalyzePanel({
           job_kind: "episode",
           progress_phase: "received",
           holistic_run_id: null,
+          parent_job_id: null,
           ordered_episode_ids: [episodeId],
           error_message: null,
           estimated_seconds: 75,
@@ -439,8 +557,10 @@ export function AnalyzePanel({
 
       if (data.analysis) {
         setAnalyses((prev) => {
-          const id = data.analysis.id as number;
-          return [data.analysis, ...prev.filter((a) => a.id !== id)];
+          const row = analysisRowFromApi(
+            data.analysis as Parameters<typeof analysisRowFromApi>[0]
+          );
+          return [row, ...prev.filter((a) => a.id !== row.id)];
         });
         setPendingScrollToResult(true);
       }
@@ -758,107 +878,65 @@ export function AnalyzePanel({
               </div>
             </div>
           )}
+          {latest.holistic_derived && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-950/25 px-4 py-3 text-sm text-amber-100/95">
+              <p className="font-medium text-amber-100">
+                통합 일괄 분석에서 가져온 요약입니다
+              </p>
+              <p className="mt-2 leading-relaxed text-amber-100/90">
+                일괄 분석은 여러 회차를 한 번에 묶어 평가합니다. 아래 종합 점수만
+                이 회차에 맞춰 두었고, 항목별 코멘트·개선 포인트는{" "}
+                <strong className="font-semibold text-amber-50">
+                  선택한 구간 전체
+                </strong>
+                를 기준으로 한 통합 리포트 문안과 같습니다. 이 화 원고만 집중해서
+                보려면 위에서 「분석 실행」으로{" "}
+                <strong className="font-semibold text-amber-50">
+                  단일 회차 분석
+                </strong>
+                을 실행하세요 (NAT 소모).
+              </p>
+              <p className="mt-3">
+                <Link
+                  href={`/works/${workId}/analysis?tab=batch`}
+                  className="font-medium text-cyan-400 underline-offset-2 hover:text-cyan-300 hover:underline"
+                >
+                  일괄 분석 탭에서 통합 리포트 보기
+                </Link>
+              </p>
+            </div>
+          )}
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-sm text-zinc-500">
-              최근 분석 · {getProfileLabel(latest.agent_version)} ·{" "}
-              {formatKoreanDateTime(latest.created_at)}
-            </p>
+            <div>
+              <p className="text-sm text-zinc-500">
+                최근 분석 · {getProfileLabel(latest.agent_version)} ·{" "}
+                {formatKoreanDateTime(latest.created_at)}
+              </p>
+              {latest.holistic_derived && (
+                <p className="mt-1 text-xs text-zinc-500">
+                  종합 점수만 이 회차에 맞춰 두었고, 상세 문안은 통합 리포트와
+                  동일합니다.
+                </p>
+              )}
+            </div>
             <p className="text-3xl font-bold text-cyan-400">
               {latest.result_json.overall_score}
               <span className="text-lg font-normal text-zinc-500">/100</span>
             </p>
           </div>
 
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-zinc-300">항목별</h3>
-            <ul className="space-y-2 text-sm">
-              {Object.entries(latest.result_json.dimensions).map(([name, d]) => (
-                <li
-                  key={name}
-                  className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2"
-                >
-                  <span className="text-zinc-400">
-                    {formatDimensionLabel(name)}
-                  </span>{" "}
-                  <span className="text-zinc-100">{d.score}점</span>
-                  <p className="mt-1 text-zinc-500">
-                    <CopyWithBreaks as="span">{d.comment}</CopyWithBreaks>
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="mb-2 text-sm font-medium text-zinc-300">개선 포인트</h3>
-            <ul className="list-inside list-disc space-y-1 text-sm text-zinc-400">
-              {latest.result_json.improvement_points.map((p, i) => (
-                <li key={i}>
-                  <CopyWithBreaks as="span">{p}</CopyWithBreaks>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {latest.result_json.tag_trend_fit && (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-4 py-3">
-              <h3 className="text-sm font-medium text-zinc-300">
-                태그 · 플랫폼 트렌드 적합도
-              </h3>
-              <div className="mt-2 space-y-2 text-sm text-zinc-400">
-                <div>
-                  <p className="text-xs font-medium text-zinc-500">일치</p>
-                  <p className="mt-1 text-zinc-300">
-                    <CopyWithBreaks as="span">
-                      {latest.result_json.tag_trend_fit.alignment}
-                    </CopyWithBreaks>
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-zinc-500">차별화</p>
-                  <p className="mt-1 text-zinc-300">
-                    <CopyWithBreaks as="span">
-                      {latest.result_json.tag_trend_fit.differentiation}
-                    </CopyWithBreaks>
-                  </p>
-                </div>
-                {latest.result_json.tag_trend_fit.suggested_trend_tags &&
-                  latest.result_json.tag_trend_fit.suggested_trend_tags.length >
-                    0 && (
-                    <div>
-                      <p className="text-xs font-medium text-zinc-500">
-                        추천 트렌드 태그
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {latest.result_json.tag_trend_fit.suggested_trend_tags.map(
-                          (t, i) => (
-                            <span
-                              key={`${t}-${i}`}
-                              className="rounded-full border border-zinc-700 bg-zinc-900/40 px-2.5 py-1 text-xs text-zinc-200"
-                            >
-                              #{t}
-                            </span>
-                          )
-                        )}
-                      </div>
-                    </div>
-                  )}
+          {latest.holistic_derived ? (
+            <details className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-4 py-3">
+              <summary className="cursor-pointer text-sm text-zinc-400">
+                통합 리포트와 동일한 상세 텍스트 보기 (항목별 · 개선 · 트렌드)
+              </summary>
+              <div className="mt-4 space-y-4 border-t border-zinc-800/80 pt-4">
+                <AnalysisResultDetailBody latest={latest} />
               </div>
-            </div>
+            </details>
+          ) : (
+            <AnalysisResultDetailBody latest={latest} />
           )}
-
-          {latest.result_json.comparable_note && (
-            <p className="text-sm text-zinc-500">
-              비교:{" "}
-              <CopyWithBreaks as="span">
-                {latest.result_json.comparable_note}
-              </CopyWithBreaks>
-            </p>
-          )}
-
-          <TrendReferencesSection
-            references={latest.result_json.trends_references}
-          />
         </div>
       )}
 

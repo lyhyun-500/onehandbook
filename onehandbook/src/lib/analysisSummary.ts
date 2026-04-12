@@ -19,6 +19,8 @@ export type AnalysisRunRow = {
   agent_version: string;
   result_json: AnalysisResult;
   created_at: string;
+  /** 통합 일괄 분석 동기화 행 여부 (`syncPerEpisodeAnalysisFromHolisticRun`) */
+  options_json?: Record<string, unknown> | null;
 };
 
 /** created_at 내림차순으로 정렬된 runs에서 회차별 최신 1건 */

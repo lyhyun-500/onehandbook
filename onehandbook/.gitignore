@@ -52,3 +52,4 @@ next-env.d.ts
 
 # Playwright 로그인 쿠키 (직접 넣지 말 것)
 /data/cookies.json
+.env*.local

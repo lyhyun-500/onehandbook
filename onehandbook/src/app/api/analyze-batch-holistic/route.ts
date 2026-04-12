@@ -193,16 +193,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const totalCombinedChars = ordered.reduce(
-    (s, e) => s + countManuscriptChars(e.content ?? ""),
-    0
-  );
-
-  const breakdown = buildHolisticNatBreakdown(
-    totalCombinedChars,
-    ordered.length,
-    opts
-  );
+  const breakdown = buildHolisticNatBreakdown(ordered.length, opts);
 
   const episodeMeta = ordered.map((e) => ({
     id: e.id,

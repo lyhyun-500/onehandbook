@@ -1,5 +1,9 @@
 import { readFile } from "fs/promises";
 import type { Browser, BrowserContext } from "playwright";
+import {
+  applyPlaywrightStealth,
+  resolveDesktopChromeUserAgent,
+} from "@/lib/scraping/playwrightStealth";
 
 /**
  * Cursor/브라우저에서 내보낸 `cookies.json`을 Playwright 컨텍스트에 반영합니다.
@@ -11,11 +15,8 @@ import type { Browser, BrowserContext } from "playwright";
  * `storageState` 파일 경로를 그대로 쓰려면 `browser.newContext({ storageState: path })` 도 가능하지만,
  * 여기서는 파싱해 객체로 넘겨 동일 동작을 보장합니다.
  */
-const DEFAULT_PLAYWRIGHT_UA =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-
 export type NewContextWithCookiesOptions = {
-  /** 미지정 시 구형 크롬 UA (하위 호환) */
+  /** 미지정 시 맥/윈도우 데스크톱 크롬 UA (`PLAYWRIGHT_UA_PROFILE`) */
   userAgent?: string;
 };
 
@@ -24,7 +25,7 @@ export async function newContextWithCookiesJson(
   cookiesJsonPath: string,
   options?: NewContextWithCookiesOptions
 ): Promise<BrowserContext> {
-  const ua = options?.userAgent?.trim() || DEFAULT_PLAYWRIGHT_UA;
+  const ua = resolveDesktopChromeUserAgent(options?.userAgent);
   const raw = await readFile(cookiesJsonPath, "utf8");
   const data = JSON.parse(raw) as unknown;
 
@@ -33,6 +34,7 @@ export async function newContextWithCookiesJson(
       userAgent: ua,
     });
     await ctx.addCookies(data as Parameters<BrowserContext["addCookies"]>[0]);
+    await applyPlaywrightStealth(ctx);
     return ctx;
   }
 
@@ -42,10 +44,12 @@ export async function newContextWithCookiesJson(
       cookies: st.cookies,
       origins: Array.isArray(st.origins) ? st.origins : [],
     };
-    return browser.newContext({
+    const ctx = await browser.newContext({
       storageState: state as never,
       userAgent: ua,
     });
+    await applyPlaywrightStealth(ctx);
+    return ctx;
   }
 
   throw new Error(

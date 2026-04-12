@@ -129,6 +129,7 @@ export function AnalysisAsyncUnchangedModal({
             job_kind: "episode",
             progress_phase: "received",
             holistic_run_id: null,
+            parent_job_id: null,
             ordered_episode_ids: [fr.episodeId],
             error_message: null,
             estimated_seconds: 75,
@@ -176,6 +177,7 @@ export function AnalysisAsyncUnchangedModal({
           job_kind: "holistic_batch",
           progress_phase: "received",
           holistic_run_id: null,
+          parent_job_id: null,
           ordered_episode_ids: [...fr.episodeIds],
           error_message: null,
           estimated_seconds:

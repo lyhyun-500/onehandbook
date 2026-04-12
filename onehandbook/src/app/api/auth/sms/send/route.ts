@@ -81,35 +81,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: profileTaken } = await adminSend
-    .from("profiles")
-    .select("id")
-    .eq("phone_number", normalized)
-    .neq("id", appUser.id)
-    .maybeSingle();
-
-  if (profileTaken) {
-    return NextResponse.json(
-      { error: "이 번호는 이미 다른 계정에서 인증되었습니다." },
-      { status: 409 }
-    );
-  }
-
-  const { data: taken } = await supabase
-    .from("users")
-    .select("id")
-    .eq("phone_e164", normalized)
-    .not("phone_verified_at", "is", null)
-    .neq("id", appUser.id)
-    .maybeSingle();
-
-  if (taken) {
-    return NextResponse.json(
-      { error: "이 번호는 이미 다른 계정에서 인증되었습니다." },
-      { status: 409 }
-    );
-  }
-
   const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { count, error: cntErr } = await supabase
     .from("sms_otp_challenges")

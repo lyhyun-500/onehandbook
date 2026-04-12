@@ -149,7 +149,6 @@ export function computeHolisticChunkNatCost(
 }
 
 export function buildHolisticNatBreakdown(
-  totalCombinedChars: number,
   episodeCount: number,
   opts: NatAnalysisOptions
 ): { lines: NatBreakdownLine[]; total: number } {
@@ -158,8 +157,8 @@ export function buildHolisticNatBreakdown(
     {
       label:
         episodeCount > 0
-          ? `기본 (회차당 1 NAT × ${episodeCount}화 · 합산 원고 ${natLengthTierLabel(totalCombinedChars)})`
-          : `기본 (${natLengthTierLabel(totalCombinedChars)})`,
+          ? `기본 (회차당 1 NAT × ${episodeCount}화)`
+          : "기본",
       nat: base,
     },
   ];

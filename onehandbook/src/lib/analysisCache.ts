@@ -8,6 +8,7 @@ export type CachedAnalysisRunRow = {
   agent_version: string;
   result_json: unknown;
   created_at: string;
+  options_json?: Record<string, unknown> | null;
 };
 
 /**
@@ -45,7 +46,9 @@ export async function findCachedAnalysisRun(
   const runIds = [...new Set(ar.map((r) => r.analysis_run_id))];
   const { data: runs } = await supabase
     .from("analysis_runs")
-    .select("id, episode_id, work_id, agent_version, result_json, created_at")
+    .select(
+      "id, episode_id, work_id, agent_version, result_json, created_at, options_json"
+    )
     .in("id", runIds)
     .eq("agent_version", agentVersion);
 

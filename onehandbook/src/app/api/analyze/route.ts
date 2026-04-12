@@ -172,6 +172,7 @@ export async function POST(request: Request) {
       };
     }
 
+    const cachedOpts = cachedRun.options_json as Record<string, unknown> | null;
     return NextResponse.json({
       analysis: {
         id: cachedRun.id,
@@ -180,6 +181,7 @@ export async function POST(request: Request) {
         agent_version: cachedRun.agent_version,
         result_json: cachedRun.result_json,
         created_at: cachedRun.created_at,
+        holistic_derived: cachedOpts?.holistic_derived === true,
       },
       previousResult: previousForCompare,
       nat: { spent: 0, balance: balanceAfter },

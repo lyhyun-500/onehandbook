@@ -251,18 +251,14 @@ function WorkAnalysisHubInner({
         agent_version: r.agent_version,
         result_json: r.result_json,
         created_at: r.created_at,
+        holistic_derived:
+          (r.options_json as Record<string, unknown> | null | undefined)
+            ?.holistic_derived === true,
       }));
   }, [effectiveRuns, panelEpisodeId]);
 
   const panelEpisode = effectiveEpisodes.find((e) => e.id === panelEpisodeId);
   const panelCharCount = panelEpisode?.charCount ?? 0;
-
-  const batchTotalChars = useMemo(() => {
-    return orderedSelectedIds.reduce((sum, id) => {
-      const e = effectiveEpisodes.find((x) => x.id === id);
-      return sum + (e?.charCount ?? 0);
-    }, 0);
-  }, [orderedSelectedIds, effectiveEpisodes]);
 
   const batchBreakdown = useMemo(() => {
     const opts = {
@@ -273,11 +269,7 @@ function WorkAnalysisHubInner({
       return { lines: [] as { label: string; nat: number }[], total: 0 };
     }
     if (orderedSelectedIds.length <= 10) {
-      return buildHolisticNatBreakdown(
-        batchTotalChars,
-        orderedSelectedIds.length,
-        opts
-      );
+      return buildHolisticNatBreakdown(orderedSelectedIds.length, opts);
     }
     const est = estimateHolisticBatchTotalNat(
       effectiveEpisodes,
@@ -294,13 +286,7 @@ function WorkAnalysisHubInner({
       lines.push({ label: "최종 통합 리포트 병합", nat: est.mergeNat });
     }
     return { lines, total: est.total };
-  }, [
-    batchTotalChars,
-    orderedSelectedIds,
-    effectiveEpisodes,
-    batchIncludeLore,
-    batchIncludePlatform,
-  ]);
+  }, [orderedSelectedIds, effectiveEpisodes, batchIncludeLore, batchIncludePlatform]);
 
   const activeHolistic = effectiveHolisticClient ?? effectiveLatestHolistic;
 
@@ -565,6 +551,7 @@ function WorkAnalysisHubInner({
             job_kind: "holistic_batch",
             progress_phase: "ai_analyzing",
             holistic_run_id: null,
+            parent_job_id: null,
             ordered_episode_ids: [...orderedSelectedIds],
             error_message: null,
             estimated_seconds:
@@ -700,6 +687,7 @@ function WorkAnalysisHubInner({
           job_kind: "holistic_batch",
           progress_phase: "received",
           holistic_run_id: null,
+          parent_job_id: null,
           ordered_episode_ids: [...orderedSelectedIds],
           error_message: null,
           estimated_seconds:

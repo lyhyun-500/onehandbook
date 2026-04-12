@@ -256,6 +256,8 @@ export async function executeHolisticAnalysisJob(
         appUserId: appUser.id,
         analysisJobId: jobId,
       },
+      parentAnalysisJobId: jobId,
+      holisticForce: rawPayload.force === true,
     });
 
     const completedPatch = {

@@ -54,6 +54,8 @@ export type AnalyzeJobPollBody = {
     agent_version: string;
     result_json: unknown;
     created_at: string;
+    /** `analysis_runs.options_json.holistic_derived` */
+    holistic_derived?: boolean;
   };
   previousResult?: PreviousAnalysisResultPayload | null;
   nat?: { spent: number; balance: number | undefined };
@@ -301,6 +303,7 @@ export async function buildAnalyzeJobPollResponse(
       agent_version: run.agent_version,
       result_json: run.result_json,
       created_at: run.created_at,
+      holistic_derived: optJson?.holistic_derived === true,
     },
     previousResult,
     nat: { spent: run.nat_cost ?? 0, balance },

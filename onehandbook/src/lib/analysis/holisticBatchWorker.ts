@@ -24,11 +24,7 @@ import type { AppUser } from "@/lib/supabase/appUser";
 import { syncAppUser } from "@/lib/supabase/appUser";
 import { AnalysisProviderExhaustedError } from "@/lib/analysis/analysisErrors";
 import { HOLISTIC_CLIENT_CHUNK_SIZE } from "@/lib/analysis/holisticEpisodeChunks";
-import {
-  deleteHolisticSyncedAnalysisRunIds,
-  syncPerEpisodeAnalysisFromHolisticRun,
-} from "@/lib/analysis/syncPerEpisodeAnalysisFromHolisticRun";
-import { computeWorkAnalysisContextHash } from "@/lib/analysis/workAnalysisContextHash";
+import { runBundledEpisodesForHolisticSelection } from "@/lib/analysis/runEpisodeAnalysisBundledInHolistic";
 import {
   holisticEpisodeScoreCoverage,
   logHolisticPipeline,
@@ -168,6 +164,10 @@ export async function runHolisticBatchPipeline(
     onPhase: (phase: "ai_analyzing" | "report_writing") => Promise<void>;
     /** 비동기 잡 등에서 Supabase에 진단 행 적재 */
     pipelineDbLog?: HolisticPipelineDbLogInput;
+    /** 통합 분석 부모 `analysis_jobs.id` — 회차별 번들 이 화 분석·자식 job 연결 */
+    parentAnalysisJobId: string;
+    /** 부모 job payload.force — 원고 미변경 시에도 회차별 분석 시도 */
+    holisticForce: boolean;
   }
 ): Promise<HolisticBatchWorkerResult> {
   const {
@@ -177,6 +177,8 @@ export async function runHolisticBatchPipeline(
     opts,
     onPhase,
     pipelineDbLog,
+    parentAnalysisJobId,
+    holisticForce,
   } = params;
 
   const orderedEpisodeIds = rawEpisodeIds.map((x) => Number(x));
@@ -295,6 +297,16 @@ export async function runHolisticBatchPipeline(
 
   await onPhase("ai_analyzing");
 
+  await runBundledEpisodesForHolisticSelection(
+    supabase,
+    appUser,
+    ordered,
+    requestedVersion,
+    opts,
+    parentAnalysisJobId,
+    holisticForce
+  );
+
   if (orderedEpisodeIds.length <= HOLISTIC_CLIENT_CHUNK_SIZE) {
     return finalizeSingleHolisticRun({
       supabase,
@@ -332,10 +344,6 @@ export async function runHolisticBatchPipeline(
           charCount: countManuscriptChars(e.content ?? ""),
         }));
 
-        const totalCombinedChars = chunkEps.reduce(
-          (s, e) => s + countManuscriptChars(e.content ?? ""),
-          0
-        );
         const cost = computeHolisticChunkNatCost(
           chunkEps.length,
           serverChunkIdx,
@@ -527,26 +535,6 @@ export async function runHolisticBatchPipeline(
     throw new Error(insErr.message ?? "저장에 실패했습니다.");
   }
 
-  let mergedSyncedRunIds: number[] = [];
-  try {
-    mergedSyncedRunIds = await syncPerEpisodeAnalysisFromHolisticRun(supabase, {
-      workId: work.id,
-      holisticRunId: row.id,
-      agentVersion: version.id,
-      holisticResult: result,
-      episodes: ordered,
-      optionsJson: optionsRecord,
-      workContextHash: computeWorkAnalysisContextHash(work, opts.includeLore),
-      pipelineDbLog,
-    });
-  } catch (syncErr) {
-    console.error("holistic merge: 회차 동기화 실패", syncErr);
-    await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
-    throw syncErr instanceof Error
-      ? syncErr
-      : new Error("통합 분석 회차 반영에 실패했습니다.");
-  }
-
   const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
     p_amount: mergeCost,
     p_ref_type: "holistic_analysis_run",
@@ -560,14 +548,12 @@ export async function runHolisticBatchPipeline(
 
   if (rpcErr) {
     console.error(rpcErr);
-    await deleteHolisticSyncedAnalysisRunIds(supabase, mergedSyncedRunIds);
     await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
     throw new Error("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
   }
 
   const rpc = rpcData as ConsumeNatRpcResult;
   if (!rpc?.ok) {
-    await deleteHolisticSyncedAnalysisRunIds(supabase, mergedSyncedRunIds);
     await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
     const err = new Error(`NAT가 부족합니다. 병합에는 ${mergeCost} NAT가 필요합니다.`);
     (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
@@ -787,26 +773,6 @@ async function finalizeSingleHolisticRun(args: {
     throw new Error(insErr.message ?? "저장에 실패했습니다.");
   }
 
-  let singleSyncedRunIds: number[] = [];
-  try {
-    singleSyncedRunIds = await syncPerEpisodeAnalysisFromHolisticRun(supabase, {
-      workId: work.id,
-      holisticRunId: row.id,
-      agentVersion: version.id,
-      holisticResult: result,
-      episodes: ordered,
-      optionsJson: optionsRecord,
-      workContextHash: computeWorkAnalysisContextHash(work, opts.includeLore),
-      pipelineDbLog,
-    });
-  } catch (syncErr) {
-    console.error("holistic single: 회차 동기화 실패", syncErr);
-    await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
-    throw syncErr instanceof Error
-      ? syncErr
-      : new Error("통합 분석 회차 반영에 실패했습니다.");
-  }
-
   const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
     p_amount: cost,
     p_ref_type: "holistic_analysis_run",
@@ -820,14 +786,12 @@ async function finalizeSingleHolisticRun(args: {
 
   if (rpcErr) {
     console.error(rpcErr);
-    await deleteHolisticSyncedAnalysisRunIds(supabase, singleSyncedRunIds);
     await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
     throw new Error("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
   }
 
   const rpc = rpcData as ConsumeNatRpcResult;
   if (!rpc?.ok) {
-    await deleteHolisticSyncedAnalysisRunIds(supabase, singleSyncedRunIds);
     await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
     const err = new Error(
       `NAT가 부족합니다. 이번 통합 분석에는 ${cost} NAT가 필요합니다.`

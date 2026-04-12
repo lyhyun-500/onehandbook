@@ -7,7 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "db:push": "supabase db push",
+    "db:push": "npx supabase db push",
     "chroma:run": "npx chroma run --path ./data/chroma_db --host localhost --port 8000",
     "trends:ingest": "tsx scripts/ingest-trends.ts",
     "trends:automate": "tsx scripts/automate_trends.ts",
@@ -18,6 +18,7 @@
     "trends:ingest-free-episodes": "tsx scripts/ingest_free_episode_summaries.ts",
     "trends:ingest-free-episodes:dry": "tsx scripts/ingest_free_episode_summaries.ts --dry-run",
     "cookies:munpia": "tsx scripts/save_munpia_storage_state.ts",
+    "munpia:unlock": "tsx scripts/clear_munpia_reader_lock.ts",
     "coins:stats:refresh": "tsx scripts/refresh-coin-stats.ts"
   },
   "dependencies": {

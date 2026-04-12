@@ -178,6 +178,14 @@ async function analysisJobRowToListItem(
 
   const holistic_run_id = parseDbInt(row.holistic_run_id);
 
+  const parentRaw = (row as { parent_job_id?: unknown }).parent_job_id;
+  const parent_job_id =
+    typeof parentRaw === "string"
+      ? parentRaw
+      : parentRaw != null
+        ? String(parentRaw)
+        : null;
+
   const { data: wk } = await supabase
     .from("works")
     .select("title")
@@ -196,6 +204,7 @@ async function analysisJobRowToListItem(
     progress_phase,
     holistic_run_id,
     ordered_episode_ids,
+    parent_job_id,
     error_message:
       typeof row.error_message === "string" ? row.error_message : null,
     estimated_seconds,
@@ -302,10 +311,29 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
 
   const getLatestJobForEpisode = useCallback(
     (episodeId: number) => {
+      const covering = mergedJobs.filter((j) => jobCoversEpisode(j, episodeId));
+      if (covering.length === 0) return null;
+
+      const childBundled = covering.filter(
+        (j) =>
+          j.job_kind === "episode" &&
+          j.status === "completed" &&
+          j.parent_job_id != null
+      );
+      const holisticDone = covering.filter(
+        (j) => j.job_kind === "holistic_batch" && j.status === "completed"
+      );
+      if (childBundled.length > 0 && holisticDone.length > 0) {
+        return childBundled.reduce((a, b) =>
+          new Date(a.updated_at).getTime() >= new Date(b.updated_at).getTime()
+            ? a
+            : b
+        );
+      }
+
       let best: AnalysisJobListItem | null = null;
       let bestTs = 0;
-      for (const j of mergedJobs) {
-        if (!jobCoversEpisode(j, episodeId)) continue;
+      for (const j of covering) {
         const ts = new Date(j.updated_at).getTime();
         if (ts >= bestTs) {
           bestTs = ts;
@@ -396,6 +424,11 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
 
   const emitJobStatusTransition = useCallback(
     (j: AnalysisJobListItem, was: JobStatus | undefined) => {
+      // holistic_batch 산하 회차별 자식 job: 부모 완료 한 번으로 충분 — 토스트·스택 알림만 억제
+      if (j.parent_job_id != null) {
+        return;
+      }
+
       const keyDone = `${j.id}:completed`;
       const keyFail = `${j.id}:failed`;
 
@@ -836,6 +869,7 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     ).length;
     const outcomeUnread = mergedJobs.filter(
       (j) =>
+        j.parent_job_id == null &&
         (j.status === "completed" || j.status === "failed") &&
         !readOutcomeJobIds.has(j.id) &&
         !(j.status === "failed" && isContentUnchangedFailure(j)) &&
@@ -846,10 +880,12 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
 
   const panelJobs = useMemo(
     () =>
-      [...mergedJobs].sort(
-        (a, b) =>
-          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-      ),
+      [...mergedJobs]
+        .filter((j) => j.parent_job_id == null)
+        .sort(
+          (a, b) =>
+            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        ),
     [mergedJobs]
   );
 
@@ -1166,7 +1202,9 @@ function AnalysisBell({
           nextCursor?: string | null;
         };
         if (cancelled) return;
-        const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+        const jobs = (Array.isArray(data.jobs) ? data.jobs : []).filter(
+          (j) => j.parent_job_id == null
+        );
         setOutcomes(jobs);
         setOutcomesCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
         setOutcomesHasMore(jobs.length >= NOTIFICATION_OUTCOMES_PAGE_SIZE);
@@ -1207,7 +1245,9 @@ function AnalysisBell({
               jobs?: AnalysisJobListItem[];
               nextCursor?: string | null;
             };
-            const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+            const jobs = (Array.isArray(data.jobs) ? data.jobs : []).filter(
+              (j) => j.parent_job_id == null
+            );
             setOutcomes((prev) => {
               const byId = new Map(prev.map((j) => [j.id, j]));
               for (const j of jobs) byId.set(j.id, j);

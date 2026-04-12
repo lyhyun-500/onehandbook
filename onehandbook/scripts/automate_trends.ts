@@ -16,10 +16,12 @@
  *   - 자동: MUNPIA_READER_WORKS_JSON 비우고 실행 → 모바일 베스트 스냅샷(상위 40)·어제 대비 급상승/신규 20위 진입 우선, 미인제스트 1~20위 최대 5작.
  *   - 수동: MUNPIA_READER_WORKS_JSON='[{"title":"…","urls":["https://novel.munpia.com/…"]}]'
  *   data/cookies.json 세션, HEADLESS=0 권장. 부하: MUNPIA_READER_BETWEEN_WORKS_MS_MIN/MAX
+ *   표준 작품 회차 수: MUNPIA_READER_EPISODES_MIN~MAX (기본 5~12, 매 작품·매 실행 랜덤)
  *
  * 필요: ANTHROPIC_API_KEY, SERPER_API_KEY, SUPABASE_SERVICE_ROLE_KEY,
  *       NEXT_PUBLIC_SUPABASE_URL, (선택) CHROMA_SERVER_HOST=54.252.238.168
  * Playwright: npx playwright install chromium
+ * (선택) PLAYWRIGHT_UA_PROFILE=mac|windows, PLAYWRIGHT_REQUEST_DELAY_MS_MIN/MAX (기본 3000~7000)
  */
 
 import { mkdir, writeFile, access, open, unlink } from "fs/promises";
@@ -33,6 +35,11 @@ import { completeAnthropic } from "@/lib/ai/providers/anthropic";
 import { ingestData } from "@/lib/trends/ingestData";
 import { createSupabaseServiceRole } from "@/lib/supabase/serviceRole";
 import { newContextWithCookiesJson } from "@/lib/scraping/playwrightCookies";
+import {
+  applyPlaywrightStealth,
+  randomPlaywrightHumanGapMs,
+  resolveDesktopChromeUserAgent,
+} from "@/lib/scraping/playwrightStealth";
 import { chromiumLaunchOptions } from "@/lib/scraping/chromiumLaunchOptions";
 import { extractMunpiaReaderMainText } from "@/lib/scraping/freeEpisodeExtract";
 import {
@@ -223,6 +230,7 @@ async function gotoChecked(
   url: string,
   label: string
 ): Promise<void> {
+  await playwrightHumanGap();
   const res = await page.goto(url, {
     waitUntil: "domcontentloaded",
     timeout: 90_000,
@@ -289,16 +297,16 @@ const NAVER_SERIES_RANK_URL =
 
 const TRENDS_DIR = join(process.cwd(), "data", "trends");
 
-/** 최신 맥 크롬 UA (자동화 탐지 완화 — 주기적으로 버전만 올려도 됨) */
-const CHROME_MAC_RECENT_UA =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36";
-
 const MUNPIA_READER_MAX_WORKS = 10;
 
 type SerperOrganic = { title?: string; snippet?: string; link?: string };
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+async function playwrightHumanGap(): Promise<void> {
+  await sleep(randomPlaywrightHumanGapMs());
 }
 
 async function withRetry<T>(
@@ -469,11 +477,14 @@ async function scrapeTopTitles(
   return withRetry(
     `Playwright ${label}`,
     async () => {
-      const page = await browser.newPage({
-        userAgent:
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      const context = await browser.newContext({
+        userAgent: resolveDesktopChromeUserAgent(),
+        viewport: { width: 1365, height: 900 },
       });
+      await applyPlaywrightStealth(context);
+      const page = await context.newPage();
       try {
+        await playwrightHumanGap();
         await page.goto(url, {
           waitUntil: "domcontentloaded",
           timeout: 60000,
@@ -484,6 +495,7 @@ async function scrapeTopTitles(
         return titles;
       } finally {
         await page.close().catch(() => {});
+        await context.close().catch(() => {});
       }
     },
     { maxAttempts: 2, baseDelayMs: 2000 }
@@ -787,6 +799,22 @@ function betweenEpisodesMs(): number {
   return randomIntInclusive(Math.min(min, max), Math.max(min, max));
 }
 
+/** 급상승·상위권(15화) 제외 일반 작: 매번 1~(N)화, N은 [min,max] 랜덤 (기본 5~12) */
+function randomMunpiaReaderStandardEpisodeCount(): number {
+  const defMin = 5;
+  const defMax = 12;
+  const rawMin = Number(process.env.MUNPIA_READER_EPISODES_MIN ?? defMin);
+  const rawMax = Number(process.env.MUNPIA_READER_EPISODES_MAX ?? defMax);
+  const lo = Number.isFinite(rawMin)
+    ? Math.max(1, Math.min(15, Math.floor(rawMin)))
+    : defMin;
+  let hi = Number.isFinite(rawMax)
+    ? Math.max(1, Math.min(15, Math.floor(rawMax)))
+    : defMax;
+  if (hi < lo) hi = lo;
+  return randomIntInclusive(lo, hi);
+}
+
 function scrollMaxMs(): number {
   const def = 10_000;
   const raw = Number(process.env.MUNPIA_READER_SCROLL_MAX_MS ?? def);
@@ -896,7 +924,6 @@ async function scrapeMunpiaWorkEpisodesHumanLike(
       );
       await sleep(gap);
     }
-    await sleep(randomIntInclusive(120, 420));
 
     console.info(
       `${LOG} [munpia-reader] "${workLabel}" ${i + 1}/${urls.length}화 로딩`
@@ -962,8 +989,8 @@ ${risingLine}
 ### 주인공의 결핍
 (2~8문장, 본문에 드러난 범위에서만)
 
-### 1~5화 사이의 터닝포인트
-(불릿 또는 짧은 문단. 실제 수집 회차가 5화 미만이면 그 구간에 맞춰 서술)
+### 수집 회차 구간의 터닝포인트
+(불릿 또는 짧은 문단. 아래 본문에 실제로 포함된 회차 범위 안에서만 서술)
 
 ---
 본문:
@@ -1104,19 +1131,19 @@ async function munpiaReaderDiscoverEpisodeUrls(
       if (seen.has(u)) continue;
       seen.add(u);
       collected.push(u);
-      if (collected.length >= Math.min(5, maxEp)) break;
+      if (collected.length >= maxEp) break;
     }
-    if (collected.length >= Math.min(5, maxEp)) break;
+    if (collected.length >= maxEp) break;
     await sleep(randomIntInclusive(650, 1300));
   }
-  if (collected.length > 0) return collected.reverse().slice(0, Math.min(5, maxEp));
+  if (collected.length > 0) return collected.reverse().slice(0, maxEp);
 
-  // 3) 최후 폴백: page/1에서 앞 5개
+  // 3) 최후 폴백: page/1에서 앞쪽 회차들
   await gotoChecked(page, buildNovelTocUrl(novelKey), "문피아 목차 폴백 진입");
   await sleep(randomIntInclusive(900, 1600));
   const fallbackExpr = buildNeSrlEpisodeCollectorExpression(novelKey);
   const fb = (await page.evaluate(fallbackExpr)) as string[];
-  return Array.isArray(fb) ? fb.filter(Boolean).slice(0, Math.min(5, maxEp)) : [];
+  return Array.isArray(fb) ? fb.filter(Boolean).slice(0, maxEp) : [];
 }
 
 async function scrapeMunpiaFullWorkReaderPath(
@@ -1134,7 +1161,7 @@ async function scrapeMunpiaFullWorkReaderPath(
   let episodeUrls: string[];
   if (opts.manualEpisodeUrls && opts.manualEpisodeUrls.length > 0) {
     await sleep(randomIntInclusive(800, 1800));
-    episodeUrls = opts.manualEpisodeUrls.slice(0, Math.min(5, opts.desiredMaxEpisodeNo));
+    episodeUrls = opts.manualEpisodeUrls.slice(0, opts.desiredMaxEpisodeNo);
   } else {
     episodeUrls = await munpiaReaderDiscoverEpisodeUrls(
       page,
@@ -1159,7 +1186,7 @@ async function scrapeMunpiaFullWorkReaderPath(
 
 /**
  * 문피아 쿠키 세션 + 베스트 자동 선정(1~20·급상승) 또는 MUNPIA_READER_WORKS_JSON 수동
- * → 작품 상세 체류 → 목차(또는 지정 URL) → 뷰어 1~5화 인간 패턴 수집
+ * → 작품 상세 체류 → 목차(또는 지정 URL) → 뷰어 1~N화 인간 패턴 수집(N은 표준 5~12 랜덤 등)
  * → Claude 요약 → data/trends/*.md + ingestData(Chroma)
  */
 export async function runMunpiaReaderScrapePipeline(options?: {
@@ -1246,25 +1273,13 @@ export async function runMunpiaReaderScrapePipeline(options?: {
         return;
       }
     }
-    context = await newContextWithCookiesJson(browser, cookiesPath, {
-      userAgent: CHROME_MAC_RECENT_UA,
-    });
+    context = await newContextWithCookiesJson(browser, cookiesPath);
   } catch (e) {
     await browser.close();
     throw new Error(
       `쿠키 로드 실패: ${cookiesPath} — npm run cookies:munpia 등으로 생성하거나 PLAYWRIGHT_COOKIES_PATH 를 확인하세요. ${e instanceof Error ? e.message : e}`
     );
   }
-
-  await context.addInitScript(() => {
-    try {
-      Object.defineProperty(navigator, "webdriver", {
-        get: () => undefined,
-      });
-    } catch {
-      /* ignore */
-    }
-  });
 
   const page = await context.newPage();
   await page.setViewportSize({ width: 1365, height: 900 });
@@ -1369,7 +1384,9 @@ export async function runMunpiaReaderScrapePipeline(options?: {
           }건`
         );
       } else {
-        console.info(`${LOG} [munpia-reader] 심층 분석 대상 없음 (전부 1~5화)`);
+        console.info(
+          `${LOG} [munpia-reader] 심층 분석 대상 없음 (일반 작은 가변 회차·상위·급상승만 15화)`
+        );
       }
       await sleep(randomIntInclusive(2800, 4500));
     }
@@ -1391,9 +1408,16 @@ export async function runMunpiaReaderScrapePipeline(options?: {
         await sleep(pauseMs);
       }
 
-      const desiredMax = task.isRisingStar || task.munpiaRank <= 3 ? 15 : 5;
+      const desiredMax =
+        task.isRisingStar || task.munpiaRank <= 3
+          ? 15
+          : randomMunpiaReaderStandardEpisodeCount();
 
-      // 확장(15화) 대상인데 기존 5화 분석이 있으면 본문에 추가 분석을 append
+      console.info(
+        `${LOG} [munpia-reader] "${task.title}" 이번 실행 수집 회차 상한 1~${desiredMax}화`
+      );
+
+      // 확장(15화) 대상인데 기존 단계 분석이 있으면 본문에 추가 분석을 append
       const platform = "문피아-독자뷰요약";
       const dedupId = computeTrendDedupId(
         `${task.title} · 독자뷰 요약 (${ymdSeoul})`,
@@ -1419,7 +1443,7 @@ export async function runMunpiaReaderScrapePipeline(options?: {
       let raw: string;
       try {
         if (desiredMax === 15 && existingMax >= 5 && existingMax < 15) {
-          // 요구사항: 10~15화 추가 분석만 붙이기 (기존 1~5화 유지)
+          // 요구사항: 10~15화 추가 분석만 붙이기 (기존 본문 유지)
           const extraStart = 10;
           const extraEnd = 15;
           const extraUrls = await munpiaReaderDiscoverEpisodeUrls(
@@ -1441,7 +1465,7 @@ export async function runMunpiaReaderScrapePipeline(options?: {
             detailUrl: task.detailUrl,
             manualEpisodeUrls: task.manualEpisodeUrls,
             desiredMaxEpisodeNo: desiredMax,
-            exitToTocEvery: desiredMax === 15 ? 3 : 0,
+            exitToTocEvery: desiredMax >= 10 ? 3 : 0,
           });
         }
       } catch (e) {
@@ -1485,7 +1509,7 @@ export async function runMunpiaReaderScrapePipeline(options?: {
       const fileName = `munpia-reader-${slugForMunpiaReaderFile(task.title)}-${ymdSeoul}.md`;
       const filePath = join(TRENDS_DIR, fileName);
 
-      const epCount = desiredMax === 15 ? 15 : 5;
+      const epCount = desiredMax;
 
       if (dry) {
         console.info(
