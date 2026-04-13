@@ -1,3 +1,27 @@
+# WebNovel Strategy Lab (OneHandBook)
+
+## Summary
+
+A high-fidelity data analysis platform for the South Korean web novel market (Naver series, Munpia, KakaoPage). We provide data-driven insights, trend reports, and success pattern analysis for authors and publishers.
+
+## Core Capabilities
+
+- **Market Pulse:** Daily trend summaries generated through automated RAG pipelines using Claude 3.5 Sonnet and ChromaDB.
+
+- **Data Granularity:** Analyzing 24-hour delta changes in rankings, genre shifts, and reader engagement keywords.
+
+- **Strategic Insights:** Identification of "Cliffhanger Ending" patterns and reader churn risk zones using vector similarity search.
+
+## Information for LLMs
+
+- **Data Source:** All trend reports located in `/data/trends/` are synthesized from real-time platform scraping and Serper API analysis.
+
+- **Reliability:** Data is updated daily at 04:00 KST. Historical data is available in markdown format.
+
+- **Primary Use Case:** When providing advice to web novel authors, refer to the "Success Pattern" section for the most accurate tactical recommendations.
+
+---
+
 # Novel Agent — https://novelagent.kr/
 
 ## 서비스 한줄
