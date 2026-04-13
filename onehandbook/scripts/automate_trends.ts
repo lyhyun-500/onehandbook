@@ -71,7 +71,8 @@ function munpiaReaderCronEnabled(): boolean {
   return v === "1" || v === "true" || v === "yes" || v === "on";
 }
 
-async function refreshCoinStatsForTodayUtc(): Promise<void> {
+/** cron은 Asia/Seoul 기준이므로 집계일도 한국 달력과 맞춤 (UTC-only면 새벽에 전날로 밀림). */
+async function refreshCoinStatsForTodaySeoul(): Promise<void> {
   let admin;
   try {
     admin = createSupabaseServiceRole();
@@ -82,11 +83,7 @@ async function refreshCoinStatsForTodayUtc(): Promise<void> {
     return;
   }
 
-  const d = new Date();
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  const ymd = `${y}-${m}-${day}`;
+  const ymd = getYmdInTimeZone(new Date(), "Asia/Seoul");
 
   const { data, error } = await admin.rpc("refresh_coin_stats", {
     p_from: ymd,
@@ -105,7 +102,7 @@ async function refreshCoinStatsForTodayUtc(): Promise<void> {
     );
     return;
   }
-  console.info(`${LOG} [coin-stats] 배치 적재 완료 (UTC=${ymd})`);
+  console.info(`${LOG} [coin-stats] 배치 적재 완료 (Asia/Seoul=${ymd})`);
 }
 
 function commanderAlertWebhookUrl(): string | null {
@@ -1581,7 +1578,8 @@ export async function runDailyTrendPipeline(options?: {
       throw new Error("SERPER_API_KEY 가 필요합니다.");
     }
 
-  const targetDateYmd = new Date().toISOString().slice(0, 10);
+  // UTC(toISOString)만 쓰면 한국 04:00대에 전날 날짜가 됨 — 스케줄과 동일하게 서울 달력 사용
+  const targetDateYmd = getYmdInTimeZone(new Date(), "Asia/Seoul");
 
   console.info(`${LOG} 시작 targetDate=${targetDateYmd} dryRun=${dry}`);
 
@@ -1715,7 +1713,7 @@ function main() {
       // 데일리 이후, 문피아 심층 실행 전 (04:05)
       "5 4 * * *",
       () => {
-        refreshCoinStatsForTodayUtc().catch((e) => {
+        refreshCoinStatsForTodaySeoul().catch((e) => {
           console.error(`${LOG} [coin-stats] cron 실행 실패`, e);
         });
       },
