@@ -232,9 +232,10 @@ export function AnalyzePanel({
     currentScore: number;
   } | null>(null);
 
+  const charCountKnown = charCount > 0;
   const tier = useMemo(
-    () => getManuscriptAnalysisTier(charCount),
-    [charCount]
+    () => (charCountKnown ? getManuscriptAnalysisTier(charCount) : "ok"),
+    [charCount, charCountKnown]
   );
 
   useEffect(() => {
@@ -493,7 +494,9 @@ export function AnalyzePanel({
   );
 
   const analyzeDisabled =
-    tier === "blocked" || !effectiveAvailable || !phoneVerified;
+    (!charCountKnown ? false : tier === "blocked") ||
+    !effectiveAvailable ||
+    !phoneVerified;
 
   const { lines: natLines, total: natTotal } = useMemo(
     () =>
@@ -715,7 +718,10 @@ export function AnalyzePanel({
       </p>
       <p className="mb-4 text-xs text-zinc-600">
         이번 회차 원고 약{" "}
-        <span className="text-zinc-400">{charCount.toLocaleString()}자</span> ·
+        <span className="text-zinc-400">
+          {charCountKnown ? `${charCount.toLocaleString()}자` : "글자 수 계산 중…"}
+        </span>{" "}
+        ·
         보유{" "}
         <span className="font-medium text-cyan-300/90">
           {natBalance.toLocaleString()} NAT
@@ -736,13 +742,13 @@ export function AnalyzePanel({
         </p>
       )}
 
-      {tier === "blocked" && (
+      {charCountKnown && tier === "blocked" && (
         <p className="mb-4 rounded-lg border border-amber-500/25 bg-amber-950/25 px-3 py-2 text-sm text-amber-100/95">
           {MANUSCRIPT_TOO_SHORT_MESSAGE}
         </p>
       )}
 
-      {tier === "low" && (
+      {charCountKnown && tier === "low" && (
         <p className="mb-4 rounded-lg border border-cyan-500/15 bg-cyan-950/20 px-3 py-2 text-sm text-cyan-100/90">
           <CopyWithBreaks as="span" className="block">
             원고가 1,000자 미만입니다. 분석 시 정확도가 낮을 수 있어, 진행 전 안내를 표시합니다.
