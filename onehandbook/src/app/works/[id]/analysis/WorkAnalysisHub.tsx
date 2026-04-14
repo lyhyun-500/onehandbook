@@ -892,6 +892,8 @@ function WorkAnalysisHubInner({
                   <tbody className="text-zinc-300">
                     {effectiveEpisodes.map((ep) => {
                       const run = latest.get(ep.id);
+                      const serverLatestRunCreatedAt =
+                        serverRuns == null ? undefined : (run?.created_at ?? null);
                       return (
                         <tr
                           key={ep.id}
@@ -911,9 +913,7 @@ function WorkAnalysisHubInner({
                           <td className="py-2 pr-4 align-top">
                             <EpisodeRowAnalysisBadge
                               episodeId={ep.id}
-                              serverLatestRunCreatedAt={
-                                run?.created_at ?? null
-                              }
+                              serverLatestRunCreatedAt={serverLatestRunCreatedAt}
                             />
                           </td>
                           <td className="py-2 pr-4 align-top font-medium text-zinc-100">
@@ -1315,6 +1315,8 @@ function WorkAnalysisHubInner({
               <tbody className="text-zinc-300">
                 {episodes.map((ep) => {
                   const run = latest.get(ep.id);
+                  const serverLatestRunCreatedAt =
+                    serverRuns == null ? undefined : (run?.created_at ?? null);
                   const checked = selectedIds.has(ep.id);
                   return (
                     <tr
@@ -1343,9 +1345,7 @@ function WorkAnalysisHubInner({
                       <td className="py-2 pr-4 align-top">
                         <EpisodeRowAnalysisBadge
                           episodeId={ep.id}
-                          serverLatestRunCreatedAt={
-                            run?.created_at ?? null
-                          }
+                          serverLatestRunCreatedAt={serverLatestRunCreatedAt}
                         />
                       </td>
                       <td className="py-2 pr-4 align-top font-medium text-zinc-100">
