@@ -25,6 +25,8 @@ import { syncAppUser } from "@/lib/supabase/appUser";
 import { AnalysisProviderExhaustedError } from "@/lib/analysis/analysisErrors";
 import { HOLISTIC_CLIENT_CHUNK_SIZE } from "@/lib/analysis/holisticEpisodeChunks";
 import { runBundledEpisodesForHolisticSelection } from "@/lib/analysis/runEpisodeAnalysisBundledInHolistic";
+import { computeWorkAnalysisContextHash } from "@/lib/analysis/workAnalysisContextHash";
+import { syncPerEpisodeAnalysisFromHolisticRun } from "@/lib/analysis/syncPerEpisodeAnalysisFromHolisticRun";
 import {
   holisticEpisodeScoreCoverage,
   logHolisticPipeline,
@@ -818,6 +820,28 @@ async function finalizeSingleHolisticRun(args: {
     });
   } catch (e) {
     console.warn("training_logs 저장 실패(무시):", e);
+  }
+
+  // 단일 호출(single_call) 통합 분석도 회차별 최신 점수·캐시가 맞도록 동기화한다.
+  // (청크/번들 경로는 runBundledEpisodesForHolisticSelection에서 회차별 run을 따로 생성)
+  try {
+    const workContextHash = computeWorkAnalysisContextHash(work, opts.includeLore);
+    await syncPerEpisodeAnalysisFromHolisticRun(supabase, {
+      workId: work.id,
+      holisticRunId: row.id,
+      agentVersion: version.id,
+      holisticResult: result,
+      episodes: ordered.map((e) => ({
+        id: e.id,
+        episode_number: e.episode_number,
+        content: e.content ?? null,
+      })),
+      optionsJson: optionsRecord,
+      workContextHash,
+      pipelineDbLog,
+    });
+  } catch (e) {
+    console.warn("single_call 회차별 동기화 실패(무시):", e);
   }
 
   return {
