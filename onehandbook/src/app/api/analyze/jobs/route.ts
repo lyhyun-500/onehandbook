@@ -4,6 +4,7 @@ import { parseDbInt } from "@/lib/supabase/parseDbInt";
 import { syncAppUser } from "@/lib/supabase/appUser";
 import { isMissingAnalysisJobsTableError } from "@/lib/db/analysisJobsTable";
 import { kickStalePendingAnalysisJobIfNeeded } from "@/lib/analysis/kickStalePendingAnalysisJob";
+import { expireStaleProcessingJobIfNeeded } from "@/lib/analysis/recoverStaleAnalysisJob";
 
 export type JobProgressPhase =
   | "received"
@@ -94,6 +95,12 @@ export async function GET() {
         accessToken
       );
     }
+  }
+
+  // processing이 오래 멈춘 job을 목록 조회만으로도 failed로 정리 (ai_analyzing 등에 무한 정체 방지)
+  for (const r of rows) {
+    if (r.status !== "processing") continue;
+    await expireStaleProcessingJobIfNeeded(supabase, String(r.id));
   }
 
   const workIds = [...new Set(rows.map((r) => r.work_id).filter((id): id is number => id != null))];
