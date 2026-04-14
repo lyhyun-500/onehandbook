@@ -39,6 +39,15 @@ async function markHolisticJobFailed(
     .eq("id", jobId);
 }
 
+function holisticJobHeartbeatIntervalMs(): number {
+  const sec = parseInt(
+    process.env.HOLISTIC_JOB_HEARTBEAT_SEC ?? process.env.ANALYZE_JOB_HEARTBEAT_SEC ?? "60",
+    10
+  );
+  const n = Number.isFinite(sec) && sec > 0 ? sec : 60;
+  return Math.max(15, Math.min(180, n)) * 1000;
+}
+
 function holisticProcessingStaleThresholdMs(): number {
   const sec = parseInt(
     process.env.ANALYZE_PROCESS_MAX_DURATION_SEC ?? "600",
@@ -228,7 +237,7 @@ export async function executeHolisticAnalysisJob(
       .update({ updated_at: new Date().toISOString() })
       .eq("id", jobId)
       .eq("status", "processing");
-  }, 2.5 * 60 * 1000);
+  }, holisticJobHeartbeatIntervalMs());
 
   try {
     console.info("[holistic-job] pipeline start", {
