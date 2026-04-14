@@ -264,7 +264,8 @@ function WorkAnalysisHubInner({
     ) {
       return initialFocusEpisodeId;
     }
-    return effectiveEpisodes[0]?.id ?? null;
+    // 기본 선택(1화 자동 오픈)을 하지 않는다. 사용자가 '개별 분석'을 눌렀을 때만 패널 오픈.
+    return null;
   });
 
   const [charCountRetryNonce, setCharCountRetryNonce] = useState(0);
