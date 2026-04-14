@@ -267,7 +267,9 @@ function WorkAnalysisHubInner({
     return effectiveEpisodes[0]?.id ?? null;
   });
 
+  const [charCountRetryNonce, setCharCountRetryNonce] = useState(0);
   const requestedCharCountRef = useRef<Set<number>>(new Set());
+  const charCountAttemptRef = useRef<Map<number, number>>(new Map());
 
   // content 전체를 `analysis-data`에서 불러오지 않기 위해, 패널로 연 회차만 글자수를 지연 계산한다.
   useEffect(() => {
@@ -276,6 +278,9 @@ function WorkAnalysisHubInner({
     const ep = effectiveEpisodes.find((e) => e.id === panelEpisodeId);
     if (!ep || (ep.charCount ?? 0) > 0) return;
     if (requestedCharCountRef.current.has(panelEpisodeId)) return;
+    const prevAttempts = charCountAttemptRef.current.get(panelEpisodeId) ?? 0;
+    if (prevAttempts >= 3) return;
+    charCountAttemptRef.current.set(panelEpisodeId, prevAttempts + 1);
     requestedCharCountRef.current.add(panelEpisodeId);
 
     let cancelled = false;
@@ -284,10 +289,22 @@ function WorkAnalysisHubInner({
         const res = await fetch(`/api/episodes/${panelEpisodeId}/char-count`, {
           cache: "no-store",
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          requestedCharCountRef.current.delete(panelEpisodeId);
+          if (!cancelled) {
+            window.setTimeout(() => setCharCountRetryNonce((n) => n + 1), 1500);
+          }
+          return;
+        }
         const data = (await res.json()) as { charCount?: number };
         const next = typeof data.charCount === "number" ? data.charCount : 0;
-        if (cancelled || next <= 0) return;
+        if (cancelled || next <= 0) {
+          requestedCharCountRef.current.delete(panelEpisodeId);
+          if (!cancelled) {
+            window.setTimeout(() => setCharCountRetryNonce((n) => n + 1), 1500);
+          }
+          return;
+        }
         setServerEpisodes((prev) => {
           const base = prev ?? effectiveEpisodes;
           return base.map((row) =>
@@ -296,13 +313,17 @@ function WorkAnalysisHubInner({
         });
       } catch {
         // best-effort: 글자수는 비용 안내용이므로 실패해도 패널 자체는 동작
+        requestedCharCountRef.current.delete(panelEpisodeId);
+        if (!cancelled) {
+          window.setTimeout(() => setCharCountRetryNonce((n) => n + 1), 1500);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [panelEpisodeId, effectiveEpisodes]);
+  }, [panelEpisodeId, effectiveEpisodes, charCountRetryNonce]);
 
   useEffect(() => {
     if (
