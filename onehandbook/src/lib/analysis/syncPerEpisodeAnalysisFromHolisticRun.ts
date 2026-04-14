@@ -132,7 +132,32 @@ export async function syncPerEpisodeAnalysisFromHolisticRun(
   const fallbackEpisodeNumbers: number[] = [];
 
   try {
+    // 멱등성: 같은 holisticRunId로 이미 동기화된 회차는 건너뛴다 (중복 run 생성 방지)
+    const episodeDbIds = episodes.map((e) => e.id);
+    const existingDerivedByEpisodeId = new Set<number>();
+    if (episodeDbIds.length > 0) {
+      const { data: existing } = await supabase
+        .from("analysis_runs")
+        .select("episode_id")
+        .eq("work_id", workId)
+        .in("episode_id", episodeDbIds)
+        .eq("nat_cost", 0)
+        .contains("options_json", {
+          holistic_derived: true,
+          from_holistic_run_id: holisticRunId,
+        })
+        .limit(5000);
+      for (const r of existing ?? []) {
+        const eid =
+          typeof r.episode_id === "number"
+            ? r.episode_id
+            : parseInt(String((r as { episode_id?: unknown }).episode_id), 10);
+        if (!Number.isNaN(eid)) existingDerivedByEpisodeId.add(eid);
+      }
+    }
+
     for (const ep of episodes) {
+      if (existingDerivedByEpisodeId.has(ep.id)) continue;
       let score = scoreByEpisodeNumber.get(ep.episode_number);
       if (typeof score !== "number") {
         score = overallFallback;
