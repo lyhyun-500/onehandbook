@@ -17,6 +17,7 @@ export function StudioPhoneVerifySuccessModal() {
 
   useEffect(() => {
     if (searchParams.get("phoneVerified") === "1") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVariant(searchParams.get("phoneReward") === "1" ? "reward" : "none");
       setOpen(true);
     } else {

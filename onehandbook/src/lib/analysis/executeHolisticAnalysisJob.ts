@@ -28,7 +28,7 @@ async function markHolisticJobFailed(
   accessToken: string
 ) {
   const supabase = createSupabaseWithAccessToken(accessToken);
-  await supabase
+  const { error } = await supabase
     .from("analysis_jobs")
     .update({
       status: "failed",
@@ -37,6 +37,15 @@ async function markHolisticJobFailed(
       updated_at: new Date().toISOString(),
     })
     .eq("id", jobId);
+  if (error) {
+    console.error("[holistic-job] mark failed update error", {
+      jobId,
+      message: error.message,
+      code: (error as { code?: string } | undefined)?.code,
+      details: (error as { details?: string } | undefined)?.details,
+      hint: (error as { hint?: string } | undefined)?.hint,
+    });
+  }
 }
 
 function holisticJobHeartbeatIntervalMs(): number {

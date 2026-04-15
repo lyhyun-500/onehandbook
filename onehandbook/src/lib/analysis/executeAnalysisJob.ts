@@ -49,7 +49,16 @@ async function markJobFailed(
     const base = (row?.payload as Record<string, unknown> | null) ?? {};
     patch.payload = { ...base, failure_code: options.failureCode };
   }
-  await supabase.from("analysis_jobs").update(patch).eq("id", jobId);
+  const { error } = await supabase.from("analysis_jobs").update(patch).eq("id", jobId);
+  if (error) {
+    console.error("[executeAnalysisJob] markJobFailed update error", {
+      jobId,
+      message: error.message,
+      code: (error as { code?: string } | undefined)?.code,
+      details: (error as { details?: string } | undefined)?.details,
+      hint: (error as { hint?: string } | undefined)?.hint,
+    });
+  }
 }
 
 /**
@@ -182,7 +191,7 @@ export async function executeAnalysisJob(
       analysisJobProgress: { jobId },
     });
 
-    await supabase
+    const { error: completeErr } = await supabase
       .from("analysis_jobs")
       .update({
         status: "completed",
@@ -192,6 +201,16 @@ export async function executeAnalysisJob(
       })
       .eq("id", jobId)
       .eq("status", "processing");
+    if (completeErr) {
+      console.error("[executeAnalysisJob] mark completed update error", {
+        jobId,
+        analysis_run_id: result.analysis.id,
+        message: completeErr.message,
+        code: (completeErr as { code?: string } | undefined)?.code,
+        details: (completeErr as { details?: string } | undefined)?.details,
+        hint: (completeErr as { hint?: string } | undefined)?.hint,
+      });
+    }
 
     void (async () => {
       const { data: ep } = await supabase

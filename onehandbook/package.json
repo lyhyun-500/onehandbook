@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "WATCHPACK_POLLING=true NEXT_DISABLE_TURBOPACK=1 next dev --webpack --hostname 127.0.0.1",
+    "predeploy": "npm run lint && npm run build && node scripts/predeploy_check_charcount.js",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",

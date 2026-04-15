@@ -29,8 +29,11 @@ export function latestAnalysisPerEpisode(
 ): Map<number, AnalysisRunRow> {
   const map = new Map<number, AnalysisRunRow>();
   for (const r of runs) {
-    if (!map.has(r.episode_id)) {
-      map.set(r.episode_id, r);
+    const eid = Number((r as unknown as { episode_id?: unknown }).episode_id);
+    if (!Number.isFinite(eid)) continue;
+    if (!map.has(eid)) {
+      // Supabase가 bigint를 string으로 내려주는 경우가 있어 키를 number로 정규화한다.
+      map.set(eid, { ...r, episode_id: eid });
     }
   }
   return map;

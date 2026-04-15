@@ -233,6 +233,7 @@ export function AnalyzePanel({
   } | null>(null);
 
   const charCountKnown = charCount > 0;
+  const charCountFailed = charCount < 0;
   const tier = useMemo(
     () => (charCountKnown ? getManuscriptAnalysisTier(charCount) : "ok"),
     [charCount, charCountKnown]
@@ -367,7 +368,16 @@ export function AnalyzePanel({
     if (st === "failed" && (was === "pending" || was === "processing")) {
       void applyFailed();
     }
-  }, [latestJobForEp?.id, latestJobForEp?.status, episodeId, router]);
+  }, [
+    latestJobForEp?.id,
+    latestJobForEp?.status,
+    latestJobForEp?.episode_id,
+    latestJobForEp?.work_id,
+    episodeId,
+    workId,
+    router,
+    showUnchangedJobNotice,
+  ]);
 
   useEffect(() => {
     if (!pollJobId) return;
@@ -719,7 +729,11 @@ export function AnalyzePanel({
       <p className="mb-4 text-xs text-zinc-600">
         이번 회차 원고 약{" "}
         <span className="text-zinc-400">
-          {charCountKnown ? `${charCount.toLocaleString()}자` : "글자 수 계산 중…"}
+          {charCountFailed
+            ? "글자 수 불러오기 실패"
+            : charCountKnown
+              ? `${charCount.toLocaleString()}자`
+              : "글자 수 계산 중…"}
         </span>{" "}
         ·
         보유{" "}

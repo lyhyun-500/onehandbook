@@ -4,7 +4,14 @@
  */
 export function getInternalSiteBaseUrl(): string {
   const fromEnv = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
-  if (fromEnv) return fromEnv;
+  // 프로덕션에서 NEXT_PUBLIC_SITE_URL 이 실수로 localhost로 잡히면
+  // 서버가 자기 자신을 호출할 때 실패하므로 무시한다.
+  const isLocalhost =
+    typeof fromEnv === "string" &&
+    (fromEnv.includes("127.0.0.1") || fromEnv.includes("localhost"));
+  if (fromEnv && !(process.env.NODE_ENV === "production" && isLocalhost)) {
+    return fromEnv;
+  }
 
   if (process.env.VERCEL_URL) {
     return `https://${process.env.VERCEL_URL}`;

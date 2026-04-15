@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { SITE_NAME } from "@/config/site";
 import { HeaderAnalysisBell } from "@/contexts/AnalysisJobsContext";
@@ -58,7 +58,9 @@ export function AppShellHeaderClient({
 }: AppShellHeaderClientProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
-  const panelId = useId();
+  // hydration 안정성: useId()는 서버/클라 트리 불일치 시 aria-controls mismatch 경고가 날 수 있어
+  // 헤더의 단일 패널은 고정 id를 사용한다.
+  const panelId = "app-shell-menu-panel";
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -97,7 +99,7 @@ export function AppShellHeaderClient({
               href="/billing"
               className="rounded-lg border border-cyan-500/30 bg-cyan-950/35 px-2.5 py-1.5 text-xs tabular-nums text-cyan-200 transition-colors hover:border-cyan-400/50 hover:bg-cyan-950/50 sm:px-3 sm:text-sm"
             >
-              {natBalance.toLocaleString()} NAT
+              {natBalance.toLocaleString("ko-KR")} NAT
             </Link>
             <HeaderAnalysisBell />
             <Link

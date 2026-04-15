@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { runAnalysisProcessAfterResponse } from "@/lib/analysis/scheduleAnalysisProcess";
+import { getInternalSiteBaseUrl } from "@/lib/siteBaseUrl";
 
 /** after() 미실행·토큰 실패 등으로 pending에 멈출 때 — 폴링으로 복구하기 전 짧은 유예 */
 const PENDING_STALE_GRACE_MS = 12_000;
@@ -10,6 +11,35 @@ const PENDING_HARD_EXPIRE_MS = 12 * 60 * 1000;
 
 const PENDING_EXPIRE_MESSAGE =
   "분석 트리거가 지연되어 작업이 만료되었습니다. 다시 시도해 주세요.";
+
+async function triggerAnalyzeProcessBestEffort(
+  jobId: string,
+  accessToken: string
+): Promise<boolean> {
+  const secret = process.env.ANALYZE_PROCESS_SECRET?.trim();
+  if (!secret) return false;
+
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 2500);
+  try {
+    const base = getInternalSiteBaseUrl();
+    const res = await fetch(`${base}/api/analyze/process`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json",
+        "X-Supabase-Access-Token": accessToken,
+      },
+      body: JSON.stringify({ jobId }),
+      signal: controller.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
 
 /**
  * pending 상태가 유예 시간을 넘겼으면 `runAnalysisProcessAfterResponse`를 한 번 더 시도.
@@ -70,7 +100,12 @@ export async function kickStalePendingAnalysisJobIfNeeded(
 
   if (error) return;
 
-  void runAnalysisProcessAfterResponse(jobId, accessToken);
+  // 1) 가능하면 별도 인보케이션으로 분리되는 process 라우트를 먼저 두드린다(트리거 누락 방지).
+  // 2) 실패하면 현재 인보케이션에서 직접 실행을 시도한다(best-effort).
+  const httpOk = await triggerAnalyzeProcessBestEffort(jobId, accessToken);
+  if (!httpOk) {
+    void runAnalysisProcessAfterResponse(jobId, accessToken);
+  }
 }
 
 export function isPendingExpireMessage(message: string | null | undefined): boolean {

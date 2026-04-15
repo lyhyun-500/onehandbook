@@ -38,6 +38,7 @@ function AuthCallbackLoadingPage() {
 
   useEffect(() => {
     if (!code) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError("로그인 코드가 없습니다. 다시 시도해 주세요.");
       return;
     }

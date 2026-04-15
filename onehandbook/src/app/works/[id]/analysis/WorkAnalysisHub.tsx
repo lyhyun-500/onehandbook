@@ -114,7 +114,6 @@ function WorkAnalysisHubInner({
   const [selectedHolisticId, setSelectedHolisticId] = useState<number | null>(
     null
   );
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [serverLoadError, setServerLoadError] = useState<string | null>(null);
 
   const effectiveEpisodes = serverEpisodes ?? episodes;
@@ -125,7 +124,12 @@ function WorkAnalysisHubInner({
       const res = await fetch(`/api/works/${workId}/analysis-data`, {
         cache: "no-store",
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setServerLoadError(
+          `분석 데이터 로딩 실패 (HTTP ${res.status}). 새로고침 후에도 지속되면 로그인/권한 또는 서버 오류를 확인해 주세요.`
+        );
+        return;
+      }
       const data = (await res.json()) as {
         episodes?: EpisodeRow[];
         runs?: AnalysisRunRow[];
@@ -134,6 +138,7 @@ function WorkAnalysisHubInner({
       };
       if (Array.isArray(data.episodes)) setServerEpisodes(data.episodes);
       if (Array.isArray(data.runs)) setServerRuns(data.runs);
+      setServerLoadError(null);
       const hist = Array.isArray(data.holisticHistory)
         ? data.holisticHistory
         : data.latestHolistic && typeof data.latestHolistic.id === "number"
@@ -269,6 +274,9 @@ function WorkAnalysisHubInner({
   });
 
   const [charCountRetryNonce, setCharCountRetryNonce] = useState(0);
+  const [charCountFailedEpisodeIds, setCharCountFailedEpisodeIds] = useState<
+    Set<number>
+  >(() => new Set());
   const requestedCharCountRef = useRef<Set<number>>(new Set());
   const charCountAttemptRef = useRef<Map<number, number>>(new Map());
 
@@ -280,7 +288,16 @@ function WorkAnalysisHubInner({
     if (!ep || (ep.charCount ?? 0) > 0) return;
     if (requestedCharCountRef.current.has(panelEpisodeId)) return;
     const prevAttempts = charCountAttemptRef.current.get(panelEpisodeId) ?? 0;
-    if (prevAttempts >= 3) return;
+    if (prevAttempts >= 3) {
+      // 3회 실패 시 "계산 중"이 영구 고착되지 않도록 실패 상태를 표시한다.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCharCountFailedEpisodeIds((prev) => {
+        const next = new Set(prev);
+        next.add(panelEpisodeId);
+        return next;
+      });
+      return;
+    }
     charCountAttemptRef.current.set(panelEpisodeId, prevAttempts + 1);
     requestedCharCountRef.current.add(panelEpisodeId);
 
@@ -355,7 +372,7 @@ function WorkAnalysisHubInner({
   const panelAnalyses = useMemo(() => {
     if (panelEpisodeId == null) return [];
     return effectiveRuns
-      .filter((r) => r.episode_id === panelEpisodeId)
+      .filter((r) => Number(r.episode_id) === panelEpisodeId)
       .sort(
         (a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -372,7 +389,10 @@ function WorkAnalysisHubInner({
   }, [effectiveRuns, panelEpisodeId]);
 
   const panelEpisode = effectiveEpisodes.find((e) => e.id === panelEpisodeId);
-  const panelCharCount = panelEpisode?.charCount ?? 0;
+  const panelCharCount =
+    panelEpisodeId != null && charCountFailedEpisodeIds.has(panelEpisodeId)
+      ? -1
+      : (panelEpisode?.charCount ?? 0);
 
   const batchBreakdown = useMemo(() => {
     const opts = {
@@ -429,7 +449,10 @@ function WorkAnalysisHubInner({
   const batchHasBlockedEpisode = useMemo(() => {
     return orderedSelectedIds.some((id) => {
       const ep = effectiveEpisodes.find((e) => e.id === id);
-      return (ep?.charCount ?? 0) < MIN_ANALYSIS_CHARS;
+      const c = ep?.charCount ?? 0;
+      // 0은 "아직 글자 수를 모름"이므로 미만으로 판단하지 않는다(오탐 방지).
+      if (c <= 0) return false;
+      return c < MIN_ANALYSIS_CHARS;
     });
   }, [orderedSelectedIds, effectiveEpisodes]);
 
@@ -437,6 +460,7 @@ function WorkAnalysisHubInner({
     if (batchHasBlockedEpisode) return false;
     return orderedSelectedIds.some((id) => {
       const c = effectiveEpisodes.find((e) => e.id === id)?.charCount ?? 0;
+      if (c <= 0) return false;
       return c >= MIN_ANALYSIS_CHARS && c < 1000;
     });
   }, [orderedSelectedIds, effectiveEpisodes, batchHasBlockedEpisode]);
@@ -886,6 +910,11 @@ function WorkAnalysisHubInner({
 
       {activeTab === "single" && (
         <div className="space-y-8">
+          {serverLoadError && (
+            <div className="rounded-xl border border-amber-500/25 bg-amber-950/20 px-4 py-3 text-sm text-amber-100/95">
+              {serverLoadError}
+            </div>
+          )}
           <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
             <h2 className="mb-1 text-lg font-semibold text-zinc-100">
               회차 선택
