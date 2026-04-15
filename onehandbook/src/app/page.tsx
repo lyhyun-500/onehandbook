@@ -81,6 +81,9 @@ export default async function HomePage() {
                 >
                   지금 시작하기
                 </Link>
+                <p className="mt-3 text-xs font-medium text-zinc-500">
+                  🔒 원고는 외부에 절대 공개되지 않으며 · AI 학습에 사용되지 않습니다
+                </p>
               </div>
             </div>
 

@@ -29,6 +29,9 @@ export function WorkAiOverview({
           원고 읽기와 분리된 화면에서 회차를 골라 구간 점수를 볼 수 있습니다.
           목록은 <span className="text-zinc-400">1화부터</span> 오름차순입니다.
         </p>
+        <p className="mt-2 text-xs font-medium text-zinc-500">
+          🔒 원고는 분석 용도로만 사용되며, 다른 사람이 볼 수 없습니다
+        </p>
         <div className="mt-3 flex flex-wrap gap-6 text-sm">
           <span className="text-zinc-400">
             작품 평균{" "}

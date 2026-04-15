@@ -83,6 +83,9 @@ export default async function StudioPage() {
             <p className="mt-1 text-sm text-zinc-400 sm:text-base">
               내 작품 현황과 Agent Score(분석 회차 평균)를 확인하세요
             </p>
+            <p className="mt-2 text-xs font-medium text-zinc-500">
+              🔒 등록하신 원고는 작가님만 볼 수 있습니다
+            </p>
           </div>
           <AddWorkButton userId={userId} />
         </div>

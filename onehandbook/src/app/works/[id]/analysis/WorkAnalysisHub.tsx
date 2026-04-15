@@ -895,6 +895,9 @@ function WorkAnalysisHubInner({
                 아래 목록은 1화부터 오름차순입니다. 분석할 회차에서 「개별 분석」을 누르면 아래에 AI 분석 패널이 열립니다.
               </CopyWithBreaks>
             </p>
+            <p className="mb-6 text-xs font-medium text-zinc-500">
+              🔒 입력하신 원고는 작가님 외 누구도 열람할 수 없으며, AI 학습 데이터로 사용되지 않습니다
+            </p>
 
             {effectiveEpisodes.length === 0 ? (
               <p className="text-sm text-zinc-500">등록된 회차가 없습니다.</p>
