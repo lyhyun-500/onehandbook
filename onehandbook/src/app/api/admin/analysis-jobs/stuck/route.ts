@@ -40,6 +40,9 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
+  const includeAllProcessing =
+    url.searchParams.get("includeAllProcessing") === "1" ||
+    url.searchParams.get("all") === "1";
   const limitRaw = parseInt(url.searchParams.get("limit") ?? "50", 10);
   const limit = clampInt(Number.isFinite(limitRaw) ? limitRaw : 50, 1, 200);
   const sinceHoursRaw = parseInt(url.searchParams.get("sinceHours") ?? "168", 10); // 7d
@@ -56,19 +59,22 @@ export async function GET(request: Request) {
     now - ANALYSIS_JOB_HOLISTIC_PROCESSING_STALE_MS
   ).toISOString();
 
-  // Supabase PostgREST의 OR 조건을 사용해서 job_kind별 stale 기준을 각각 적용
-  const { data, error } = await admin
+  const base = admin
     .from("analysis_jobs")
     .select(
       "id, job_kind, status, progress_phase, updated_at, created_at, work_id, episode_id, app_user_id, error_message, payload"
     )
     .eq("status", "processing")
     .gte("updated_at", sinceIso)
-    .or(
-      `and(job_kind.eq.episode,updated_at.lt.${cutoffEpisodeIso}),and(job_kind.eq.holistic_batch,updated_at.lt.${cutoffHolisticIso})`
-    )
     .order("updated_at", { ascending: true })
     .limit(limit);
+
+  // includeAllProcessing=1이면 stale 조건 없이 processing 전체를 보여준다.
+  const { data, error } = includeAllProcessing
+    ? await base
+    : await base.or(
+        `and(job_kind.eq.episode,updated_at.lt.${cutoffEpisodeIso}),and(job_kind.eq.holistic_batch,updated_at.lt.${cutoffHolisticIso})`
+      );
 
   if (error) {
     console.error("admin analysis-jobs stuck:", error.message);
@@ -79,6 +85,7 @@ export async function GET(request: Request) {
     ok: true,
     sinceHours,
     limit,
+    includeAllProcessing,
     stale_cutoffs: {
       episode_ms: ANALYSIS_JOB_PROCESSING_STALE_MS,
       holistic_ms: ANALYSIS_JOB_HOLISTIC_PROCESSING_STALE_MS,
