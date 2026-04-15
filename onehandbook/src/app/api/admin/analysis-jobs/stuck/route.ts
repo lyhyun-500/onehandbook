@@ -43,6 +43,10 @@ export async function GET(request: Request) {
   const includeAllProcessing =
     url.searchParams.get("includeAllProcessing") === "1" ||
     url.searchParams.get("all") === "1";
+  const appUserIdRaw = url.searchParams.get("appUserId");
+  const workIdRaw = url.searchParams.get("workId");
+  const episodeIdRaw = url.searchParams.get("episodeId");
+  const jobKind = url.searchParams.get("jobKind");
   const limitRaw = parseInt(url.searchParams.get("limit") ?? "50", 10);
   const limit = clampInt(Number.isFinite(limitRaw) ? limitRaw : 50, 1, 200);
   const sinceHoursRaw = parseInt(url.searchParams.get("sinceHours") ?? "168", 10); // 7d
@@ -69,10 +73,21 @@ export async function GET(request: Request) {
     .order("updated_at", { ascending: true })
     .limit(limit);
 
+  let q = base;
+  const appUserId = appUserIdRaw ? parseInt(appUserIdRaw, 10) : NaN;
+  if (Number.isFinite(appUserId) && appUserId > 0) q = q.eq("app_user_id", appUserId);
+  const workId = workIdRaw ? parseInt(workIdRaw, 10) : NaN;
+  if (Number.isFinite(workId) && workId > 0) q = q.eq("work_id", workId);
+  const episodeId = episodeIdRaw ? parseInt(episodeIdRaw, 10) : NaN;
+  if (Number.isFinite(episodeId) && episodeId > 0) q = q.eq("episode_id", episodeId);
+  if (typeof jobKind === "string" && (jobKind === "episode" || jobKind === "holistic_batch")) {
+    q = q.eq("job_kind", jobKind);
+  }
+
   // includeAllProcessing=1이면 stale 조건 없이 processing 전체를 보여준다.
   const { data, error } = includeAllProcessing
-    ? await base
-    : await base.or(
+    ? await q
+    : await q.or(
         `and(job_kind.eq.episode,updated_at.lt.${cutoffEpisodeIso}),and(job_kind.eq.holistic_batch,updated_at.lt.${cutoffHolisticIso})`
       );
 
@@ -86,6 +101,16 @@ export async function GET(request: Request) {
     sinceHours,
     limit,
     includeAllProcessing,
+    filters: {
+      appUserId: Number.isFinite(appUserId) ? appUserId : null,
+      workId: Number.isFinite(workId) ? workId : null,
+      episodeId: Number.isFinite(episodeId) ? episodeId : null,
+      jobKind:
+        typeof jobKind === "string" &&
+        (jobKind === "episode" || jobKind === "holistic_batch")
+          ? jobKind
+          : null,
+    },
     stale_cutoffs: {
       episode_ms: ANALYSIS_JOB_PROCESSING_STALE_MS,
       holistic_ms: ANALYSIS_JOB_HOLISTIC_PROCESSING_STALE_MS,
