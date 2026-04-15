@@ -21,6 +21,12 @@ export type AnalysisJobPayload = {
   includePlatformOptimization: boolean;
 };
 
+function episodeJobHeartbeatIntervalMs(): number {
+  const sec = parseInt(process.env.ANALYZE_JOB_HEARTBEAT_SEC ?? "60", 10);
+  const n = Number.isFinite(sec) && sec > 0 ? sec : 60;
+  return Math.max(15, Math.min(180, n)) * 1000;
+}
+
 async function markJobFailed(
   jobId: string,
   errorMessage: string,
@@ -157,6 +163,15 @@ export async function executeAnalysisJob(
     return { ok: true, skipped: true };
   }
 
+  /** LLM 대기 중 updated_at 정지 → stale(5분) 오인 방지 */
+  const heartbeat = setInterval(() => {
+    void supabase
+      .from("analysis_jobs")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", jobId)
+      .eq("status", "processing");
+  }, episodeJobHeartbeatIntervalMs());
+
   try {
     const result = await runEpisodeAnalysisPipeline(supabase, {
       episodeId: job.episode_id,
@@ -238,5 +253,7 @@ export async function executeAnalysisJob(
     }
 
     return { ok: false, error: message };
+  } finally {
+    clearInterval(heartbeat);
   }
 }
