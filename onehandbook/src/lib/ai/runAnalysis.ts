@@ -18,8 +18,9 @@ import {
 import { getProfileConfig } from "./profileLookup";
 import type { AgentVersionConfig } from "./registry";
 import {
-  completeAnthropic,
-  completeAnthropicConversation,
+  completeAnthropicConversationWithUsage,
+  completeAnthropicWithUsage,
+  type AnthropicUsage,
 } from "./providers/anthropic";
 import { completeGoogle, completeGoogleConversation } from "./providers/google";
 import type {
@@ -164,46 +165,61 @@ async function completeAndParseModelJson<T>(
   system: string,
   user: string,
   parse: (raw: string) => T
-): Promise<T> {
-  let raw =
-    profile.provider === "anthropic"
-      ? await completeAnthropic({
-          model: profile.model,
-          system,
-          user,
-        })
-      : await completeGoogle({
-          model: profile.model,
-          system,
-          user,
-        });
+): Promise<{ parsed: T; llmUsage?: { input_tokens?: number; output_tokens?: number } }> {
+  let raw: string;
+  let usage: AnthropicUsage | null = null;
+
+  if (profile.provider === "anthropic") {
+    const out = await completeAnthropicWithUsage({
+      model: profile.model,
+      system,
+      user,
+    });
+    raw = out.text;
+    usage = out.usage;
+  } else {
+    raw = await completeGoogle({ model: profile.model, system, user });
+  }
 
   try {
-    return parse(raw);
+    return {
+      parsed: parse(raw),
+      ...(profile.provider === "anthropic" && usage
+        ? { llmUsage: { input_tokens: usage.input_tokens, output_tokens: usage.output_tokens } }
+        : {}),
+    };
   } catch (e1) {
-    raw =
-      profile.provider === "anthropic"
-        ? await completeAnthropicConversation({
-            model: profile.model,
-            system,
-            messages: [
-              { role: "user", content: user },
-              { role: "assistant", content: raw },
-              { role: "user", content: JSON_PARSE_RETRY_USER_MESSAGE },
-            ],
-          })
-        : await completeGoogleConversation({
-            model: profile.model,
-            system,
-            messages: [
-              { role: "user", content: user },
-              { role: "model", content: raw },
-              { role: "user", content: JSON_PARSE_RETRY_USER_MESSAGE },
-            ],
-          });
+    if (profile.provider === "anthropic") {
+      const out2 = await completeAnthropicConversationWithUsage({
+        model: profile.model,
+        system,
+        messages: [
+          { role: "user", content: user },
+          { role: "assistant", content: raw },
+          { role: "user", content: JSON_PARSE_RETRY_USER_MESSAGE },
+        ],
+      });
+      raw = out2.text;
+      usage = out2.usage;
+    } else {
+      raw = await completeGoogleConversation({
+        model: profile.model,
+        system,
+        messages: [
+          { role: "user", content: user },
+          { role: "model", content: raw },
+          { role: "user", content: JSON_PARSE_RETRY_USER_MESSAGE },
+        ],
+      });
+    }
 
     try {
-      return parse(raw);
+      return {
+        parsed: parse(raw),
+        ...(profile.provider === "anthropic" && usage
+          ? { llmUsage: { input_tokens: usage.input_tokens, output_tokens: usage.output_tokens } }
+          : {}),
+      };
     } catch (e2) {
       throw new Error(
         `AI 응답 JSON 파싱에 실패했습니다. ${formatJsonParseFailures(e1, e2)}`
@@ -222,6 +238,8 @@ export async function runAnalysis(
   trendsContextBlock: string | null;
   /** 표시용 출처/날짜만 남긴 레퍼런스 목록 */
   trendsReferences: TrendReferenceItem[];
+  /** Claude provider일 때 usage(input/output tokens) */
+  llmUsage?: { input_tokens?: number; output_tokens?: number };
 }> {
   const profile = getProfileConfig(versionId);
   if (!profile) {
@@ -238,7 +256,8 @@ export async function runAnalysis(
   const system = buildSystemPrompt(input.genre, profile, trendsBlock);
   const user = buildUserPrompt(input);
 
-  const parsed = await completeAndParseModelJson(profile, system, user, parseAnalysisJson);
+  const parsedOut = await completeAndParseModelJson(profile, system, user, parseAnalysisJson);
+  const parsed = parsedOut.parsed;
   const result: AnalysisResult = {
     ...parsed,
     ...(trendRefs.length > 0 ? { trends_references: trendRefs } : {}),
@@ -255,6 +274,7 @@ export async function runAnalysis(
     version,
     trendsContextBlock: trendsBlock,
     trendsReferences: trendRefs,
+    ...(parsedOut.llmUsage ? { llmUsage: parsedOut.llmUsage } : {}),
   };
 }
 
@@ -267,6 +287,8 @@ export async function runHolisticAnalysis(
   version: AgentVersionConfig;
   trendsContextBlock: string | null;
   trendsReferences: TrendReferenceItem[];
+  /** Claude provider일 때 usage(input/output tokens) */
+  llmUsage?: { input_tokens?: number; output_tokens?: number };
 }> {
   const profile = getProfileConfig(versionId);
   if (!profile) {
@@ -283,12 +305,13 @@ export async function runHolisticAnalysis(
   const system = buildHolisticSystemPrompt(input.genre, profile, trendsBlock);
   const user = buildHolisticUserPrompt(input.genre, input, segments);
 
-  const parsed = await completeAndParseModelJson(
+  const parsedOut = await completeAndParseModelJson(
     profile,
     system,
     user,
     parseHolisticAnalysisJson
   );
+  const parsed = parsedOut.parsed;
   const result: HolisticAnalysisResult = {
     ...parsed,
     ...(trendRefs.length > 0 ? { trends_references: trendRefs } : {}),
@@ -305,6 +328,7 @@ export async function runHolisticAnalysis(
     version,
     trendsContextBlock: trendsBlock,
     trendsReferences: trendRefs,
+    ...(parsedOut.llmUsage ? { llmUsage: parsedOut.llmUsage } : {}),
   };
 }
 
@@ -320,6 +344,8 @@ export async function runHolisticMergeAnalysis(
   version: AgentVersionConfig;
   trendsContextBlock: string | null;
   trendsReferences: TrendReferenceItem[];
+  /** Claude provider일 때 usage(input/output tokens) */
+  llmUsage?: { input_tokens?: number; output_tokens?: number };
 }> {
   const profile = getProfileConfig(versionId);
   if (!profile) {
@@ -331,12 +357,13 @@ export async function runHolisticMergeAnalysis(
   const system = buildHolisticMergeSystemPrompt(genre, profile, trendsBlock);
   const user = buildHolisticMergeUserPrompt(genre, chunks, episodeWeights);
 
-  const parsed = await completeAndParseModelJson(
+  const parsedOut = await completeAndParseModelJson(
     profile,
     system,
     user,
     parseHolisticAnalysisJson
   );
+  const parsed = parsedOut.parsed;
   const result: HolisticAnalysisResult = {
     ...parsed,
     ...(trendRefs.length > 0 ? { trends_references: trendRefs } : {}),
@@ -353,6 +380,7 @@ export async function runHolisticMergeAnalysis(
     version,
     trendsContextBlock: trendsBlock,
     trendsReferences: trendRefs,
+    ...(parsedOut.llmUsage ? { llmUsage: parsedOut.llmUsage } : {}),
   };
 }
 

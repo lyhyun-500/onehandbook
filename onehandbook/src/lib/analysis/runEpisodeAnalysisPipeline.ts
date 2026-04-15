@@ -57,6 +57,8 @@ export type EpisodeAnalysisSuccess = {
   nat: { spent: number; balance: number | undefined };
   breakdown: ReturnType<typeof buildNatBreakdown>;
   cached: false;
+  /** Claude provider일 때 usage(input/output tokens) */
+  llmUsage?: { input_tokens?: number; output_tokens?: number };
 };
 
 /**
@@ -190,6 +192,7 @@ export async function runEpisodeAnalysisPipeline(
   let version;
   let trendsContextBlock: string | null = null;
   let trendsReferences: unknown[] = [];
+  let llmUsage: { input_tokens?: number; output_tokens?: number } | undefined;
   try {
     const out = await runAnalysis(
       {
@@ -208,6 +211,30 @@ export async function runEpisodeAnalysisPipeline(
     version = out.version;
     trendsContextBlock = out.trendsContextBlock;
     trendsReferences = out.trendsReferences;
+    llmUsage = out.llmUsage;
+    if (out.llmUsage && analysisJobProgress?.jobId) {
+      const { data: cur } = await supabase
+        .from("analysis_jobs")
+        .select("payload")
+        .eq("id", analysisJobProgress.jobId)
+        .maybeSingle();
+      const base = (cur?.payload as Record<string, unknown> | null) ?? {};
+      await supabase
+        .from("analysis_jobs")
+        .update({
+          payload: {
+            ...base,
+            llm_usage: {
+              provider: "anthropic",
+              model: version.model,
+              input_tokens: out.llmUsage.input_tokens ?? null,
+              output_tokens: out.llmUsage.output_tokens ?? null,
+            },
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", analysisJobProgress.jobId);
+    }
   } catch (e) {
     if (e instanceof AnalysisProviderExhaustedError) {
       throw e;
@@ -333,5 +360,6 @@ export async function runEpisodeAnalysisPipeline(
     nat: { spent: cost, balance: rpc.balance },
     breakdown,
     cached: false,
+    ...(llmUsage ? { llmUsage } : {}),
   };
 }

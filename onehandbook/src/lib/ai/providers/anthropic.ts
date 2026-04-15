@@ -15,6 +15,11 @@ function getStatus(err: unknown): number | undefined {
 
 type AnthropicTurn = { role: "user" | "assistant"; content: string };
 
+export type AnthropicUsage = {
+  input_tokens?: number;
+  output_tokens?: number;
+};
+
 function extractTextFromAnthropicMessage(msg: {
   content: Array<{ type: string; text?: string }>;
 }): string {
@@ -38,12 +43,33 @@ export async function completeAnthropic(params: {
   });
 }
 
+export async function completeAnthropicWithUsage(params: {
+  model: string;
+  system: string;
+  user: string;
+}): Promise<{ text: string; usage: AnthropicUsage | null }> {
+  return completeAnthropicConversationWithUsage({
+    model: params.model,
+    system: params.system,
+    messages: [{ role: "user", content: params.user }],
+  });
+}
+
 /** user/assistant 교차 대화(재요청·JSON 수정용 등). 마지막 턴은 user 여야 함. */
 export async function completeAnthropicConversation(params: {
   model: string;
   system: string;
   messages: AnthropicTurn[];
 }): Promise<string> {
+  const out = await completeAnthropicConversationWithUsage(params);
+  return out.text;
+}
+
+export async function completeAnthropicConversationWithUsage(params: {
+  model: string;
+  system: string;
+  messages: AnthropicTurn[];
+}): Promise<{ text: string; usage: AnthropicUsage | null }> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
     throw new Error("ANTHROPIC_API_KEY 가 설정되지 않았습니다.");
@@ -61,7 +87,11 @@ export async function completeAnthropicConversation(params: {
         system: params.system,
         messages: params.messages,
       });
-      return extractTextFromAnthropicMessage(msg);
+      const usage =
+        msg && typeof msg === "object" && "usage" in msg
+          ? ((msg as { usage?: AnthropicUsage }).usage ?? null)
+          : null;
+      return { text: extractTextFromAnthropicMessage(msg), usage };
     } catch (e) {
       const status = getStatus(e);
       const retryable = status === 429 || status === 529;
@@ -77,5 +107,5 @@ export async function completeAnthropicConversation(params: {
     }
   }
 
-  throw new Error("completeAnthropicConversation: unreachable");
+  throw new Error("completeAnthropicConversationWithUsage: unreachable");
 }
