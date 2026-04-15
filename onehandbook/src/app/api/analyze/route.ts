@@ -38,7 +38,7 @@ function parseNatOptions(body: Record<string, unknown>): NatAnalysisOptions {
   return { includeLore, includePlatformOptimization };
 }
 
-/** `after()` 안에서 LLM 분석이 돌아가므로 process 라우트와 동일한 상한을 둔다. */
+/** 이 라우트는 job 생성/트리거만 하고 즉시 반환한다. */
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
