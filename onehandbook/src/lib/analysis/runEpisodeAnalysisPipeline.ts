@@ -261,6 +261,62 @@ export async function runEpisodeAnalysisPipeline(
     char_count: charCount,
   };
 
+  let shouldSkipNatConsume = false;
+  let skipNatFromHolisticRunId: string | null = null;
+  if (analysisJobProgress?.jobId) {
+    const { data: cur } = await supabase
+      .from("analysis_jobs")
+      .select("payload")
+      .eq("id", analysisJobProgress.jobId)
+      .maybeSingle();
+
+    const payload = (cur?.payload as Record<string, unknown> | null) ?? null;
+    const skipRequested = payload?.skip_nat_consume === true;
+    const fromHolisticRunId =
+      typeof payload?.from_holistic_run_id === "string"
+        ? payload.from_holistic_run_id
+        : null;
+
+    if (skipRequested && fromHolisticRunId) {
+      skipNatFromHolisticRunId = fromHolisticRunId;
+      const { data: holisticRun } = await supabase
+        .from("holistic_analysis_runs")
+        .select("id, work_id")
+        .eq("id", fromHolisticRunId)
+        .maybeSingle();
+
+      let ownershipOk = false;
+      if (holisticRun?.work_id != null) {
+        const { data: ownerWork } = await supabase
+          .from("works")
+          .select("author_id")
+          .eq("id", holisticRun.work_id)
+          .maybeSingle();
+        ownershipOk = ownerWork != null && ownerWork.author_id === appUser.id;
+      }
+
+      if (ownershipOk) {
+        shouldSkipNatConsume = true;
+        console.log(
+          "[runEpisodeAnalysisPipeline] NAT consume skipped: post_holistic source",
+          {
+            jobId: analysisJobProgress.jobId,
+            episodeId: episode.id,
+            fromHolisticRunId: fromHolisticRunId,
+          }
+        );
+      } else {
+        console.warn(
+          "[runEpisodeAnalysisPipeline] skip_nat_consume requested but holistic_run ownership check failed. Falling back to normal NAT consume.",
+          {
+            jobId: analysisJobProgress.jobId,
+            fromHolisticRunId: payload?.from_holistic_run_id,
+          }
+        );
+      }
+    }
+  }
+
   const { data: row, error: insErr } = await supabase
     .from("analysis_runs")
     .insert({
@@ -268,7 +324,7 @@ export async function runEpisodeAnalysisPipeline(
       work_id: work.id,
       agent_version: version.id,
       result_json: result,
-      nat_cost: cost,
+      nat_cost: shouldSkipNatConsume ? 0 : cost,
       options_json: optionsRecord,
     })
     .select("id, episode_id, work_id, agent_version, result_json, created_at")
@@ -279,33 +335,36 @@ export async function runEpisodeAnalysisPipeline(
     throw new Error(insErr.message ?? "저장에 실패했습니다.");
   }
 
-  const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
-    p_amount: cost,
-    p_ref_type: "analysis_run",
-    p_ref_id: row.id,
-    p_metadata: {
-      episode_id: episode.id,
-      work_id: work.id,
-      agent_version: version.id,
-    },
-  });
+  let rpc: ConsumeNatRpcResult | null = null;
+  if (!shouldSkipNatConsume) {
+    const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
+      p_amount: cost,
+      p_ref_type: "analysis_run",
+      p_ref_id: row.id,
+      p_metadata: {
+        episode_id: episode.id,
+        work_id: work.id,
+        agent_version: version.id,
+      },
+    });
 
-  if (rpcErr) {
-    console.error(rpcErr);
-    await supabase.from("analysis_runs").delete().eq("id", row.id);
-    throw new Error("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
-  }
+    if (rpcErr) {
+      console.error(rpcErr);
+      await supabase.from("analysis_runs").delete().eq("id", row.id);
+      throw new Error("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    }
 
-  const rpc = rpcData as ConsumeNatRpcResult;
-  if (!rpc?.ok) {
-    await supabase.from("analysis_runs").delete().eq("id", row.id);
-    const err = new Error(
-      `NAT가 부족합니다. 이번 분석에는 ${cost} NAT가 필요합니다.`
-    );
-    (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
-    (err as Error & { required?: number }).required = rpc?.required ?? cost;
-    (err as Error & { balance?: number }).balance = rpc?.balance ?? balance;
-    throw err;
+    rpc = rpcData as ConsumeNatRpcResult;
+    if (!rpc?.ok) {
+      await supabase.from("analysis_runs").delete().eq("id", row.id);
+      const err = new Error(
+        `NAT가 부족합니다. 이번 분석에는 ${cost} NAT가 필요합니다.`
+      );
+      (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
+      (err as Error & { required?: number }).required = rpc?.required ?? cost;
+      (err as Error & { balance?: number }).balance = rpc?.balance ?? balance;
+      throw err;
+    }
   }
 
   const analyzedAt = new Date().toISOString();
@@ -315,7 +374,7 @@ export async function runEpisodeAnalysisPipeline(
     analysis_run_id: row.id,
     score: result.overall_score,
     feedback: serializeAnalysisFeedback(result),
-    nat_consumed: cost,
+    nat_consumed: shouldSkipNatConsume ? 0 : cost,
     content_hash: currentHash,
     work_context_hash: workContextHash,
     analyzed_at: analyzedAt,
@@ -357,7 +416,10 @@ export async function runEpisodeAnalysisPipeline(
   return {
     analysis: row,
     previousResult,
-    nat: { spent: cost, balance: rpc.balance },
+    nat: {
+      spent: shouldSkipNatConsume ? 0 : cost,
+      balance: shouldSkipNatConsume ? balance : rpc?.balance,
+    },
     breakdown,
     cached: false,
     ...(llmUsage ? { llmUsage } : {}),
