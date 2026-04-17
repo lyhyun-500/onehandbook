@@ -11,6 +11,7 @@ import {
 import { EpisodeActions } from "./EpisodeActions";
 import { EpisodeRowAnalysisBadge } from "@/components/EpisodeRowAnalysisBadge";
 import { WorkAiOverview } from "./WorkAiOverview";
+import { DeleteWorkButton } from "./DeleteWorkButton";
 
 export default async function WorkDetailPage({
   params,
@@ -24,8 +25,9 @@ export default async function WorkDetailPage({
   // 작품 조회 (본인 작품인지 확인)
   const { data: work, error: workError } = await supabase
     .from("works")
-    .select("id, title, genre, status, total_episodes, author_id")
+    .select("id, title, genre, status, total_episodes, author_id, deleted_at")
     .eq("id", id)
+    .is("deleted_at", null)
     .single();
 
   if (workError || !work || work.author_id !== appUser.id) {
@@ -73,12 +75,15 @@ export default async function WorkDetailPage({
               {work.genre} · {work.total_episodes}화
             </p>
           </div>
-          <Link
-            href={`/works/${id}/settings`}
-            className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
-          >
-            작품 설정
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/works/${id}/settings`}
+              className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+            >
+              작품 설정
+            </Link>
+            <DeleteWorkButton workId={Number(work.id)} />
+          </div>
         </div>
 
         <WorkAiOverview

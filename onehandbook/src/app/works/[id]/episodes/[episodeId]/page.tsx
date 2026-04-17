@@ -15,8 +15,9 @@ export default async function EpisodeViewPage({
 
   const { data: work } = await supabase
     .from("works")
-    .select("id, title, author_id")
+    .select("id, title, author_id, deleted_at")
     .eq("id", id)
+    .is("deleted_at", null)
     .single();
 
   if (!work || work.author_id !== appUser.id) {

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { TagInput } from "@/components/TagInput";
 
 const GENRES = [
   "로맨스",
@@ -17,6 +18,7 @@ const GENRES = [
 ];
 
 const STATUSES = ["연재중", "완결", "휴재"] as const;
+const CONTRACT_STATUSES = ["미계약", "계약"] as const;
 
 export function AddWorkButton({ userId }: { userId: number }) {
   const router = useRouter();
@@ -26,9 +28,20 @@ export function AddWorkButton({ userId }: { userId: number }) {
   const [title, setTitle] = useState("");
   const [genre, setGenre] = useState("로맨스");
   const [status, setStatus] = useState<"연재중" | "완결" | "휴재">("연재중");
-  const [totalEpisodes, setTotalEpisodes] = useState(0);
+  const [tags, setTags] = useState<string[]>([]);
+  const [contractStatus, setContractStatus] = useState<"미계약" | "계약">("미계약");
+  const [managementOfferOptIn, setManagementOfferOptIn] = useState(false);
 
   const supabase = createClient();
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +54,9 @@ export function AddWorkButton({ userId }: { userId: number }) {
         genre,
         author_id: userId,
         status,
-        total_episodes: totalEpisodes,
+        tags,
+        contract_status: contractStatus,
+        management_offer_opt_in: managementOfferOptIn,
       });
 
       if (error) throw error;
@@ -49,7 +64,9 @@ export function AddWorkButton({ userId }: { userId: number }) {
       setTitle("");
       setGenre("로맨스");
       setStatus("연재중");
-      setTotalEpisodes(0);
+      setTags([]);
+      setContractStatus("미계약");
+      setManagementOfferOptIn(false);
       router.refresh();
     } catch (err) {
       setError(
@@ -72,7 +89,7 @@ export function AddWorkButton({ userId }: { userId: number }) {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-md rounded-xl border border-cyan-500/10 bg-zinc-900 p-6 shadow-2xl shadow-black/40">
+          <div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-xl border border-cyan-500/10 bg-zinc-900 p-6 shadow-2xl shadow-black/40">
             <h2 className="mb-6 text-lg font-semibold text-zinc-100">
               새 작품 등록
             </h2>
@@ -131,18 +148,48 @@ export function AddWorkButton({ userId }: { userId: number }) {
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-                  총 회차
+                  계약 여부
                 </label>
-                <input
-                  type="number"
-                  value={totalEpisodes || ""}
+                <select
+                  value={contractStatus}
                   onChange={(e) =>
-                    setTotalEpisodes(Math.max(0, parseInt(e.target.value) || 0))
+                    setContractStatus(e.target.value as (typeof CONTRACT_STATUSES)[number])
                   }
-                  min={0}
-                  placeholder="0"
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 placeholder-zinc-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-                />
+                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                >
+                  {CONTRACT_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950/30 px-4 py-3">
+                <label
+                  className="flex cursor-pointer items-start gap-3 text-sm text-zinc-400"
+                  aria-disabled="true"
+                >
+                  <input
+                    type="checkbox"
+                    checked={managementOfferOptIn}
+                    onChange={(e) => setManagementOfferOptIn(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-zinc-700 bg-zinc-800 text-cyan-600 opacity-80"
+                  />
+                  <span className="leading-snug">
+                    매니지먼트 계약 제의를 받겠습니다 (현재 서비스 개발 중)
+                  </span>
+                </label>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+                  태그
+                </label>
+                <p className="mb-2 text-sm text-zinc-500">
+                  엔터로 추가하고, 칩의 ×로 삭제합니다. 예: #회귀물 #먼치킨 #전문직
+                </p>
+                <TagInput value={tags} onChange={setTags} />
               </div>
 
               {error && (

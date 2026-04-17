@@ -10,6 +10,7 @@ import {
 } from "@/lib/analysis/holisticJobPayload";
 import { isStaleJobFailureMessage } from "@/lib/analysis/recoverStaleAnalysisJob";
 import { parseDbInt } from "@/lib/supabase/parseDbInt";
+import { logHolisticPipelineAwait } from "@/lib/analysis/holisticPipelineLog";
 
 export type HolisticAnalysisJobPayload = {
   workId: number;
@@ -352,6 +353,24 @@ export async function executeHolisticAnalysisJob(
       episodeCount: (holisticRow.episode_ids ?? []).length,
     });
 
+    await logHolisticPipelineAwait(
+      "batch_success",
+      {
+        jobId,
+        workId,
+        holisticRunId: holisticRow.id,
+        orderedEpisodeIds: holisticRow.episode_ids ?? [],
+        episodeCount: (holisticRow.episode_ids ?? []).length,
+      },
+      {
+        supabase,
+        appUserId: appUser.id,
+        analysisJobId: jobId,
+        workId,
+        holisticRunId: holisticRow.id,
+      }
+    );
+
     void (async () => {
       const ids = holisticRow.episode_ids ?? [];
       const { data: wk } = await supabase
@@ -390,6 +409,24 @@ export async function executeHolisticAnalysisJob(
         : "통합 분석에 실패했습니다.";
 
     console.error("[holistic-job] failed", { jobId, message, e });
+    await logHolisticPipelineAwait(
+      "batch_failed",
+      {
+        jobId,
+        workId,
+        errorMessage: message,
+        errorCode:
+          e instanceof Error ? (e as Error & { code?: string }).code : undefined,
+        errorName: e instanceof Error ? e.name : typeof e,
+        isProviderExhausted: isProvider,
+      },
+      {
+        supabase,
+        appUserId: appUser.id,
+        analysisJobId: jobId,
+        workId,
+      }
+    );
     await markHolisticJobFailed(jobId, message, accessToken);
 
     if (e instanceof Error && (e as Error & { code?: string }).code === "INSUFFICIENT_NAT") {

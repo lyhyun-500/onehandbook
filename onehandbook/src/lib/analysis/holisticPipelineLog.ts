@@ -95,3 +95,28 @@ export function logHolisticPipeline(
       );
     });
 }
+
+/** 서버 종료 직전에도 남기고 싶은 종료/실패 행용(await). */
+export async function logHolisticPipelineAwait(
+  step: string,
+  payload: Record<string, unknown>,
+  db?: HolisticPipelineDbContext | null
+): Promise<void> {
+  console.info(`[${HOLISTIC_PIPELINE_GREP}]`, step, JSON.stringify(payload));
+  if (!db?.supabase) return;
+  const { error } = await db.supabase.from("holistic_pipeline_events").insert({
+    app_user_id: db.appUserId,
+    work_id: db.workId,
+    analysis_job_id: db.analysisJobId ?? null,
+    holistic_run_id: db.holisticRunId ?? null,
+    step,
+    payload,
+  });
+  if (!error) return;
+  if (isMissingHolisticPipelineEventsTableError(error)) return;
+  console.warn(
+    `[${HOLISTIC_PIPELINE_GREP}] db insert failed`,
+    step,
+    error.message
+  );
+}

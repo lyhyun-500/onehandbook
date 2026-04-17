@@ -21,9 +21,10 @@ export default async function WorkSettingsPage({
   const { data: work } = await supabase
     .from("works")
     .select(
-      "id, title, genre, status, tags, author_id, world_setting, character_settings"
+      "id, title, genre, status, tags, author_id, world_setting, character_settings, contract_status, management_offer_opt_in, deleted_at"
     )
     .eq("id", id)
+    .is("deleted_at", null)
     .single();
 
   if (!work || work.author_id !== appUser.id) {
@@ -55,6 +56,10 @@ export default async function WorkSettingsPage({
           initialTitle={work.title}
           initialGenre={work.genre}
           initialStatus={work.status}
+          initialContractStatus={
+            work.contract_status === "계약" ? "계약" : "미계약"
+          }
+          initialManagementOfferOptIn={Boolean(work.management_offer_opt_in)}
           initialTags={Array.isArray(work.tags) ? work.tags : []}
           initialWorld={normalizeWorldSetting(work.world_setting)}
           initialCharacters={normalizeCharacterSettings(work.character_settings)}

@@ -34,6 +34,7 @@ export default async function StudioPage() {
     .from("works")
     .select("id, title, genre, status, total_episodes, created_at")
     .eq("author_id", userId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   const workIds = (works ?? []).map((w) => w.id);
