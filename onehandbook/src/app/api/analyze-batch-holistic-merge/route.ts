@@ -15,11 +15,12 @@ import { NextResponse } from "next/server";
 import { syncAppUser } from "@/lib/supabase/appUser";
 import { md5Hex } from "@/lib/contentHash";
 import { isMissingHolisticChunkResultsTableError } from "@/lib/db/holisticChunkResultsTable";
-import { runBundledEpisodesForHolisticSelection } from "@/lib/analysis/runEpisodeAnalysisBundledInHolistic";
 import {
   holisticEpisodeScoreCoverage,
   logHolisticPipeline,
 } from "@/lib/analysis/holisticPipelineLog";
+import { runAnalysisProcessAfterResponse } from "@/lib/analysis/scheduleAnalysisProcess";
+import { after } from "next/server";
 
 type ConsumeNatRpcResult = {
   ok?: boolean;
@@ -142,6 +143,28 @@ export async function POST(request: Request) {
   let sessionIdForCleanup: string | null = null;
   let jobIdForUpdate: string | null = null;
   let jobPayloadBase: Record<string, unknown> | null = null;
+  /** 본인 소유 + status=processing 확인 후에만 true — 잘못된 jobId로 타인 잡을 failed 처리하지 않음 */
+  let sessionMergeAuthorized = false;
+
+  const markSessionJobFailed = async (message: string) => {
+    if (!useDbSession || !jobIdForUpdate || !sessionMergeAuthorized) return;
+    const { error } = await supabase
+      .from("analysis_jobs")
+      .update({
+        status: "failed",
+        error_message: message.slice(0, 500),
+        progress_phase: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", jobIdForUpdate)
+      .eq("status", "processing");
+    if (error) {
+      console.warn("[holistic-merge] markSessionJobFailed", {
+        jobId: jobIdForUpdate,
+        message: error.message,
+      });
+    }
+  };
 
   if (useDbSession) {
     const sessionId = body.sessionId as string;
@@ -168,25 +191,33 @@ export async function POST(request: Request) {
       );
     }
 
+    sessionMergeAuthorized = true;
+
     const jp = (job.payload ?? {}) as Record<string, unknown>;
     if (jp.clientChunked !== true || jp.chunkSessionId !== sessionId) {
+      await markSessionJobFailed("작업 세션 정보가 맞지 않습니다.");
       return NextResponse.json({ error: "작업 세션 정보가 맞지 않습니다." }, { status: 400 });
     }
 
     const pv = jp.requestedVersion;
     if (typeof pv === "string" && pv !== requestedVersion) {
+      await markSessionJobFailed("agentVersion이 원래 작업과 일치하지 않습니다.");
       return NextResponse.json(
         { error: "agentVersion이 원래 작업과 일치하지 않습니다." },
         { status: 400 }
       );
     }
     if (jp.includeLore !== opts.includeLore) {
+      await markSessionJobFailed("includeLore 옵션이 원래 작업과 일치하지 않습니다.");
       return NextResponse.json(
         { error: "includeLore 옵션이 원래 작업과 일치하지 않습니다." },
         { status: 400 }
       );
     }
     if (jp.includePlatformOptimization !== opts.includePlatformOptimization) {
+      await markSessionJobFailed(
+        "includePlatformOptimization 옵션이 원래 작업과 일치하지 않습니다."
+      );
       return NextResponse.json(
         { error: "includePlatformOptimization 옵션이 원래 작업과 일치하지 않습니다." },
         { status: 400 }
@@ -202,6 +233,7 @@ export async function POST(request: Request) {
           : 0;
 
     if (chunkTotal < 2) {
+      await markSessionJobFailed("DB 세션 병합은 2개 이상의 청크가 필요합니다.");
       return NextResponse.json(
         { error: "DB 세션 병합은 2개 이상의 청크가 필요합니다." },
         { status: 400 }
@@ -216,6 +248,9 @@ export async function POST(request: Request) {
 
     if (rErr) {
       if (isMissingHolisticChunkResultsTableError(rErr)) {
+        await markSessionJobFailed(
+          "holistic_chunk_results 테이블이 없습니다. 마이그레이션을 적용해 주세요."
+        );
         return NextResponse.json(
           {
             error:
@@ -226,6 +261,7 @@ export async function POST(request: Request) {
         );
       }
       console.error(rErr);
+      await markSessionJobFailed("청크 결과를 불러오지 못했습니다.");
       return NextResponse.json(
         { error: "청크 결과를 불러오지 못했습니다." },
         { status: 500 }
@@ -233,6 +269,9 @@ export async function POST(request: Request) {
     }
 
     if (!rows || rows.length !== chunkTotal) {
+      await markSessionJobFailed(
+        `저장된 청크가 부족합니다. (${rows?.length ?? 0}/${chunkTotal})`
+      );
       return NextResponse.json(
         {
           error: `저장된 청크가 부족합니다. (${rows?.length ?? 0}/${chunkTotal})`,
@@ -249,12 +288,14 @@ export async function POST(request: Request) {
         : [];
       const res = row.result_json;
       if (ids.length === 0 || !res || typeof res !== "object") {
+        await markSessionJobFailed("청크 결과 형식이 잘못되었습니다.");
         return NextResponse.json(
           { error: "청크 결과 형식이 잘못되었습니다." },
           { status: 500 }
         );
       }
       if (ids.length > 10) {
+        await markSessionJobFailed("저장된 청크의 회차 수가 올바르지 않습니다.");
         return NextResponse.json(
           { error: "저장된 청크의 회차 수가 올바르지 않습니다." },
           { status: 500 }
@@ -262,12 +303,14 @@ export async function POST(request: Request) {
       }
       for (const id of ids) {
         if (!orderedSet.has(id)) {
+          await markSessionJobFailed("청크 회차가 orderedEpisodeIds와 맞지 않습니다.");
           return NextResponse.json(
             { error: "청크 회차가 orderedEpisodeIds와 맞지 않습니다." },
             { status: 400 }
           );
         }
         if (seenInChunks.has(id)) {
+          await markSessionJobFailed("회차가 청크 간 중복되었습니다.");
           return NextResponse.json(
             { error: "회차가 청크 간 중복되었습니다." },
             { status: 400 }
@@ -319,6 +362,9 @@ export async function POST(request: Request) {
   }
 
   if (parsedChunks.length < 2) {
+    await markSessionJobFailed(
+      "병합은 10화를 초과하는 선택(배치 2회 이상)일 때만 사용합니다. 10화 이하는 통합 분석 한 번으로 처리하세요."
+    );
     return NextResponse.json(
       {
         error:
@@ -329,6 +375,7 @@ export async function POST(request: Request) {
   }
 
   if (seenInChunks.size !== orderedEpisodeIds.length) {
+    await markSessionJobFailed("chunks가 orderedEpisodeIds 전체를 덮지 않습니다.");
     return NextResponse.json(
       { error: "chunks가 orderedEpisodeIds 전체를 덮지 않습니다." },
       { status: 400 }
@@ -342,6 +389,7 @@ export async function POST(request: Request) {
     .in("id", orderedEpisodeIds);
 
   if (!epRows || epRows.length !== orderedEpisodeIds.length) {
+    await markSessionJobFailed("회차 데이터를 불러오지 못했습니다.");
     return NextResponse.json(
       { error: "회차 데이터를 불러오지 못했습니다." },
       { status: 400 }
@@ -358,6 +406,7 @@ export async function POST(request: Request) {
   for (const id of orderedEpisodeIds) {
     const row = byId.get(Number(id));
     if (!row) {
+      await markSessionJobFailed("회차 데이터를 불러오지 못했습니다.");
       return NextResponse.json(
         { error: "회차 데이터를 불러오지 못했습니다." },
         { status: 400 }
@@ -379,6 +428,9 @@ export async function POST(request: Request) {
   const mergeCost = computeHolisticMergeNatCost();
   const balance = appUser.coin_balance ?? 0;
   if (balance < mergeCost) {
+    await markSessionJobFailed(
+      `NAT가 부족합니다. 병합에는 ${mergeCost} NAT가 필요합니다.`
+    );
     return NextResponse.json(
       {
         error: `NAT가 부족합니다. 병합에는 ${mergeCost} NAT가 필요합니다.`,
@@ -391,24 +443,14 @@ export async function POST(request: Request) {
   }
 
   if (!isProviderConfigured(profile.provider)) {
+    await markSessionJobFailed(
+      `${profile.label}에 필요한 API 키가 설정되어 있지 않습니다.`
+    );
     return NextResponse.json(
       {
         error: `${profile.label}에 필요한 API 키가 설정되어 있지 않습니다.`,
       },
       { status: 400 }
-    );
-  }
-
-  if (jobIdForUpdate) {
-    const jfb = jobPayloadBase as { force?: boolean } | null;
-    await runBundledEpisodesForHolisticSelection(
-      supabase,
-      appUser,
-      orderedEps.map((e) => ({ id: Number(e.id) })),
-      requestedVersion,
-      opts,
-      jobIdForUpdate,
-      jfb?.force === true
     );
   }
 
@@ -443,6 +485,12 @@ export async function POST(request: Request) {
   }));
 
   try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const accessToken =
+      typeof session?.access_token === "string" ? session.access_token : null;
+
     const { result: rawMerged, version } = await runHolisticMergeAnalysis(
       work.genre ?? "",
       mergePayloads,
@@ -518,6 +566,7 @@ export async function POST(request: Request) {
 
     if (insErr) {
       console.error(insErr);
+      await markSessionJobFailed(insErr.message ?? "저장에 실패했습니다.");
       return NextResponse.json(
         { error: insErr.message ?? "저장에 실패했습니다." },
         { status: 500 }
@@ -525,18 +574,7 @@ export async function POST(request: Request) {
     }
 
     const markMergeJobFailed = async (message: string) => {
-      if (useDbSession && jobIdForUpdate) {
-        await supabase
-          .from("analysis_jobs")
-          .update({
-            status: "failed",
-            error_message: message.slice(0, 500),
-            progress_phase: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", jobIdForUpdate)
-          .eq("status", "processing");
-      }
+      await markSessionJobFailed(message);
     };
 
     const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
@@ -632,13 +670,100 @@ export async function POST(request: Request) {
       }
     }
 
+    // 통합 분석이 완전히 끝난 뒤, 회차별 episode job을 best-effort로 enqueue
+    let childInsertError: unknown | null = null;
+    let insertedChildCount = 0;
+    let firstChildJobId: string | null = null;
+    if (jobIdForUpdate) {
+      const childJobs = orderedEpisodeIds.map((episodeId) => ({
+        app_user_id: appUser.id,
+        episode_id: episodeId,
+        work_id: work.id,
+        job_kind: "episode",
+        status: "pending",
+        parent_job_id: jobIdForUpdate,
+        payload: {
+          requestedVersion,
+          force: false,
+          includeLore: opts.includeLore,
+          includePlatformOptimization: opts.includePlatformOptimization,
+          estimatedSeconds: 75,
+          source: "post_holistic",
+          from_holistic_run_id: row.id,
+          skip_nat_consume: true,
+        },
+        progress_phase: "received",
+      }));
+
+      const { data: childRows, error: childErr } = await supabase
+        .from("analysis_jobs")
+        .insert(childJobs)
+        .select("id, episode_id");
+
+      if (childErr) {
+        childInsertError = childErr;
+        console.error(
+          "[merge route] failed to insert child episode jobs",
+          childErr
+        );
+        logHolisticPipeline(
+          "merge_route_child_jobs_insert_failed",
+          {
+            jobId: jobIdForUpdate,
+            holisticRunId: row.id,
+            workId: work.id,
+            orderedEpisodeIds,
+            error: childErr.message,
+          },
+          {
+            supabase,
+            appUserId: appUser.id,
+            workId: work.id,
+            analysisJobId: jobIdForUpdate,
+            holisticRunId: row.id,
+          }
+        );
+      } else {
+        insertedChildCount = Array.isArray(childRows) ? childRows.length : 0;
+        const firstEpisodeId = orderedEpisodeIds[0];
+        if (firstEpisodeId != null && Array.isArray(childRows)) {
+          const hit = childRows.find((r) => Number(r.episode_id) === firstEpisodeId);
+          firstChildJobId = (hit?.id as string | undefined) ?? null;
+        }
+      }
+    }
+
+    // best-effort: 첫 번째 자식 잡만 워커 트리거(나머지는 폴링/킥으로 회수됨)
+    if (firstChildJobId && accessToken) {
+      after(async () => {
+        try {
+          await runAnalysisProcessAfterResponse(firstChildJobId, accessToken);
+        } catch (e) {
+          console.error(
+            "[merge route] failed to trigger worker for child job",
+            e
+          );
+        }
+      });
+    } else if (firstChildJobId && !accessToken) {
+      console.error("[merge route] missing access token; cannot trigger worker for child job", {
+        firstChildJobId,
+      });
+    }
+
     return NextResponse.json({
       holistic: row,
       nat: { spent: mergeCost, balance: rpc.balance },
+      childJobs: {
+        count: orderedEpisodeIds.length,
+        insertSuccess: childInsertError == null,
+        insertedCount: insertedChildCount,
+      },
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "병합 분석에 실패했습니다.";
     console.error(e);
+    await markSessionJobFailed(message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
