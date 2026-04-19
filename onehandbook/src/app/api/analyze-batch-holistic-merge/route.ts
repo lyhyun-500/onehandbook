@@ -19,8 +19,6 @@ import {
   holisticEpisodeScoreCoverage,
   logHolisticPipeline,
 } from "@/lib/analysis/holisticPipelineLog";
-import { runAnalysisProcessAfterResponse } from "@/lib/analysis/scheduleAnalysisProcess";
-import { after } from "next/server";
 
 type ConsumeNatRpcResult = {
   ok?: boolean;
@@ -485,12 +483,6 @@ export async function POST(request: Request) {
   }));
 
   try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const accessToken =
-      typeof session?.access_token === "string" ? session.access_token : null;
-
     const { result: rawMerged, version } = await runHolisticMergeAnalysis(
       work.genre ?? "",
       mergePayloads,
@@ -670,95 +662,9 @@ export async function POST(request: Request) {
       }
     }
 
-    // 통합 분석이 완전히 끝난 뒤, 회차별 episode job을 best-effort로 enqueue
-    let childInsertError: unknown | null = null;
-    let insertedChildCount = 0;
-    let firstChildJobId: string | null = null;
-    if (jobIdForUpdate) {
-      const childJobs = orderedEpisodeIds.map((episodeId) => ({
-        app_user_id: appUser.id,
-        episode_id: episodeId,
-        work_id: work.id,
-        job_kind: "episode",
-        status: "pending",
-        parent_job_id: jobIdForUpdate,
-        payload: {
-          requestedVersion,
-          force: false,
-          includeLore: opts.includeLore,
-          includePlatformOptimization: opts.includePlatformOptimization,
-          estimatedSeconds: 75,
-          source: "post_holistic",
-          from_holistic_run_id: row.id,
-          skip_nat_consume: true,
-        },
-        progress_phase: "received",
-      }));
-
-      const { data: childRows, error: childErr } = await supabase
-        .from("analysis_jobs")
-        .insert(childJobs)
-        .select("id, episode_id");
-
-      if (childErr) {
-        childInsertError = childErr;
-        console.error(
-          "[merge route] failed to insert child episode jobs",
-          childErr
-        );
-        logHolisticPipeline(
-          "merge_route_child_jobs_insert_failed",
-          {
-            jobId: jobIdForUpdate,
-            holisticRunId: row.id,
-            workId: work.id,
-            orderedEpisodeIds,
-            error: childErr.message,
-          },
-          {
-            supabase,
-            appUserId: appUser.id,
-            workId: work.id,
-            analysisJobId: jobIdForUpdate,
-            holisticRunId: row.id,
-          }
-        );
-      } else {
-        insertedChildCount = Array.isArray(childRows) ? childRows.length : 0;
-        const firstEpisodeId = orderedEpisodeIds[0];
-        if (firstEpisodeId != null && Array.isArray(childRows)) {
-          const hit = childRows.find((r) => Number(r.episode_id) === firstEpisodeId);
-          firstChildJobId = (hit?.id as string | undefined) ?? null;
-        }
-      }
-    }
-
-    // best-effort: 첫 번째 자식 잡만 워커 트리거(나머지는 폴링/킥으로 회수됨)
-    if (firstChildJobId && accessToken) {
-      after(async () => {
-        try {
-          await runAnalysisProcessAfterResponse(firstChildJobId, accessToken);
-        } catch (e) {
-          console.error(
-            "[merge route] failed to trigger worker for child job",
-            e
-          );
-        }
-      });
-    } else if (firstChildJobId && !accessToken) {
-      console.error("[merge route] missing access token; cannot trigger worker for child job", {
-        firstChildJobId,
-      });
-    }
-
     return NextResponse.json({
       holistic: row,
       nat: { spent: mergeCost, balance: rpc.balance },
-      childJobs: {
-        count: orderedEpisodeIds.length,
-        insertSuccess: childInsertError == null,
-        insertedCount: insertedChildCount,
-      },
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "병합 분석에 실패했습니다.";
