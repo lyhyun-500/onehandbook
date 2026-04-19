@@ -1006,31 +1006,16 @@ export function AnalyzePanel({
             </div>
           )}
           {displayedAnalysis.holistic_derived && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-950/25 px-4 py-3 text-sm text-amber-100/95">
-              <p className="font-medium text-amber-100">
-                통합 일괄 분석에서 가져온 요약입니다
-              </p>
-              <p className="mt-2 leading-relaxed text-amber-100/90">
-                일괄 분석은 여러 회차를 한 번에 묶어 평가합니다. 아래 종합 점수만
-                이 회차에 맞춰 두었고, 항목별 코멘트·개선 포인트는{" "}
-                <strong className="font-semibold text-amber-50">
-                  선택한 구간 전체
-                </strong>
-                를 기준으로 한 통합 리포트 문안과 같습니다. 이 화 원고만 집중해서
-                보려면 위에서 「분석 실행」으로{" "}
-                <strong className="font-semibold text-amber-50">
-                  단일 회차 분석
-                </strong>
-                을 실행하세요 (NAT 소모).
-              </p>
-              <p className="mt-3">
-                <Link
-                  href={`/works/${workId}/analysis?tab=batch`}
-                  className="font-medium text-cyan-400 underline-offset-2 hover:text-cyan-300 hover:underline"
-                >
-                  일괄 분석 탭에서 통합 리포트 보기
-                </Link>
-              </p>
+            <div className="flex items-center gap-2 text-xs text-amber-200/80">
+              <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-950/25 px-2 py-0.5 font-medium text-amber-100">
+                일괄 분석 일부
+              </span>
+              <Link
+                href={`/works/${workId}/analysis?tab=batch`}
+                className="text-cyan-400 underline-offset-2 hover:text-cyan-300"
+              >
+                통합 리포트 보기 →
+              </Link>
             </div>
           )}
           <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -1046,12 +1031,6 @@ export function AnalyzePanel({
                 {getProfileLabel(displayedAnalysis.agent_version)} ·{" "}
                 {formatKoreanDateTime(displayedAnalysis.created_at)}
               </p>
-              {displayedAnalysis.holistic_derived && (
-                <p className="mt-1 text-xs text-zinc-500">
-                  종합 점수만 이 회차에 맞춰 두었고, 상세 문안은 통합 리포트와
-                  동일합니다.
-                </p>
-              )}
             </div>
             <p className="text-3xl font-bold text-cyan-400">
               {displayedAnalysis.result_json.overall_score}
@@ -1060,9 +1039,9 @@ export function AnalyzePanel({
           </div>
 
           {displayedAnalysis.holistic_derived ? (
-            <details className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-4 py-3">
+            <details open className="rounded-lg border border-zinc-800 bg-zinc-950/40 px-4 py-3">
               <summary className="cursor-pointer text-sm text-zinc-400">
-                통합 리포트와 동일한 상세 텍스트 보기 (항목별 · 개선 · 트렌드)
+                이 회차의 상세 분석 (항목별 · 개선 · 트렌드)
               </summary>
               <div className="mt-4 space-y-4 border-t border-zinc-800/80 pt-4">
                 <AnalysisResultDetailBody latest={displayedAnalysis} />
