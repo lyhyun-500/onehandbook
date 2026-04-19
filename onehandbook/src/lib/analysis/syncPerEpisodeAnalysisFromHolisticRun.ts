@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { AnalysisResult, HolisticAnalysisResult } from "@/lib/ai/types";
+import type {
+  AnalysisResult,
+  HolisticAnalysisResult,
+  HolisticEpisodeScore,
+} from "@/lib/ai/types";
 import { md5Hex } from "@/lib/contentHash";
 import { serializeAnalysisFeedback } from "@/lib/analysisResultCache";
 import { insertAnalysisResultSnapshot } from "@/lib/analysis/analysisResultsWorkContextSupport";
@@ -86,6 +90,7 @@ export async function syncPerEpisodeAnalysisFromHolisticRun(
   );
 
   const scoreByEpisodeNumber = new Map<number, number>();
+  const episodeDataByNumber = new Map<number, HolisticEpisodeScore>();
   for (const es of holisticResult.episode_scores ?? []) {
     if (
       typeof es.episode_number === "number" &&
@@ -97,6 +102,7 @@ export async function syncPerEpisodeAnalysisFromHolisticRun(
         es.episode_number,
         clampAnalysisSnapshotScore(es.score)
       );
+      episodeDataByNumber.set(es.episode_number, es);
     }
   }
 
@@ -124,9 +130,9 @@ export async function syncPerEpisodeAnalysisFromHolisticRun(
   }
 
   const analyzedAt = new Date().toISOString();
-  const dims = holisticResult.dimensions ?? {};
-  const improvements = holisticResult.improvements ?? [];
-  const execNote = holisticResult.executive_summary?.slice(0, 2000);
+  const overallDims = holisticResult.dimensions ?? {};
+  const overallImprovements = holisticResult.improvements ?? [];
+  const overallExecNote = holisticResult.executive_summary?.slice(0, 2000);
 
   const insertedRunIds: number[] = [];
   const fallbackEpisodeNumbers: number[] = [];
@@ -170,11 +176,15 @@ export async function syncPerEpisodeAnalysisFromHolisticRun(
         score = clampAnalysisSnapshotScore(score);
       }
 
+      const episodeData = episodeDataByNumber.get(ep.episode_number);
+
       const resultJson: AnalysisResult = {
         overall_score: score,
-        dimensions: dims,
-        improvement_points: [...improvements],
-        comparable_note: execNote,
+        dimensions: episodeData?.dimensions ?? overallDims,
+        improvement_points: episodeData?.improvements
+          ? [...episodeData.improvements]
+          : [...overallImprovements],
+        comparable_note: episodeData?.comment ?? overallExecNote,
         trends_references: holisticResult.trends_references,
       };
 
