@@ -82,7 +82,7 @@ export async function completeAnthropicConversationWithUsage(params: {
     try {
       const msg = await client.messages.create({
         model: params.model,
-        max_tokens: 8192,
+        max_tokens: 16000,
         temperature: 0,
         system: params.system,
         messages: params.messages,

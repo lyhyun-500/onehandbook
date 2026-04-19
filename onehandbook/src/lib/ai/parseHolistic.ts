@@ -8,6 +8,39 @@ const DIM_KEYS = [
   "플랫폼 적합성",
 ] as const;
 
+function parseEpisodeDimensionsOrUndefined(
+  raw: unknown
+): Record<string, { score: number; comment: string }> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+
+  const requiredKeys = [
+    "플로우 일관성",
+    "캐릭터 아크",
+    "복선 활용도",
+    "플랫폼 적합성",
+  ];
+  const result: Record<string, { score: number; comment: string }> = {};
+
+  for (const key of requiredKeys) {
+    const dim = r[key];
+    if (
+      !dim ||
+      typeof dim !== "object" ||
+      typeof (dim as Record<string, unknown>).score !== "number" ||
+      typeof (dim as Record<string, unknown>).comment !== "string"
+    ) {
+      return undefined;
+    }
+    result[key] = {
+      score: (dim as { score: number }).score,
+      comment: (dim as { comment: string }).comment,
+    };
+  }
+
+  return result;
+}
+
 export function parseHolisticAnalysisJson(raw: string): HolisticAnalysisResult {
   const trimmed = raw.trim();
   let jsonStr: string;
@@ -34,7 +67,21 @@ export function parseHolisticAnalysisJson(raw: string): HolisticAnalysisResult {
     const score = typeof r.score === "number" ? r.score : 0;
     const title =
       typeof r.episode_title === "string" ? r.episode_title : undefined;
-    return { episode_number: ep, episode_title: title, score };
+
+    const dimensions = parseEpisodeDimensionsOrUndefined(r.dimensions);
+    const improvements = Array.isArray(r.improvements)
+      ? r.improvements.filter((s): s is string => typeof s === "string")
+      : undefined;
+    const comment = typeof r.comment === "string" ? r.comment : undefined;
+
+    return {
+      episode_number: ep,
+      episode_title: title,
+      score,
+      dimensions,
+      improvements,
+      comment,
+    };
   });
   if (!o.dimensions || typeof o.dimensions !== "object") {
     throw new Error("dimensions 가 없습니다.");

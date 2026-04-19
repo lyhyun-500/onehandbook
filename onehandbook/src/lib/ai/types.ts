@@ -71,6 +71,9 @@ export interface HolisticEpisodeScore {
   episode_number: number;
   episode_title?: string;
   score: number;
+  dimensions?: Record<string, { score: number; comment: string }>;
+  improvements?: string[];
+  comment?: string;
 }
 
 export interface HolisticAnalysisResult {
