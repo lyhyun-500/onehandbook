@@ -206,6 +206,43 @@ function WorkAnalysisHubInner({
     };
   }, [workId, reloadAnalysisData]);
 
+  /**
+   * 일괄 분석 완료 직후 race condition 대응:
+   * analysis_jobs.completed 시점과 sync_per_episode 완료 시점 사이 race window
+   * 에서 reloadAnalysisData 가 stale 데이터를 받을 수 있음.
+   *
+   * 최근 30초 이내 완료된 holistic_batch job 이 있으면 3초 간격으로 polling.
+   * 30초 후 자동 중단 (또는 컴포넌트 unmount 시).
+   */
+  useEffect(() => {
+    const panelJobs = analysisJobsCtx?.panelJobs ?? [];
+    const now = Date.now();
+
+    const hasRecentHolisticBatch = panelJobs.some((j) => {
+      if (j.status !== "completed") return false;
+      if (j.job_kind !== "holistic_batch") return false;
+      if (j.holistic_run_id == null) return false;
+      const updatedMs = new Date(j.updated_at).getTime();
+      if (Number.isNaN(updatedMs)) return false;
+      return now - updatedMs < 30000;
+    });
+
+    if (!hasRecentHolisticBatch) return;
+
+    const interval = setInterval(() => {
+      void reloadAnalysisData();
+    }, 3000);
+
+    const stop = setTimeout(() => {
+      clearInterval(interval);
+    }, 30000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(stop);
+    };
+  }, [analysisJobsCtx?.panelJobs, reloadAnalysisData]);
+
   const urlTab: "single" | "batch" =
     searchParams.get("tab") === "batch" ? "batch" : "single";
 
