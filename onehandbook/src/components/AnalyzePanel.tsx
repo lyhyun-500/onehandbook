@@ -1065,6 +1065,7 @@ export function AnalyzePanel({
             {analyses.map((a, idx) => {
               const viewing = displayedAnalysis?.id === a.id;
               const isLatest = idx === 0;
+              const isHolistic = a.holistic_derived === true;
               return (
                 <li key={a.id}>
                   <button
@@ -1081,6 +1082,11 @@ export function AnalyzePanel({
                       {isLatest && (
                         <span className="ml-2 rounded bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-300/95">
                           최신
+                        </span>
+                      )}
+                      {isHolistic && (
+                        <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300/95">
+                          일괄
                         </span>
                       )}
                     </span>
