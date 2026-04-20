@@ -48,7 +48,7 @@ export type AnalysisRow = {
   agent_version: string;
   result_json: AnalysisResult;
   created_at: string;
-  /** 통합 일괄 분석 후 회차별로 복제된 행(`options_json.holistic_derived`) */
+   /** 일괄 분석에서 파생된 회차별 행 (`options_json.holistic_derived`) */
   holistic_derived?: boolean;
 };
 
