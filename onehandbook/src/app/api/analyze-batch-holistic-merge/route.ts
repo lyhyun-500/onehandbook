@@ -20,6 +20,8 @@ import {
   logHolisticPipeline,
 } from "@/lib/analysis/holisticPipelineLog";
 
+export const maxDuration = 800;
+
 type ConsumeNatRpcResult = {
   ok?: boolean;
   error?: string;
