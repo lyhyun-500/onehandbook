@@ -17,6 +17,29 @@ html {
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* 사이드 패널 배경/구조 */
+  --color-sidepanel-bg: #0b0e14;
+  --color-sidepanel-card: #13171f;
+  --color-sidepanel-card-hover: #1a1f2a;
+  --color-sidepanel-border-subtle: #1f2530;
+  --color-sidepanel-border-dirty: #3b82f6;
+  --color-sidepanel-border-invalid: #ef4444;
+
+  /* 사이드 패널 텍스트 */
+  --color-sidepanel-text-primary: #e6e8ec;
+  --color-sidepanel-text-secondary: #9ca3af;
+  --color-sidepanel-text-muted: #6b7280;
+
+  /* 사이드 패널 액센트 */
+  --color-sidepanel-accent: #6366f1;
+  --color-sidepanel-accent-hover: #818cf8;
+
+  /* 역할 뱃지 색상 */
+  --color-role-protagonist: #a78bfa;
+  --color-role-supporting: #94a3b8;
+  --color-role-minor: #64748b;
+  --color-role-villain: #fb7185;
 }
 
 body {
