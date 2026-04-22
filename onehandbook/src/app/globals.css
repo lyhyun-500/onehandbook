@@ -40,6 +40,22 @@ html {
   --color-role-supporting: #94a3b8;
   --color-role-minor: #64748b;
   --color-role-villain: #fb7185;
+
+  /* 어드민 — 밝은 테마 (Supabase 대시보드 참고) */
+  --color-admin-bg-page: #ffffff;
+  --color-admin-bg-surface: #f9fafb;
+  --color-admin-bg-hover: #f3f4f6;
+  --color-admin-border: #e5e7eb;
+  --color-admin-border-strong: #d1d5db;
+  --color-admin-text-primary: #111827;
+  --color-admin-text-secondary: #4b5563;
+  --color-admin-text-muted: #9ca3af;
+  --color-admin-accent: #2563eb;
+  --color-admin-accent-hover: #1d4ed8;
+  --color-admin-success: #059669;
+  --color-admin-warning: #d97706;
+  --color-admin-danger: #dc2626;
+  --color-admin-info: #0891b2;
 }
 
 body {
