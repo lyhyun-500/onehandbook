@@ -22,6 +22,7 @@ export function makeCharactersWithKeys(
   const list = settings ?? [];
   return list.map((c) => ({
     name: c.name ?? "",
+    summary: c.summary,
     role: c.role,
     goals: c.goals,
     abilities: c.abilities,
@@ -34,6 +35,7 @@ export function makeCharactersWithKeys(
 export function emptyCharacterRow(): CharacterWithKey {
   return {
     name: "",
+    summary: "",
     role: "",
     goals: "",
     abilities: "",
@@ -46,6 +48,7 @@ export function emptyCharacterRow(): CharacterWithKey {
 function normalizeChar(c: Character): Record<string, string> {
   return {
     name: c.name ?? "",
+    summary: c.summary ?? "",
     role: c.role ?? "",
     goals: c.goals ?? "",
     abilities: c.abilities ?? "",

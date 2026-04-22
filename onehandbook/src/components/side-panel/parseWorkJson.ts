@@ -23,6 +23,7 @@ export function parseCharacterSettings(raw: unknown): CharacterSettings {
     if (!name.trim()) continue;
     out.push({
       name,
+      summary: typeof c.summary === "string" ? c.summary : undefined,
       role: typeof c.role === "string" ? c.role : undefined,
       goals: typeof c.goals === "string" ? c.goals : undefined,
       abilities: typeof c.abilities === "string" ? c.abilities : undefined,
