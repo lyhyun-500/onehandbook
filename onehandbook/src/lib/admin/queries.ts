@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createSupabaseServiceRole } from "@/lib/supabase/serviceRole";
 import {
   USER_LIST_LIMIT_DEFAULT,
   USER_LIST_LIMIT_MAX,
@@ -37,10 +38,15 @@ export type ListAdminUsersResult = {
 //   - analysis_jobs count: 유저별 head count 병렬 N회 (group by 부재로 배치 불가,
 //     베타 규모 기준 N ≤ 100 이라 왕복 비용 허용)
 // 규모 확장 시 view 또는 RPC 함수로 DB 레벨 집계로 교체 예정.
+// users 테이블에 auth.uid() = auth_id RLS 가 걸려 있어 세션 클라이언트로 조회하면
+// 로그인한 어드민 본인 1행만 돌아온다. 호출부(requireAdmin / getAdminForApi)에서
+// 이미 admin role 을 검증하므로 여기서는 service_role 로 RLS 를 우회한다.
+// 첫 인자는 기존 시그니처 유지용이며 실제로는 사용하지 않는다.
 export async function listAdminUsers(
-  supabase: SupabaseClient,
+  _sessionClient: SupabaseClient,
   input: ListAdminUsersInput
 ): Promise<ListAdminUsersResult> {
+  const supabase = createSupabaseServiceRole();
   const search = (input.search ?? "").trim();
   const provider: LoginProvider | "all" = input.provider ?? "all";
   const status: UserStatusFilter = input.status ?? "active";
@@ -161,10 +167,12 @@ export type AdminUserDetailBundle = {
 // 유저 상세 조회.
 //   - works / analysis_jobs 는 최근 10건 + 전체/활성 count 를 별도 head 쿼리로 보정.
 //   - coin_logs 는 최근 20건, metadata.adjusted_by / admin_reason 파싱.
+// listAdminUsers 와 동일한 이유로 service_role 사용. 첫 인자는 시그니처 호환용.
 export async function getAdminUserDetail(
-  supabase: SupabaseClient,
+  _sessionClient: SupabaseClient,
   userId: number
 ): Promise<AdminUserDetailBundle | null> {
+  const supabase = createSupabaseServiceRole();
   const { data: userRow, error: uErr } = await supabase
     .from("users")
     .select(
