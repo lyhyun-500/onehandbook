@@ -60,6 +60,7 @@ export default async function AdminUsersPage({
       )}
 
       <UsersListView
+        key={`${input.provider}-${input.status}-${input.sort}-${input.search}`}
         initialUsers={result.users}
         initialTotal={result.total}
         initialPage={1}
