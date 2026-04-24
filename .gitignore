@@ -37,4 +37,4 @@ Thumbs.db
 
 # 개인 실험 스크립트 (로컬 보관, 커밋 제외)
 scripts/experiment-*.ts
-tmp/
+tmp/portfolio-screenshots/
