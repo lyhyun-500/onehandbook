@@ -43,31 +43,8 @@ type ToastItem = {
   action?: { label: string; href: string; jobId?: string };
 };
 
-const READ_JOBS_KEY = "ohb_analysis_read_job_outcomes";
-
 /** 알림 패널 완료/실패 목록: 최근 7일, 페이지당 건수 */
 const NOTIFICATION_OUTCOMES_PAGE_SIZE = 20;
-
-function loadReadJobIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = sessionStorage.getItem(READ_JOBS_KEY);
-    if (!raw) return new Set();
-    const arr = JSON.parse(raw) as unknown;
-    if (!Array.isArray(arr)) return new Set();
-    return new Set(arr.filter((x): x is string => typeof x === "string"));
-  } catch {
-    return new Set();
-  }
-}
-
-function persistReadJobIds(ids: Set<string>) {
-  try {
-    sessionStorage.setItem(READ_JOBS_KEY, JSON.stringify([...ids]));
-  } catch {
-    /* ignore */
-  }
-}
 
 function jobCoversEpisode(j: AnalysisJobListItem, episodeId: number): boolean {
   if (j.job_kind === "holistic_batch") {
@@ -186,6 +163,9 @@ async function analysisJobRowToListItem(
         ? String(parentRaw)
         : null;
 
+  const readAtRaw = (row as { read_at?: unknown }).read_at;
+  const read_at = typeof readAtRaw === "string" ? readAtRaw : null;
+
   const { data: wk } = await supabase
     .from("works")
     .select("title")
@@ -234,6 +214,7 @@ async function analysisJobRowToListItem(
     estimated_seconds,
     failure_code,
     progress_percent,
+    read_at,
   };
 }
 
@@ -263,6 +244,10 @@ type AnalysisJobsContextValue = {
   markJobOutcomeRead: (jobId: string) => void;
   /** 알림 패널의 "모두 읽음" */
   markAllOutcomesRead: () => Promise<void>;
+  /** 서버에서 내려준 jobs 중 read_at 이 세팅된 것을 현 세션 UI 상태에 동기화 */
+  ingestReadOutcomes: (
+    jobs: readonly { id: string; read_at: string | null }[]
+  ) => void;
   /** 진행 중(pending|processing) 작업을 failed로 마무리 — 서버 /api/analyze/jobs/:id/cancel */
   cancelAnalysisJob: (jobId: string) => Promise<void>;
   /** DB와 목록 동기화(Realtime 누락·optimistic 꼬임 복구) */
@@ -296,8 +281,12 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
   const [optimistic, setOptimistic] = useState<AnalysisJobListItem[]>([]);
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const [readOutcomeJobIds, setReadOutcomeJobIds] = useState<Set<string>>(() =>
-    typeof window !== "undefined" ? loadReadJobIds() : new Set()
+  // 서버의 analysis_jobs.read_at 이 truth source.
+  // 이 Set 은 (a) 서버 응답으로 들어온 read_at NOT NULL 행을 ingest 하거나,
+  // (b) "모두 읽음" 클릭 직후 refetch 전 optimistic UI 를 위해 추가하는 용도.
+  // sessionStorage 저장은 하지 않는다 (다른 브라우저/기기와 불일치 유발).
+  const [readOutcomeJobIds, setReadOutcomeJobIds] = useState<Set<string>>(
+    () => new Set()
   );
   const [unchangedJobNotices, setUnchangedJobNotices] = useState<
     UnchangedJobNoticeState[]
@@ -332,6 +321,24 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     }
     return [...byId.values()];
   }, [apiJobs, optimistic]);
+
+  // 주 목록 (/api/analyze/jobs) 이 로드될 때마다 read_at 이 세팅된 행들을
+  // readOutcomeJobIds 에 반영. 다른 브라우저에서 "모두 읽음" 한 상태도
+  // 이 경로로 현재 세션 UI 에 전파된다.
+  useEffect(() => {
+    if (apiJobs.length === 0) return;
+    setReadOutcomeJobIds((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const j of apiJobs) {
+        if (j.read_at && !next.has(j.id)) {
+          next.add(j.id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [apiJobs]);
 
   const getLatestJobForEpisode = useCallback(
     (episodeId: number) => {
@@ -749,10 +756,11 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
   }, [pushToast]);
 
   const markJobOutcomeRead = useCallback((jobId: string) => {
+    // 개별 읽음은 서버 영속화 아직 미구현 (이번 범위는 "모두 읽음" 버그 수정).
+    // 탭 내에서만 즉각 UI 반영용으로 local Set 에 추가. 다음 새로고침엔 사라짐.
     setReadOutcomeJobIds((prev) => {
       const next = new Set(prev);
       next.add(jobId);
-      persistReadJobIds(next);
       return next;
     });
   }, []);
@@ -767,10 +775,28 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
       for (const id of ids) {
         if (typeof id === "string" && id) next.add(id);
       }
-      persistReadJobIds(next);
       return next;
     });
   }, []);
+
+  // 서버가 내려준 job 들 중 read_at 이 세팅된 것을 ingest.
+  // apiJobs (주 리스트) / outcomes (알림 패널) 양쪽에서 호출됨.
+  const ingestReadOutcomes = useCallback(
+    (jobs: readonly { id: string; read_at: string | null }[]) => {
+      setReadOutcomeJobIds((prev) => {
+        let changed = false;
+        const next = new Set(prev);
+        for (const j of jobs) {
+          if (j.read_at && !next.has(j.id)) {
+            next.add(j.id);
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    },
+    []
+  );
 
   const cancelAnalysisJob = useCallback(
     async (jobId: string) => {
@@ -888,7 +914,6 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
           setReadOutcomeJobIds((prev) => {
             const s = new Set(prev);
             s.add(hit.jobId);
-            persistReadJobIds(s);
             return s;
           });
         });
@@ -937,6 +962,7 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
       notifyAnalysisStarted,
       markJobOutcomeRead,
       markAllOutcomesRead,
+      ingestReadOutcomes,
       cancelAnalysisJob,
       refreshAnalysisJobs,
       unreadCount,
@@ -955,6 +981,7 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
       notifyAnalysisStarted,
       markJobOutcomeRead,
       markAllOutcomesRead,
+      ingestReadOutcomes,
       cancelAnalysisJob,
       refreshAnalysisJobs,
       unreadCount,
@@ -999,6 +1026,7 @@ export function HeaderAnalysisBell() {
     readOutcomeJobIds,
     markJobOutcomeRead,
     markAllOutcomesRead,
+    ingestReadOutcomes,
     markNotificationRead,
     cancelAnalysisJob,
     refreshAnalysisJobs,
@@ -1010,6 +1038,7 @@ export function HeaderAnalysisBell() {
       panelJobs={panelJobs}
       readOutcomeJobIds={readOutcomeJobIds}
       onMarkAllRead={markAllOutcomesRead}
+      onIngestReadOutcomes={ingestReadOutcomes}
       onCancelJob={cancelAnalysisJob}
       onPanelOpen={refreshAnalysisJobs}
       onNavigate={(href, jobId, notificationId) => {
@@ -1195,6 +1224,7 @@ function AnalysisBell({
   panelJobs,
   readOutcomeJobIds,
   onMarkAllRead,
+  onIngestReadOutcomes,
   onCancelJob,
   onPanelOpen,
   onNavigate,
@@ -1203,6 +1233,9 @@ function AnalysisBell({
   panelJobs: AnalysisJobListItem[];
   readOutcomeJobIds: ReadonlySet<string>;
   onMarkAllRead: () => Promise<void>;
+  onIngestReadOutcomes: (
+    jobs: readonly { id: string; read_at: string | null }[]
+  ) => void;
   onCancelJob: (jobId: string) => Promise<void>;
   onPanelOpen: () => Promise<void>;
   onNavigate: (href: string, jobId: string | null, notificationId: string | null) => void;
@@ -1248,6 +1281,7 @@ function AnalysisBell({
           (j) => j.parent_job_id == null
         );
         setOutcomes(jobs);
+        onIngestReadOutcomes(jobs);
         setOutcomesCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
         setOutcomesHasMore(jobs.length >= NOTIFICATION_OUTCOMES_PAGE_SIZE);
       } finally {
@@ -1258,7 +1292,7 @@ function AnalysisBell({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, onIngestReadOutcomes]);
 
   useEffect(() => {
     if (!open) return;
@@ -1298,6 +1332,7 @@ function AnalysisBell({
                   new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
               );
             });
+            onIngestReadOutcomes(jobs);
             setOutcomesCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
             setOutcomesHasMore(jobs.length >= NOTIFICATION_OUTCOMES_PAGE_SIZE);
           } finally {
@@ -1310,7 +1345,14 @@ function AnalysisBell({
 
     obs.observe(el);
     return () => obs.disconnect();
-  }, [open, outcomesCursor, outcomesHasMore, outcomesLoadingMore, outcomesLoadingInitial]);
+  }, [
+    open,
+    outcomesCursor,
+    outcomesHasMore,
+    outcomesLoadingMore,
+    outcomesLoadingInitial,
+    onIngestReadOutcomes,
+  ]);
 
   useEffect(() => {
     if (!open) return;

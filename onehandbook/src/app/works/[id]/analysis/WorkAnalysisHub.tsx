@@ -755,6 +755,7 @@ function WorkAnalysisHubInner({
                 : null,
             failure_code: null,
             progress_percent: 0,
+            read_at: null,
           });
           analysisJobsCtx.notifyAnalysisStarted();
         }
@@ -895,6 +896,7 @@ function WorkAnalysisHubInner({
               : null,
           failure_code: null,
           progress_percent: null,
+          read_at: null,
         });
         analysisJobsCtx.notifyAnalysisStarted();
       }

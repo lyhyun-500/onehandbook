@@ -36,6 +36,8 @@ export type AnalysisJobListItem = {
   failure_code: string | null;
   /** 통합 분석 클라이언트 청크 진행률 (payload.progressPercent) */
   progress_percent: number | null;
+  /** 헤더 알림 벨에서 "모두 읽음" 처리된 시각. null 이면 아직 안 읽음. */
+  read_at: string | null;
 };
 
 /**
@@ -59,7 +61,7 @@ export async function GET() {
   const { data: jobs, error } = await supabase
     .from("analysis_jobs")
     .select(
-      "id, episode_id, work_id, job_kind, progress_phase, status, updated_at, created_at, payload, holistic_run_id, error_message, parent_job_id"
+      "id, episode_id, work_id, job_kind, progress_phase, status, updated_at, created_at, payload, holistic_run_id, error_message, parent_job_id, read_at"
     )
     .eq("app_user_id", appUser.id)
     .order("updated_at", { ascending: false })
@@ -231,6 +233,9 @@ export async function GET() {
           ? String(parentRaw)
           : null;
 
+    const readAtRaw = (r as { read_at?: unknown }).read_at;
+    const read_at = typeof readAtRaw === "string" ? readAtRaw : null;
+
     const epMeta = episodeMetaById.get(episode_id);
     list.push({
       id: String(r.id),
@@ -254,6 +259,7 @@ export async function GET() {
       estimated_seconds,
       failure_code,
       progress_percent,
+      read_at,
     });
   }
 

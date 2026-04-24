@@ -47,7 +47,7 @@ export async function GET(request: Request) {
   let q = supabase
     .from("analysis_jobs")
     .select(
-      "id, episode_id, work_id, job_kind, progress_phase, status, updated_at, created_at, payload, holistic_run_id, error_message, parent_job_id"
+      "id, episode_id, work_id, job_kind, progress_phase, status, updated_at, created_at, payload, holistic_run_id, error_message, parent_job_id, read_at"
     )
     .eq("app_user_id", appUser.id)
     .is("parent_job_id", null)
@@ -189,6 +189,9 @@ export async function GET(request: Request) {
           ? String(parentRaw)
           : null;
 
+    const readAtRaw = (r as { read_at?: unknown }).read_at;
+    const read_at = typeof readAtRaw === "string" ? readAtRaw : null;
+
     const epMeta = episodeMetaById.get(episode_id);
     list.push({
       id: String(r.id),
@@ -211,6 +214,7 @@ export async function GET(request: Request) {
       estimated_seconds,
       failure_code,
       progress_percent,
+      read_at,
     });
   }
 

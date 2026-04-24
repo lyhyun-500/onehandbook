@@ -137,6 +137,7 @@ export function AnalysisAsyncUnchangedModal({
             estimated_seconds: 75,
             failure_code: null,
             progress_percent: null,
+            read_at: null,
           });
           notifyAnalysisStarted();
         }
@@ -190,6 +191,7 @@ export function AnalysisAsyncUnchangedModal({
               : null,
           failure_code: null,
           progress_percent: null,
+          read_at: null,
         });
         notifyAnalysisStarted();
       }

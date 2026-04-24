@@ -631,6 +631,7 @@ export function AnalyzePanel({
           estimated_seconds: 75,
           failure_code: null,
           progress_percent: null,
+          read_at: null,
         });
         notifyAnalysisStarted();
         setPollJobId(jobId);

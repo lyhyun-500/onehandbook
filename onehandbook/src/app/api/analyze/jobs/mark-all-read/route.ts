@@ -6,9 +6,9 @@ import { isMissingAnalysisJobsTableError } from "@/lib/db/analysisJobsTable";
 export const runtime = "nodejs";
 
 /**
- * "모두 읽음"은 현재 클라이언트(sessionStorage) 기반이라 DB에 read 플래그를 저장하지 않습니다.
- * 대신 서버가 "해당 유저의 결과(outcome) job id 목록"을 반환하고,
- * 클라이언트가 이를 readOutcomeJobIds에 반영해 UI를 일괄 읽음 처리합니다.
+ * 유저의 completed/failed 최상위 job 중 아직 안 읽은 것 (read_at IS NULL) 을
+ * 한 번에 읽음 처리하고, 갱신된 job_ids 를 반환한다.
+ * 응답 포맷은 클라이언트 호환을 위해 { job_ids: string[] } 유지.
  */
 export async function POST() {
   const supabase = await createClient();
@@ -27,11 +27,12 @@ export async function POST() {
 
   const { data: rows, error } = await supabase
     .from("analysis_jobs")
-    .select("id, status")
+    .update({ read_at: new Date().toISOString() })
     .eq("app_user_id", appUser.id)
+    .is("parent_job_id", null)
     .in("status", ["completed", "failed"])
-    .order("updated_at", { ascending: false })
-    .limit(2000);
+    .is("read_at", null)
+    .select("id");
 
   if (error) {
     if (isMissingAnalysisJobsTableError(error)) {
@@ -46,4 +47,3 @@ export async function POST() {
 
   return NextResponse.json({ job_ids: ids });
 }
-
