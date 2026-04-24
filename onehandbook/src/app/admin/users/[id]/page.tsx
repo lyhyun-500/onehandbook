@@ -191,7 +191,7 @@ function CoinLogsTable({ logs }: { logs: AdminCoinLogItem[] }) {
   return (
     <section className="mb-6">
       <h3 className="mb-3 text-sm font-semibold text-admin-text-primary">
-        NAT 조정 히스토리 (최근 20건)
+        NAT 변동 내역 (최근 20건)
       </h3>
       <div className="overflow-hidden rounded-lg border border-admin-border">
         <table className="w-full border-collapse text-sm">
@@ -337,8 +337,17 @@ function AnalysesTable({
             {analyses.map((a) => (
               <tr key={a.id}>
                 <td className="px-4 py-2.5 text-admin-text-secondary">
-                  {a.workId ?? (
-                    <span className="text-admin-text-muted">-</span>
+                  {a.workTitle ? (
+                    <span
+                      className="block max-w-[220px] truncate"
+                      title={a.workTitle}
+                    >
+                      {a.workTitle}
+                    </span>
+                  ) : (
+                    <span className="text-admin-text-muted">
+                      (삭제된 작품)
+                    </span>
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-admin-text-secondary">

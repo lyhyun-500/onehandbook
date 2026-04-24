@@ -58,9 +58,11 @@ export type AdminUserWorkItem = {
 export type AdminUserAnalysisItem = {
   id: string;
   workId: number | null;
+  workTitle: string | null;
   episodeId: number | null;
   status: string;
   createdAt: string;
+  parentJobId: string | null;
 };
 
 export type AdminCoinLogItem = {

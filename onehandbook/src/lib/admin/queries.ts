@@ -198,7 +198,7 @@ export async function getAdminUserDetail(
         .is("deleted_at", null),
       supabase
         .from("analysis_jobs")
-        .select("id, work_id, episode_id, status, created_at")
+        .select("id, work_id, episode_id, status, created_at, parent_job_id")
         .eq("app_user_id", userId)
         .order("created_at", { ascending: false })
         .limit(10),
@@ -246,15 +246,41 @@ export async function getAdminUserDetail(
     deletedAt: (w.deleted_at as string | null) ?? null,
   }));
 
-  const recentAnalyses: AdminUserAnalysisItem[] = (jobsResult.data ?? []).map(
-    (j) => ({
+  const jobRows = jobsResult.data ?? [];
+  // 작품 제목 보강: 소프트 딜리트 포함해서 조회 (분석 기록 시점에 존재했으니까).
+  // 해시드 딜리트되어 조회되지 않으면 workTitle 은 null 로 남고 UI 에서 "(삭제된 작품)" 처리.
+  const workIds = Array.from(
+    new Set(
+      jobRows
+        .map((j) => j.work_id as number | null)
+        .filter((v): v is number => typeof v === "number")
+    )
+  );
+  const titleById = new Map<number, string>();
+  if (workIds.length > 0) {
+    const { data: workRows, error: workErr } = await supabase
+      .from("works")
+      .select("id, title")
+      .in("id", workIds);
+    if (workErr) throw workErr;
+    for (const w of workRows ?? []) {
+      titleById.set(w.id as number, (w.title as string | null) ?? "");
+    }
+  }
+
+  const recentAnalyses: AdminUserAnalysisItem[] = jobRows.map((j) => {
+    const workId = (j.work_id as number | null) ?? null;
+    const title = workId != null ? titleById.get(workId) ?? null : null;
+    return {
       id: j.id as string,
-      workId: (j.work_id as number | null) ?? null,
+      workId,
+      workTitle: title && title.length > 0 ? title : null,
       episodeId: (j.episode_id as number | null) ?? null,
       status: (j.status as string | null) ?? "",
       createdAt: j.created_at as string,
-    })
-  );
+      parentJobId: (j.parent_job_id as string | null) ?? null,
+    };
+  });
 
   const coinLogs: AdminCoinLogItem[] = (logsResult.data ?? []).map((l) => {
     const meta = (l.metadata as Record<string, unknown> | null) ?? {};
