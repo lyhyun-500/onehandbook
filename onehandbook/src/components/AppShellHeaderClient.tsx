@@ -165,10 +165,31 @@ export function AppShellHeaderClient({
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
                 로그인 계정
               </p>
-              <p className="break-all rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-300">
-                {email}
-              </p>
+              <Link
+                href="/account"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-300 transition-colors hover:border-cyan-500/30 hover:bg-zinc-900/80 hover:text-zinc-100"
+              >
+                <span className="break-all">{email}</span>
+                <span className="shrink-0 text-xs text-cyan-400/90">
+                  내 계정 →
+                </span>
+              </Link>
               <nav className="mt-4 flex flex-col gap-1 border-t border-zinc-800 pt-4">
+                <Link
+                  href="/account"
+                  onClick={() => setMenuOpen(false)}
+                  className="rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"
+                >
+                  마이페이지
+                </Link>
+                <Link
+                  href="/account/inquiries"
+                  onClick={() => setMenuOpen(false)}
+                  className="rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"
+                >
+                  내 문의
+                </Link>
                 <Link
                   href="/studio"
                   onClick={() => setMenuOpen(false)}

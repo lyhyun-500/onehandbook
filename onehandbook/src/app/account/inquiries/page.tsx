@@ -2,9 +2,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import { AppShellHeader } from "@/components/AppShellHeader";
+import { inquiryCategoryLabel } from "@/lib/inquiry/categories";
 
 type InquiryRow = {
   id: string;
+  category: string | null;
   title: string;
   content: string;
   reply_email: string;
@@ -32,7 +34,7 @@ export default async function MyInquiriesPage() {
   const { data: rows, error } = await supabase
     .from("inquiries")
     .select(
-      "id, title, content, reply_email, reply_content, replied_at, created_at"
+      "id, category, title, content, reply_email, reply_content, replied_at, created_at"
     )
     .order("created_at", { ascending: false })
     .limit(50);
@@ -84,9 +86,12 @@ export default async function MyInquiriesPage() {
                     <h2 className="truncate text-sm font-semibold text-zinc-100">
                       {inq.title}
                     </h2>
-                    <p className="mt-1 text-xs text-zinc-500">
-                      {formatDateTime(inq.created_at)}
-                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                      <span className="rounded bg-zinc-800/80 px-2 py-0.5 text-[11px] text-zinc-300">
+                        {inquiryCategoryLabel(inq.category ?? "general")}
+                      </span>
+                      <span>{formatDateTime(inq.created_at)}</span>
+                    </div>
                   </div>
                   {replied ? (
                     <span className="shrink-0 rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-300">

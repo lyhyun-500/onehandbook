@@ -177,6 +177,8 @@ export type AdminInquiryItem = {
   userEmail: string | null;
   /** users.nickname 의 현재값 */
   userNickname: string | null;
+  /** 문의 분류 (lib/inquiry/categories.ts 의 enum 값) */
+  category: string;
   title: string;
   content: string;
   /** 컨슈머 폼이 받은 답장 이메일 (탈퇴해도 보존) */
@@ -198,6 +200,8 @@ export type AdminInquirySummary = {
 export type AdminInquiryListQuery = {
   status?: InquiryStatusFilter;
   range?: InquiryRangeFilter;
+  /** 카테고리 필터 — "all" 이면 미적용. enum 값은 lib/inquiry/categories.ts 참조. */
+  category?: string;
   search?: string;
   page?: number;
   limit?: number;

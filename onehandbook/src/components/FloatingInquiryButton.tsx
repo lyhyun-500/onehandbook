@@ -8,11 +8,16 @@ import {
   isLikelyNonRoutableAuthEmail,
   isValidReplyRecipientEmail,
 } from "@/lib/inquiryReplyEmail";
+import {
+  INQUIRY_CATEGORIES,
+  type InquiryCategory,
+} from "@/lib/inquiry/categories";
 
 type ToastState = { kind: "ok" | "err"; message: string };
 
 export function FloatingInquiryButton() {
   const [open, setOpen] = useState(false);
+  const [category, setCategory] = useState<InquiryCategory>("general");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [consent, setConsent] = useState(false);
@@ -101,6 +106,7 @@ export function FloatingInquiryButton() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          category,
           title: title.trim(),
           content: content.trim(),
           replyEmail: replyTrim,
@@ -121,7 +127,11 @@ export function FloatingInquiryButton() {
       setContent("");
       setReplyEmail("");
       setConsent(false);
-      setToast({ kind: "ok", message: "문의가 접수됐습니다." });
+      setCategory("general");
+      setToast({
+        kind: "ok",
+        message: "문의가 접수됐습니다. 답변은 사이트 알림으로 안내드립니다.",
+      });
       onClose();
     } catch {
       setToast({
@@ -227,8 +237,15 @@ export function FloatingInquiryButton() {
               <p className="text-xs font-medium text-cyan-200/95">운영 시간</p>
               <p className="mt-0.5 text-sm text-zinc-300">{SUPPORT_HOURS_LINE}</p>
               <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-                로그인 후 제출하면 운영 메일로 전달됩니다. 영업일 기준 순차적으로
-                답변 드립니다.
+                답변은 헤더의 알림 종으로 안내드리며,{" "}
+                <Link
+                  href="/account/inquiries"
+                  className="text-cyan-300 underline-offset-2 hover:underline"
+                  onClick={onClose}
+                >
+                  내 문의 페이지
+                </Link>
+                에서 다시 확인할 수 있습니다.
               </p>
             </div>
 
@@ -237,6 +254,23 @@ export function FloatingInquiryButton() {
               className="flex flex-1 flex-col overflow-y-auto px-5 pb-8 pt-5"
             >
               <label className="block">
+                <span className="text-sm font-medium text-zinc-300">분류</span>
+                <select
+                  value={category}
+                  onChange={(e) =>
+                    setCategory(e.target.value as InquiryCategory)
+                  }
+                  className="mt-1.5 w-full rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-2.5 text-sm text-zinc-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/40"
+                >
+                  {INQUIRY_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="mt-4 block">
                 <span className="text-sm font-medium text-zinc-300">제목</span>
                 <input
                   type="text"
@@ -250,7 +284,7 @@ export function FloatingInquiryButton() {
 
               <label className="mt-4 block">
                 <span className="text-sm font-medium text-zinc-300">
-                  답변 받을 이메일
+                  답변 받을 이메일 <span className="text-zinc-500">(백업용)</span>
                 </span>
                 <input
                   type="email"
@@ -263,10 +297,10 @@ export function FloatingInquiryButton() {
                   className="mt-1.5 w-full rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/40"
                 />
                 <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-                  이메일 로그인이면 자동 입력됩니다. 네이버·카카오 등 SNS만 연결된
-                  경우에는 <span className="text-zinc-400">꼭 받을 수 있는 주소</span>
-                  를 적어 주세요. (로그인 계정 이메일이 가짜 주소로 보일 수
-                  있습니다.)
+                  답변은 사이트 알림으로 보내드립니다. 이 이메일은 알림이 닿지
+                  않을 경우 운영팀이 별도 연락할 때만 사용합니다. SNS 로그인만
+                  사용 중이면 <span className="text-zinc-400">꼭 받을 수 있는 주소</span>
+                  를 적어 주세요.
                 </p>
               </label>
 
@@ -292,12 +326,12 @@ export function FloatingInquiryButton() {
                   />
                   <span className="text-zinc-400">
                     <span className="font-medium text-cyan-400/90">[필수]</span>{" "}
-                    상담을 위해 문의 내용이 메일로 전송·저장되는 것에
+                    상담을 위해 문의 내용이 운영팀에 전달·저장되는 것에
                     동의합니다. (수집·이용 동의)
                   </span>
                 </label>
                 <p className="mt-2 pl-7 text-xs leading-relaxed text-zinc-600">
-                  문의 처리 목적으로 제목·내용·회신용 메일 주소가 운영 측에
+                  문의 처리 목적으로 분류·제목·내용·회신용 이메일이 운영 측에
                   전달됩니다. 자세한 내용은{" "}
                   <Link
                     href="/terms"

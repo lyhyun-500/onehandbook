@@ -6,6 +6,7 @@ import {
   isLikelyNonRoutableAuthEmail,
   isValidReplyRecipientEmail,
 } from "@/lib/inquiryReplyEmail";
+import { isInquiryCategory } from "@/lib/inquiry/categories";
 
 export const runtime = "nodejs";
 
@@ -37,11 +38,24 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { title?: unknown; content?: unknown; replyEmail?: unknown };
+  let body: {
+    category?: unknown;
+    title?: unknown;
+    content?: unknown;
+    replyEmail?: unknown;
+  };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
+
+  const category = isInquiryCategory(body.category) ? body.category : null;
+  if (!category) {
+    return NextResponse.json(
+      { error: "문의 분류를 선택해 주세요." },
+      { status: 400 }
+    );
   }
 
   const replyEmailRaw =
@@ -82,6 +96,7 @@ export async function POST(request: Request) {
   const { error: insErr } = await service.from("inquiries").insert({
     user_id: appUser.id,
     user_auth_id: user.id,
+    category,
     title,
     content,
     reply_email: resolvedReplyTo,

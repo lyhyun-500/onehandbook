@@ -79,7 +79,7 @@ export async function PATCH(
   const { data: existing, error: selErr } = await service
     .from("inquiries")
     .select(
-      "id, user_id, user_auth_id, title, content, reply_email, reply_content, replied_at, replied_by, created_at"
+      "id, user_id, user_auth_id, category, title, content, reply_email, reply_content, replied_at, replied_by, created_at"
     )
     .eq("id", id)
     .maybeSingle();
@@ -109,7 +109,7 @@ export async function PATCH(
     })
     .eq("id", id)
     .select(
-      "id, user_id, user_auth_id, title, content, reply_email, reply_content, replied_at, replied_by, created_at"
+      "id, user_id, user_auth_id, category, title, content, reply_email, reply_content, replied_at, replied_by, created_at"
     )
     .maybeSingle();
 
@@ -159,6 +159,7 @@ export async function PATCH(
     userAuthId: (updated.user_auth_id as string | null) ?? null,
     userEmail,
     userNickname,
+    category: (updated.category as string | null) ?? "general",
     title: (updated.title as string | null) ?? "",
     content: (updated.content as string | null) ?? "",
     replyEmail: (updated.reply_email as string | null) ?? "",

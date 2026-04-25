@@ -1,8 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
+import { ExternalLink, Search } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import {
+  INQUIRY_CATEGORIES,
+  inquiryCategoryLabel,
+} from "@/lib/inquiry/categories";
 import type {
   AdminInquiryItem,
   AdminInquiryReplyResponse,
@@ -13,6 +18,7 @@ import type {
 type Query = {
   status: InquiryStatusFilter;
   range: InquiryRangeFilter;
+  category: string;
   search: string;
   limit: number;
 };
@@ -28,6 +34,7 @@ function buildSearchString(q: Query): string {
   const p = new URLSearchParams();
   if (q.status !== "all") p.set("status", q.status);
   if (q.range !== "all") p.set("range", q.range);
+  if (q.category !== "all") p.set("category", q.category);
   if (q.search) p.set("search", q.search);
   const s = p.toString();
   return s ? `?${s}` : "";
@@ -130,14 +137,34 @@ function InquiryRow({
           {formatDateTime(inquiry.createdAt)}
         </td>
         <td className="px-4 py-3 text-admin-text-primary">
-          <div className="font-medium">
-            {inquiry.userNickname ?? (
-              <span className="text-admin-text-muted">-</span>
+          <div className="flex items-center gap-1.5 font-medium">
+            <span className="truncate">
+              {inquiry.userNickname ?? (
+                <span className="text-admin-text-muted">-</span>
+              )}
+            </span>
+            {inquiry.userId != null && (
+              <Link
+                href={`/admin/users/${inquiry.userId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="shrink-0 rounded p-0.5 text-admin-text-muted hover:bg-admin-bg-hover hover:text-admin-accent"
+                aria-label="유저 상세 새 창에서 열기"
+                title="유저 상세 새 창에서 열기"
+              >
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+              </Link>
             )}
           </div>
           <div className="text-xs text-admin-text-muted">
             {inquiry.replyEmail}
           </div>
+        </td>
+        <td className="px-4 py-3">
+          <span className="inline-flex items-center rounded bg-admin-bg-hover px-2 py-0.5 text-xs text-admin-text-secondary">
+            {inquiryCategoryLabel(inquiry.category)}
+          </span>
         </td>
         <td className="px-4 py-3 text-admin-text-primary">
           <span
@@ -163,7 +190,7 @@ function InquiryRow({
       </tr>
       {expanded && (
         <tr className="bg-admin-bg-surface">
-          <td colSpan={6} className="px-6 py-5">
+          <td colSpan={7} className="px-6 py-5">
             <div className="grid gap-4 md:grid-cols-2">
               <section>
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-admin-text-muted">
@@ -246,6 +273,7 @@ export function InquiriesListView(props: Props) {
     props.query.status
   );
   const [range, setRange] = useState<InquiryRangeFilter>(props.query.range);
+  const [category, setCategory] = useState<string>(props.query.category);
 
   const [rows, setRows] = useState<AdminInquiryItem[]>(props.initialInquiries);
   const [total, setTotal] = useState(props.initialTotal);
@@ -262,18 +290,20 @@ export function InquiriesListView(props: Props) {
         search: searchInput.trim(),
         status,
         range,
+        category,
         limit: props.query.limit,
         ...overrides,
       };
       router.push(`/admin/inquiries${buildSearchString(q)}`);
     },
-    [searchInput, status, range, props.query.limit, router]
+    [searchInput, status, range, category, props.query.limit, router]
   );
 
   const reset = useCallback(() => {
     setSearchInput("");
     setStatus("all");
     setRange("all");
+    setCategory("all");
     router.push("/admin/inquiries");
   }, [router]);
 
@@ -285,6 +315,8 @@ export function InquiriesListView(props: Props) {
       const sp = new URLSearchParams();
       if (props.query.status !== "all") sp.set("status", props.query.status);
       if (props.query.range !== "all") sp.set("range", props.query.range);
+      if (props.query.category !== "all")
+        sp.set("category", props.query.category);
       if (props.query.search) sp.set("search", props.query.search);
       sp.set("page", String(page + 1));
       sp.set("limit", String(props.query.limit));
@@ -384,6 +416,24 @@ export function InquiriesListView(props: Props) {
             </select>
           </div>
 
+          <div>
+            <label className="mb-1 block text-xs font-medium text-admin-text-secondary">
+              분류
+            </label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="h-9 rounded border border-admin-border-strong bg-admin-bg-page px-3 text-sm text-admin-text-primary focus:border-admin-accent focus:outline-none"
+            >
+              <option value="all">전체</option>
+              {INQUIRY_CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex items-end gap-2">
             <button
               type="button"
@@ -420,6 +470,7 @@ export function InquiriesListView(props: Props) {
             <tr>
               <th className="px-4 py-3 text-left font-medium">작성일</th>
               <th className="px-4 py-3 text-left font-medium">작성자</th>
+              <th className="px-4 py-3 text-left font-medium">분류</th>
               <th className="px-4 py-3 text-left font-medium">제목</th>
               <th className="px-4 py-3 text-left font-medium">본문 (요약)</th>
               <th className="px-4 py-3 text-left font-medium">상태</th>
@@ -430,7 +481,7 @@ export function InquiriesListView(props: Props) {
             {rows.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-4 py-12 text-center text-sm text-admin-text-muted"
                 >
                   문의가 없습니다

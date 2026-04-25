@@ -114,13 +114,14 @@ export default async function AdminInquiriesPage({
       )}
 
       <InquiriesListView
-        key={`${input.status}-${input.range}-${input.search}`}
+        key={`${input.status}-${input.range}-${input.category}-${input.search}`}
         initialInquiries={listResult.inquiries}
         initialTotal={listResult.total}
         initialPage={1}
         query={{
           status: input.status,
           range: input.range,
+          category: input.category,
           search: input.search,
           limit: input.limit,
         }}

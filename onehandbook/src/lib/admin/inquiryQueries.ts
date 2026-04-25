@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseServiceRole } from "@/lib/supabase/serviceRole";
+import { isInquiryCategory } from "@/lib/inquiry/categories";
 import {
   INQUIRY_LIST_LIMIT_DEFAULT,
   INQUIRY_LIST_LIMIT_MAX,
@@ -16,6 +17,8 @@ import {
 export type ListAdminInquiriesInput = {
   status?: InquiryStatusFilter;
   range?: InquiryRangeFilter;
+  /** "all" 또는 InquiryCategory enum 값. 그 외는 무시. */
+  category?: string;
   search?: string;
   page?: number;
   limit?: number;
@@ -41,6 +44,8 @@ export async function listAdminInquiries(
   const supabase = createSupabaseServiceRole();
   const status: InquiryStatusFilter = input.status ?? "all";
   const range: InquiryRangeFilter = input.range ?? "all";
+  const categoryRaw = input.category ?? "all";
+  const category = isInquiryCategory(categoryRaw) ? categoryRaw : null;
   const search = (input.search ?? "").trim();
   const page = input.page && input.page > 0 ? input.page : 1;
   const limit = Math.min(
@@ -53,7 +58,7 @@ export async function listAdminInquiries(
   let q = supabase
     .from("inquiries")
     .select(
-      "id, user_id, user_auth_id, title, content, reply_email, reply_content, replied_at, replied_by, created_at",
+      "id, user_id, user_auth_id, category, title, content, reply_email, reply_content, replied_at, replied_by, created_at",
       { count: "exact" }
     )
     // 미답장이 항상 위로 (replied_at NULLS FIRST), 그 안에서 최신순.
@@ -63,6 +68,8 @@ export async function listAdminInquiries(
 
   if (status === "unreplied") q = q.is("replied_at", null);
   else if (status === "replied") q = q.not("replied_at", "is", null);
+
+  if (category) q = q.eq("category", category);
 
   const sinceIso = rangeToSinceIso(range);
   if (sinceIso) q = q.gte("created_at", sinceIso);
@@ -124,6 +131,7 @@ export async function listAdminInquiries(
         userAuthId: (r.user_auth_id as string | null) ?? null,
         userEmail: email,
         userNickname: nickname,
+        category: (r.category as string | null) ?? "general",
         title: (r.title as string | null) ?? "",
         content: (r.content as string | null) ?? "",
         replyEmail: (r.reply_email as string | null) ?? "",
@@ -193,6 +201,11 @@ export function parseInquiriesQueryFromSearchParams(
     rangeRaw === "7d" || rangeRaw === "30d" || rangeRaw === "90d"
       ? rangeRaw
       : "all";
+  const categoryRaw = get("category") ?? "all";
+  const category =
+    categoryRaw === "all" || isInquiryCategory(categoryRaw)
+      ? categoryRaw
+      : "all";
   const search = (get("search") ?? "").trim();
   const pageRaw = parseInt(get("page") ?? "1", 10);
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
@@ -207,5 +220,5 @@ export function parseInquiriesQueryFromSearchParams(
     ),
     INQUIRY_LIST_LIMIT_MAX
   );
-  return { status, range, search, page, limit };
+  return { status, range, category, search, page, limit };
 }
