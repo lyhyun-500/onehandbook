@@ -9,7 +9,7 @@ type InquiryRow = {
   category: string | null;
   title: string;
   content: string;
-  reply_email: string;
+  reply_email: string | null;
   reply_content: string | null;
   replied_at: string | null;
   created_at: string;

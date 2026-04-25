@@ -181,8 +181,8 @@ export type AdminInquiryItem = {
   category: string;
   title: string;
   content: string;
-  /** 컨슈머 폼이 받은 답장 이메일 (탈퇴해도 보존) */
-  replyEmail: string;
+  /** 컨슈머 폼이 받은 답장 이메일. 선택 입력 — 미입력 시 null. (탈퇴해도 보존) */
+  replyEmail: string | null;
   /** 어드민이 작성한 답변 본문 */
   replyContent: string | null;
   repliedAt: string | null;

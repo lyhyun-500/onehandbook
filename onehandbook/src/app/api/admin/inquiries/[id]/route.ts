@@ -153,6 +153,7 @@ export async function PATCH(
     userEmail = (u?.email as string | null) ?? null;
   }
 
+  const replyEmailRaw = updated.reply_email as string | null;
   const inquiry: AdminInquiryItem = {
     id: String(updated.id),
     userId: targetUserId,
@@ -162,7 +163,10 @@ export async function PATCH(
     category: (updated.category as string | null) ?? "general",
     title: (updated.title as string | null) ?? "",
     content: (updated.content as string | null) ?? "",
-    replyEmail: (updated.reply_email as string | null) ?? "",
+    replyEmail:
+      typeof replyEmailRaw === "string" && replyEmailRaw.length > 0
+        ? replyEmailRaw
+        : null,
     replyContent: (updated.reply_content as string | null) ?? null,
     repliedAt: (updated.replied_at as string | null) ?? null,
     repliedBy: (updated.replied_by as string | null) ?? null,

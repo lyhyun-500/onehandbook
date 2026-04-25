@@ -85,18 +85,8 @@ export function FloatingInquiryButton() {
     }
 
     const replyTrim = replyEmail.trim();
-    const sessionEmailOk =
-      !!user.email && !isLikelyNonRoutableAuthEmail(user.email);
-
-    if (replyTrim) {
-      if (!isValidReplyRecipientEmail(replyTrim)) {
-        setSubmitError("답변 받을 이메일 형식을 확인해 주세요.");
-        return;
-      }
-    } else if (!sessionEmailOk) {
-      setSubmitError(
-        "답변 받을 이메일을 입력해 주세요. SNS 로그인만 사용 중이면 실제로 받는 주소를 적어 주세요."
-      );
+    if (replyTrim && !isValidReplyRecipientEmail(replyTrim)) {
+      setSubmitError("답변 받을 이메일 형식을 확인해 주세요.");
       return;
     }
 
@@ -284,7 +274,7 @@ export function FloatingInquiryButton() {
 
               <label className="mt-4 block">
                 <span className="text-sm font-medium text-zinc-300">
-                  답변 받을 이메일 <span className="text-zinc-500">(백업용)</span>
+                  답변 받을 이메일 <span className="text-zinc-500">(선택)</span>
                 </span>
                 <input
                   type="email"
@@ -292,15 +282,13 @@ export function FloatingInquiryButton() {
                   autoComplete="email"
                   value={replyEmail}
                   onChange={(e) => setReplyEmail(e.target.value)}
-                  placeholder="실제로 받을 수 있는 주소"
+                  placeholder="필요시 입력"
                   maxLength={320}
                   className="mt-1.5 w-full rounded-lg border border-zinc-700 bg-zinc-800/80 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/40"
                 />
                 <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-                  답변은 사이트 알림으로 보내드립니다. 이 이메일은 알림이 닿지
-                  않을 경우 운영팀이 별도 연락할 때만 사용합니다. SNS 로그인만
-                  사용 중이면 <span className="text-zinc-400">꼭 받을 수 있는 주소</span>
-                  를 적어 주세요.
+                  답변은 사이트 알림으로 안내됩니다. 별도 메일 연락이 필요한
+                  경우만 입력하세요.
                 </p>
               </label>
 

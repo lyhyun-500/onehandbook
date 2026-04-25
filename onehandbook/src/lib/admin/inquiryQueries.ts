@@ -125,6 +125,7 @@ export async function listAdminInquiries(
         userId != null ? userInfoById.get(userId) ?? null : null;
       const nickname = info?.nickname ?? null;
       const email = info?.email ?? null;
+      const replyEmailRaw = r.reply_email as string | null;
       return {
         id: String(r.id),
         userId,
@@ -134,7 +135,10 @@ export async function listAdminInquiries(
         category: (r.category as string | null) ?? "general",
         title: (r.title as string | null) ?? "",
         content: (r.content as string | null) ?? "",
-        replyEmail: (r.reply_email as string | null) ?? "",
+        replyEmail:
+          typeof replyEmailRaw === "string" && replyEmailRaw.length > 0
+            ? replyEmailRaw
+            : null,
         replyContent: (r.reply_content as string | null) ?? null,
         repliedAt: (r.replied_at as string | null) ?? null,
         repliedBy: (r.replied_by as string | null) ?? null,
@@ -146,7 +150,7 @@ export async function listAdminInquiries(
       // 서버 or() 가 잡지 못한 닉네임/유저이메일 (탈퇴 후 placeholder 제외)
       // 까지 클라이언트 보강 매칭. 이미 매칭된 행은 그대로 통과.
       if (item.title.toLowerCase().includes(searchLower)) return true;
-      if (item.replyEmail.toLowerCase().includes(searchLower)) return true;
+      if (item.replyEmail?.toLowerCase().includes(searchLower)) return true;
       if (item.userNickname?.toLowerCase().includes(searchLower)) return true;
       if (item.userEmail?.toLowerCase().includes(searchLower)) return true;
       return false;

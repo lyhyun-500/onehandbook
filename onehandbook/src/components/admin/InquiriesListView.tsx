@@ -158,7 +158,9 @@ function InquiryRow({
             )}
           </div>
           <div className="text-xs text-admin-text-muted">
-            {inquiry.replyEmail}
+            {inquiry.replyEmail ?? (
+              <span className="italic">(이메일 미입력)</span>
+            )}
           </div>
         </td>
         <td className="px-4 py-3">

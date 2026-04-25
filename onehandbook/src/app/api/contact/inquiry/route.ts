@@ -74,21 +74,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "내용을 확인해 주세요." }, { status: 400 });
   }
 
+  // 답변은 사이트 알림이 메인 경로 — 이메일은 선택. 입력했으면 형식만 검증.
   let resolvedReplyTo: string | null = null;
-  if (replyEmailRaw && isValidReplyRecipientEmail(replyEmailRaw)) {
+  if (replyEmailRaw) {
+    if (!isValidReplyRecipientEmail(replyEmailRaw)) {
+      return NextResponse.json(
+        { error: "이메일 형식을 확인해 주세요." },
+        { status: 400 }
+      );
+    }
     resolvedReplyTo = replyEmailRaw;
   } else if (user.email && !isLikelyNonRoutableAuthEmail(user.email)) {
+    // 명시 입력이 없어도 라우팅 가능한 세션 이메일이 있으면 백업으로 보존.
     resolvedReplyTo = user.email.trim();
-  }
-
-  if (!resolvedReplyTo) {
-    return NextResponse.json(
-      {
-        error:
-          "답변 받을 이메일을 입력해 주세요. SNS 로그인만 사용 중이면 실제로 받을 수 있는 주소를 적어 주세요.",
-      },
-      { status: 400 }
-    );
   }
 
   // inquiries 는 service_role only — RLS 정책상 authenticated 직접 INSERT 불가.
