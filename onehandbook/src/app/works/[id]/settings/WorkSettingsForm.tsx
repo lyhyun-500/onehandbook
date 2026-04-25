@@ -10,6 +10,10 @@ import {
   type CharacterSetting,
   type WorldSetting,
 } from "@/lib/works/loreTypes";
+import {
+  SIDEPANEL_CHARACTER_ROLES,
+  normalizeRoleForSidePanel,
+} from "@/components/side-panel/types";
 
 const GENRES = [
   "로맨스",
@@ -480,15 +484,11 @@ function CharacterAccordionCard({
             <div className="sm:col-span-1">
               <label className="mb-1 block text-xs text-zinc-500">역할</label>
               <select
-                value={
-                  CHARACTER_ROLES.some((r) => r === character.role)
-                    ? character.role
-                    : "주인공"
-                }
+                value={normalizeRoleForSidePanel(character.role)}
                 onChange={(e) => onPatch({ role: e.target.value })}
                 className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
               >
-                {CHARACTER_ROLES.map((r) => (
+                {SIDEPANEL_CHARACTER_ROLES.map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>

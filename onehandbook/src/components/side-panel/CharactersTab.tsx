@@ -9,7 +9,10 @@ import {
   useState,
 } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { CHARACTER_ROLES } from "@/lib/works/loreTypes";
+import {
+  SIDEPANEL_CHARACTER_ROLES,
+  normalizeRoleForSidePanel,
+} from "@/components/side-panel/types";
 import type { Character, CharacterSettings, CharacterWithKey } from "./types";
 import {
   charactersEqual,
@@ -234,7 +237,10 @@ export function CharactersTab({
           const status = getCardStatus(c, initial);
           const open = expandedKey === c._key;
           const label = c.name.trim() || "(이름 없음)";
-          const sub = c.role?.trim() ? ` · ${c.role}` : "";
+          const displayRole = c.role?.trim()
+            ? normalizeRoleForSidePanel(c.role)
+            : "";
+          const sub = displayRole ? ` · ${displayRole}` : "";
           const border = cardBorderClass(status);
 
           return (
@@ -296,15 +302,11 @@ export function CharactersTab({
                       역할
                     </label>
                     <select
-                      value={
-                        CHARACTER_ROLES.some((r) => r === (c.role ?? ""))
-                          ? (c.role ?? "")
-                          : "주인공"
-                      }
+                      value={normalizeRoleForSidePanel(c.role)}
                       onChange={(e) => patchCard(c._key, { role: e.target.value })}
                       className={inputClass}
                     >
-                      {CHARACTER_ROLES.map((r) => (
+                      {SIDEPANEL_CHARACTER_ROLES.map((r) => (
                         <option key={r} value={r}>
                           {r}
                         </option>

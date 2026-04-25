@@ -13,13 +13,21 @@ export type CharacterSetting = {
   relationships: string;
 };
 
+import {
+  SIDEPANEL_CHARACTER_ROLES,
+} from "@/components/side-panel/types";
+
 export const EMPTY_WORLD: WorldSetting = {
   background: "",
   era: "",
   rules: "",
 };
 
-export const CHARACTER_ROLES = ["주인공", "조력자", "악역"] as const;
+/**
+ * @deprecated Use `SIDEPANEL_CHARACTER_ROLES` as the single source of truth.
+ * Kept as an alias for backward compatibility.
+ */
+export const CHARACTER_ROLES = SIDEPANEL_CHARACTER_ROLES;
 
 export function emptyCharacter(): CharacterSetting {
   return {
@@ -54,9 +62,12 @@ export function normalizeCharacterSettings(raw: unknown): CharacterSetting[] {
     }
     const o = item as Record<string, unknown>;
     const rawRole = typeof o.role === "string" ? o.role : "주인공";
-    const role = CHARACTER_ROLES.some((r) => r === rawRole)
-      ? rawRole
-      : "주인공";
+    // NOTE: DB value is preserved (legacy "조력자" kept).
+    // UI should use `normalizeRoleForSidePanel()` when presenting/selecting.
+    const role =
+      rawRole === "조력자" || CHARACTER_ROLES.some((r) => r === rawRole)
+        ? rawRole
+        : "주인공";
     return {
       name: typeof o.name === "string" ? o.name : "",
       role,

@@ -19,7 +19,8 @@ const SIDEPANEL_ROLE_SET = new Set<string>(SIDEPANEL_CHARACTER_ROLES);
 
 export function normalizeRoleForSidePanel(role?: string): string {
   if (!role) return "조연"; // 기본값
-  if (role === "조력자") return "조연"; // loreTypes 의 "조력자"를 "조연"으로 매핑
+  // legacy: 작품설정(v1)에서 쓰던 "조력자"를 "조연"으로 자동 매핑
+  if (role === "조력자") return "조연";
   if (SIDEPANEL_ROLE_SET.has(role)) return role;
   return "기타"; // 알 수 없는 값
 }
