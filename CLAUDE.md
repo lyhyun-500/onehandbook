@@ -29,7 +29,7 @@
 - `analysis_runs`: 회차별 분석 결과
 - `holistic_analysis_runs`: 통합(일괄) 분석 결과
 - `notifications`: 알림
-- `withdrawal_logs`: 탈퇴 로그
+- `account_withdrawals`: 탈퇴 로그
 - `training_logs`: Ollama 파인튜닝 대비 학습 데이터
 - `users`: 사용자 정보 (auth_id, NAT 잔량 등)
 

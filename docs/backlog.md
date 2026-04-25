@@ -83,6 +83,17 @@
 - **작업 규모**: 3~4시간 (P2-004 와 동시 처리 시 효율 ↑)
 - **준비 상태**: `parent_job_id` 는 이미 쿼리/타입에 포함됨 (커밋 `eca622e`), UI 필터만 추가하면 됨
 
+### P2-006: 탈퇴 시 스냅샷 데이터 보존
+- **발견**: 2026-04-25, 어드민 탈퇴 로그 페이지 구현 중
+- **현황**: 익명화 + 하드딜리트로 닉네임/이메일/작품수/분석횟수 손실
+  (`account_withdrawals` 에는 reason/reason_detail 만 저장됨)
+- **개선 방향**:
+  - 옵션 A: `account_withdrawals` 에 스냅샷 컬럼 추가
+    (`nickname_snapshot`, `email_snapshot`, `works_count`, `analyses_count`)
+  - 옵션 B: 별도 `audit_log` 테이블 신설
+- **트레이드오프**: 분쟁 추적 가능성 vs GDPR/개인정보 최소화 원칙
+- **우선순위 재평가**: 운영 분쟁 발생 시 P1 승격
+
 ---
 
 ## 🔵 P3 — 아이디어, 나중에 검토
