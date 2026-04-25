@@ -1,4 +1,4 @@
-import type { Character, CharacterSettings, CharacterWithKey } from "./types";
+import { SIDEPANEL_CHARACTER_ROLES, type Character, type CharacterSettings, type CharacterWithKey } from "./types";
 
 export function stripCharacterKey(c: CharacterWithKey): Character {
   const { _key: _k, ...rest } = c;
@@ -36,7 +36,8 @@ export function emptyCharacterRow(): CharacterWithKey {
   return {
     name: "",
     summary: "",
-    role: "",
+    // Aligns with normalizeRoleForSidePanel default + role select; header badge uses raw role
+    role: SIDEPANEL_CHARACTER_ROLES[1] ?? "조연",
     goals: "",
     abilities: "",
     personality: "",
