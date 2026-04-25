@@ -106,3 +106,49 @@ export type NatAdjustResponse = NatAdjustSuccess | NatAdjustFailure;
 
 export const USER_LIST_LIMIT_DEFAULT = 50;
 export const USER_LIST_LIMIT_MAX = 100;
+
+// 탈퇴 로그
+//   - account_withdrawals 테이블 + users 의 잔존 컬럼(login_provider, created_at) 을 조인.
+//   - 닉네임/이메일/작품수/분석횟수 는 익명화·하드딜리트로 손실되어 표시 대상에서 제외.
+
+export type WithdrawalRange = "all" | "7d" | "30d" | "90d";
+
+export type AdminWithdrawalItem = {
+  /** account_withdrawals.id (uuid) */
+  id: string;
+  /** users.id — 운영 추적 참고용 */
+  userId: number;
+  /** users.login_provider — 탈퇴 후에도 보존 */
+  loginProvider: LoginProvider | null;
+  /** users.created_at — 가입일 */
+  signupAt: string | null;
+  /** account_withdrawals.created_at — 탈퇴일 */
+  withdrawnAt: string;
+  /** signupAt → withdrawnAt 일수, 둘 중 하나라도 invalid 면 null */
+  durationDays: number | null;
+  reason: string;
+  reasonDetail: string | null;
+};
+
+export type AdminWithdrawalSummary = {
+  last7d: number;
+  last30d: number;
+  total: number;
+};
+
+export type AdminWithdrawalListQuery = {
+  range?: WithdrawalRange;
+  page?: number;
+  limit?: number;
+};
+
+export type AdminWithdrawalListResponse = {
+  ok: true;
+  withdrawals: AdminWithdrawalItem[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+export const WITHDRAWAL_LIST_LIMIT_DEFAULT = 50;
+export const WITHDRAWAL_LIST_LIMIT_MAX = 200;
