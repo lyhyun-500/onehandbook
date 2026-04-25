@@ -18,6 +18,7 @@ import type {
 import { createClient } from "@/lib/supabase/client";
 import { parseDbInt } from "@/lib/supabase/parseDbInt";
 import type { AnalysisJobListItem } from "@/app/api/analyze/jobs/route";
+import type { NotificationItem } from "@/app/api/notifications/route";
 import { AnalysisAsyncUnchangedModal } from "@/components/AnalysisAsyncUnchangedModal";
 import {
   isContentUnchangedFailure,
@@ -256,6 +257,10 @@ type AnalysisJobsContextValue = {
   /** 알림 패널용 (진행·완료 목록) */
   panelJobs: AnalysisJobListItem[];
   readOutcomeJobIds: ReadonlySet<string>;
+  /** 통합 알림 (notifications 테이블) — ADR-0008 옵션 X */
+  bellNotifications: NotificationItem[];
+  markBellNotificationRead: (notificationId: string) => Promise<void>;
+  refreshBellNotifications: () => Promise<void>;
   notifications: InAppNotification[];
   markNotificationRead: (id: string) => void;
   clearNotification: (id: string) => void;
@@ -288,6 +293,10 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
   const [readOutcomeJobIds, setReadOutcomeJobIds] = useState<Set<string>>(
     () => new Set()
   );
+  // ADR-0008: 통합 알림 (notifications 테이블, 1:1 문의 답변 등) — 옵션 a 양쪽 fetch.
+  const [bellNotifications, setBellNotifications] = useState<
+    NotificationItem[]
+  >([]);
   const [unchangedJobNotices, setUnchangedJobNotices] = useState<
     UnchangedJobNoticeState[]
   >([]);
@@ -339,6 +348,7 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
       return changed ? next : prev;
     });
   }, [apiJobs]);
+
 
   const getLatestJobForEpisode = useCallback(
     (episodeId: number) => {
@@ -765,6 +775,22 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     });
   }, []);
 
+  // 통합 알림 fetch — 단순 GET (RLS 가 본인만 보장).
+  const refreshBellNotifications = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json().catch(() => null)) as
+        | { notifications?: NotificationItem[] }
+        | null;
+      if (data && Array.isArray(data.notifications)) {
+        setBellNotifications(data.notifications);
+      }
+    } catch {
+      /* 네트워크 일시 오류는 다음 폴링에서 회복 */
+    }
+  }, []);
+
   const markAllOutcomesRead = useCallback(async () => {
     const res = await fetch("/api/analyze/jobs/mark-all-read", { method: "POST" });
     if (!res.ok) throw new Error("모두 읽음 처리에 실패했습니다.");
@@ -777,7 +803,46 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
       }
       return next;
     });
-  }, []);
+    // 서버가 notifications 도 함께 마크 — optimistic 으로 미리 반영 + 백그라운드 refresh.
+    setBellNotifications((prev) =>
+      prev.map((n) =>
+        n.read_at ? n : { ...n, read_at: new Date().toISOString() }
+      )
+    );
+    void refreshBellNotifications();
+  }, [refreshBellNotifications]);
+
+  const markBellNotificationRead = useCallback(
+    async (notificationId: string) => {
+      // optimistic
+      setBellNotifications((prev) =>
+        prev.map((n) =>
+          n.id === notificationId
+            ? { ...n, read_at: n.read_at ?? new Date().toISOString() }
+            : n
+        )
+      );
+      try {
+        await fetch(
+          `/api/notifications/${encodeURIComponent(notificationId)}/read`,
+          { method: "POST", credentials: "same-origin" }
+        );
+      } catch {
+        /* 실패 시 다음 refresh 가 정정 */
+      }
+    },
+    []
+  );
+
+  // 통합 알림 마운트 시 1회 + 60초 폴링.
+  // (옵션 a: 단순 fetch. 향후 supabase realtime 으로 INSERT 구독 가능 — Phase 2 후보.)
+  useEffect(() => {
+    void refreshBellNotifications();
+    const id = window.setInterval(() => {
+      void refreshBellNotifications();
+    }, 60_000);
+    return () => window.clearInterval(id);
+  }, [refreshBellNotifications]);
 
   // 서버가 내려준 job 들 중 read_at 이 세팅된 것을 ingest.
   // apiJobs (주 리스트) / outcomes (알림 패널) 양쪽에서 호출됨.
@@ -938,8 +1003,9 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
         !(j.status === "failed" && isContentUnchangedFailure(j)) &&
         !(j.status === "failed" && isUserCancelledFailure(j))
     ).length;
-    return active + outcomeUnread;
-  }, [mergedJobs, readOutcomeJobIds]);
+    const bellUnread = bellNotifications.filter((n) => n.read_at == null).length;
+    return active + outcomeUnread + bellUnread;
+  }, [mergedJobs, readOutcomeJobIds, bellNotifications]);
 
   const panelJobs = useMemo(
     () =>
@@ -968,6 +1034,9 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
       unreadCount,
       panelJobs,
       readOutcomeJobIds,
+      bellNotifications,
+      markBellNotificationRead,
+      refreshBellNotifications,
       notifications,
       markNotificationRead,
       clearNotification,
@@ -987,6 +1056,9 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
       unreadCount,
       panelJobs,
       readOutcomeJobIds,
+      bellNotifications,
+      markBellNotificationRead,
+      refreshBellNotifications,
       notifications,
       markNotificationRead,
       clearNotification,
@@ -1027,6 +1099,9 @@ export function HeaderAnalysisBell() {
     markJobOutcomeRead,
     markAllOutcomesRead,
     ingestReadOutcomes,
+    bellNotifications,
+    markBellNotificationRead,
+    refreshBellNotifications,
     markNotificationRead,
     cancelAnalysisJob,
     refreshAnalysisJobs,
@@ -1037,10 +1112,15 @@ export function HeaderAnalysisBell() {
       unreadCount={unreadCount}
       panelJobs={panelJobs}
       readOutcomeJobIds={readOutcomeJobIds}
+      bellNotifications={bellNotifications}
       onMarkAllRead={markAllOutcomesRead}
       onIngestReadOutcomes={ingestReadOutcomes}
+      onMarkBellNotificationRead={markBellNotificationRead}
       onCancelJob={cancelAnalysisJob}
-      onPanelOpen={refreshAnalysisJobs}
+      onPanelOpen={async () => {
+        await refreshAnalysisJobs();
+        await refreshBellNotifications();
+      }}
       onNavigate={(href, jobId, notificationId) => {
         if (notificationId) markNotificationRead(notificationId);
         if (jobId) markJobOutcomeRead(jobId);
@@ -1223,8 +1303,10 @@ function AnalysisBell({
   unreadCount,
   panelJobs,
   readOutcomeJobIds,
+  bellNotifications,
   onMarkAllRead,
   onIngestReadOutcomes,
+  onMarkBellNotificationRead,
   onCancelJob,
   onPanelOpen,
   onNavigate,
@@ -1232,10 +1314,12 @@ function AnalysisBell({
   unreadCount: number;
   panelJobs: AnalysisJobListItem[];
   readOutcomeJobIds: ReadonlySet<string>;
+  bellNotifications: NotificationItem[];
   onMarkAllRead: () => Promise<void>;
   onIngestReadOutcomes: (
     jobs: readonly { id: string; read_at: string | null }[]
   ) => void;
+  onMarkBellNotificationRead: (notificationId: string) => Promise<void>;
   onCancelJob: (jobId: string) => Promise<void>;
   onPanelOpen: () => Promise<void>;
   onNavigate: (href: string, jobId: string | null, notificationId: string | null) => void;
@@ -1493,6 +1577,52 @@ function AnalysisBell({
                 <p className="mt-2 text-xs text-red-300/95">{cancelError}</p>
               ) : null}
             </div>
+
+            {bellNotifications.length > 0 && (
+              <div className="border-t border-zinc-800 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                  알림
+                </p>
+                <ul className="space-y-2 pt-1">
+                  {bellNotifications.map((n) => {
+                    const read = n.read_at != null;
+                    const href = n.link_url ?? "/";
+                    return (
+                      <li key={n.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpen(false);
+                            void onMarkBellNotificationRead(n.id);
+                            onNavigate(href, null, null);
+                          }}
+                          className={`w-full text-left flex flex-col gap-1 rounded-xl border border-zinc-800/80 px-3 py-2 transition-colors hover:border-zinc-700 hover:bg-zinc-900/60 ${
+                            read
+                              ? "bg-zinc-950/40 opacity-55"
+                              : "bg-zinc-900/40 opacity-100"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="rounded-md bg-cyan-500/15 px-2 py-0.5 text-[10px] font-semibold text-cyan-200">
+                              {n.type === "inquiry_reply" ? "1:1 답변" : "알림"}
+                            </span>
+                            <span className="text-[10px] text-zinc-500">
+                              {formatKstYYMMDD(n.created_at)}
+                            </span>
+                          </div>
+                          <p className="text-sm font-medium text-zinc-100">
+                            {n.title}
+                          </p>
+                          {n.body && (
+                            <p className="text-[11px] text-zinc-400">{n.body}</p>
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
 
             {(outcomeJobs.length > 0 || outcomesLoadingInitial) && (
               <div className="border-t border-zinc-800 px-3 py-2">
