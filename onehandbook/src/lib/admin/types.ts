@@ -136,6 +136,13 @@ export type AdminWithdrawalSummary = {
   total: number;
 };
 
+export type AdminWithdrawalReasonStat = {
+  reason: string;
+  count: number;
+  /** 전체 탈퇴 수 대비 비율 (0~100, 소수 1자리) */
+  percentage: number;
+};
+
 export type AdminWithdrawalListQuery = {
   range?: WithdrawalRange;
   page?: number;

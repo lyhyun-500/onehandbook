@@ -4,6 +4,7 @@ import {
   WITHDRAWAL_LIST_LIMIT_DEFAULT,
   WITHDRAWAL_LIST_LIMIT_MAX,
   type AdminWithdrawalItem,
+  type AdminWithdrawalReasonStat,
   type AdminWithdrawalSummary,
   type LoginProvider,
   type WithdrawalRange,
@@ -158,6 +159,47 @@ export async function getWithdrawalSummary(): Promise<AdminWithdrawalSummary> {
     last30d: r30.count ?? 0,
     total: rAll.count ?? 0,
   };
+}
+
+// 사유별 분포 — Supabase JS SDK 가 GROUP BY 를 직접 지원하지 않아
+// reason 컬럼만 끌어와서 JS 집계. 베타 규모 (수십~수백 건) 기준 충분.
+// 규모 확장 시 RPC (CREATE FUNCTION) 로 DB 레벨 GROUP BY 로 교체 권장.
+// 정렬: count DESC, 동률은 reason 오름차순(locale-aware) — 매번 같은 결과 보장.
+export async function getWithdrawalReasonStats(): Promise<
+  AdminWithdrawalReasonStat[]
+> {
+  const supabase = createSupabaseServiceRole();
+  // 베타 규모 안전 캡 (10k 초과 시 부분 집계가 되므로 후속 RPC 교체 트리거).
+  const { data: rows, error } = await supabase
+    .from("account_withdrawals")
+    .select("reason")
+    .range(0, 9_999);
+  if (error) throw error;
+
+  const counts = new Map<string, number>();
+  for (const r of rows ?? []) {
+    const reason = (r.reason as string | null) ?? "";
+    if (!reason) continue;
+    counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+
+  let total = 0;
+  for (const c of counts.values()) total += c;
+  if (total === 0) return [];
+
+  const stats: AdminWithdrawalReasonStat[] = [];
+  for (const [reason, count] of counts) {
+    stats.push({
+      reason,
+      count,
+      percentage: Math.round((count / total) * 1000) / 10,
+    });
+  }
+  stats.sort((a, b) => {
+    if (a.count !== b.count) return b.count - a.count;
+    return a.reason.localeCompare(b.reason, "ko");
+  });
+  return stats;
 }
 
 export function parseWithdrawalsQueryFromSearchParams(
