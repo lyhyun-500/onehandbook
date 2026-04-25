@@ -32,31 +32,54 @@ export function DeleteConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: "color-mix(in srgb, #000000 60%, transparent)" }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="delete-confirm-title"
     >
-      <div className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 p-6 shadow-xl">
+      <div
+        className="w-full max-w-md rounded-xl border p-6 shadow-xl"
+        style={{
+          borderColor: "var(--color-sidepanel-border-subtle)",
+          background: "var(--color-sidepanel-card)",
+        }}
+      >
         <h2
           id="delete-confirm-title"
-          className="text-lg font-semibold text-zinc-100"
+          className="text-lg font-semibold"
+          style={{ color: "var(--color-sidepanel-text-primary)" }}
         >
           {title}
         </h2>
-        <p className="mt-3 text-sm leading-relaxed text-zinc-400">{message}</p>
+        <p
+          className="mt-3 text-sm leading-relaxed"
+          style={{ color: "var(--color-sidepanel-text-secondary)" }}
+        >
+          {message}
+        </p>
         <div className="mt-6 flex justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg border border-zinc-600 px-4 py-2 text-sm text-zinc-300 transition-colors hover:bg-zinc-800"
+            className="rounded-lg border px-4 py-2 text-sm"
+            style={{
+              borderColor: "var(--color-sidepanel-border-subtle)",
+              color: "var(--color-sidepanel-text-primary)",
+              background: "var(--color-sidepanel-bg)",
+            }}
           >
             취소
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-lg border border-red-500/50 bg-red-950/40 px-4 py-2 text-sm font-medium text-red-200 transition-colors hover:bg-red-950/60"
+            className="rounded-lg border px-4 py-2 text-sm font-medium"
+            style={{
+              borderColor: "color-mix(in srgb, var(--color-sidepanel-danger) 40%, transparent)",
+              background: "color-mix(in srgb, var(--color-sidepanel-danger) 18%, var(--color-sidepanel-bg))",
+              color: "color-mix(in srgb, var(--color-sidepanel-danger) 70%, #ffffff)",
+            }}
           >
             {confirmLabel}
           </button>

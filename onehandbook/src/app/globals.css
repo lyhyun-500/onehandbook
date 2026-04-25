@@ -25,6 +25,8 @@ html {
   --color-sidepanel-border-subtle: #1f2530;
   --color-sidepanel-border-dirty: #3b82f6;
   --color-sidepanel-border-invalid: #ef4444;
+  /* invalid 좌측 스트라이프(legacy 데이터 보존 UX) */
+  --color-sidepanel-danger: #ef4444;
 
   /* 사이드 패널 텍스트 */
   --color-sidepanel-text-primary: #e6e8ec;

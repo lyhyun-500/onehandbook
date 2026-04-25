@@ -9,18 +9,10 @@ import {
   useState,
 } from "react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  SIDEPANEL_CHARACTER_ROLES,
-  normalizeRoleForSidePanel,
-} from "@/components/side-panel/types";
 import type { Character, CharacterSettings, CharacterWithKey } from "./types";
-import {
-  charactersEqual,
-  emptyCharacterRow,
-  makeCharactersWithKeys,
-  stripCharacterKey,
-} from "./characterModel";
+import { emptyCharacterRow, makeCharactersWithKeys, stripCharacterKey } from "./characterModel";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
+import { CharacterCard } from "./CharacterCard";
 
 const MESSAGE_HIDE_MS = 3000;
 
@@ -34,18 +26,13 @@ function getCardStatus(
   if (initial === undefined) return "dirty";
   const changed =
     current.name !== (initial.name ?? "") ||
+    (current.summary ?? "") !== (initial.summary ?? "") ||
     (current.role ?? "") !== (initial.role ?? "") ||
     (current.goals ?? "") !== (initial.goals ?? "") ||
     (current.abilities ?? "") !== (initial.abilities ?? "") ||
     (current.personality ?? "") !== (initial.personality ?? "") ||
     (current.relationships ?? "") !== (initial.relationships ?? "");
   return changed ? "dirty" : "clean";
-}
-
-function cardBorderClass(status: CardStatus): string {
-  if (status === "dirty") return "border-blue-500";
-  if (status === "invalid") return "border-yellow-500";
-  return "border-zinc-700";
 }
 
 export function CharactersTab({
@@ -209,18 +196,21 @@ export function CharactersTab({
     await commitList(next);
   };
 
-  const inputClass =
-    "w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500";
-  const textareaClass = `${inputClass} resize-y min-h-[4rem]`;
-
   if (characters.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-4">
-        <p className="text-sm text-zinc-500">등록된 인물이 없습니다</p>
+        <p className="text-sm" style={{ color: "var(--color-sidepanel-text-secondary)" }}>
+          등록된 인물이 없습니다
+        </p>
         <button
           type="button"
           onClick={handleAdd}
-          className="self-start rounded-lg border border-zinc-600 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
+          className="self-start rounded-lg border px-3 py-2 text-sm"
+          style={{
+            borderColor: "var(--color-sidepanel-border-subtle)",
+            color: "var(--color-sidepanel-text-primary)",
+            background: "var(--color-sidepanel-bg)",
+          }}
         >
           + 인물 추가
         </button>
@@ -230,144 +220,34 @@ export function CharactersTab({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <h2 className="text-sm font-semibold text-zinc-200">인물</h2>
+      <h2
+        className="text-sm font-semibold"
+        style={{ color: "var(--color-sidepanel-text-primary)" }}
+      >
+        인물
+      </h2>
       <ul className="space-y-3">
         {characters.map((c) => {
           const initial = getInitial(c._key);
           const status = getCardStatus(c, initial);
           const open = expandedKey === c._key;
           const label = c.name.trim() || "(이름 없음)";
-          const displayRole = c.role?.trim()
-            ? normalizeRoleForSidePanel(c.role)
-            : "";
-          const sub = displayRole ? ` · ${displayRole}` : "";
-          const border = cardBorderClass(status);
 
           return (
-            <li
+            <CharacterCard
               key={c._key}
-              className={`overflow-hidden rounded-lg border bg-zinc-800/50 ${border}`}
-            >
-              <div className="flex items-center gap-2 px-3 py-2">
-                <button
-                  type="button"
-                  onClick={() => toggleExpand(c._key)}
-                  className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left text-sm text-zinc-200"
-                >
-                  <span className="min-w-0 truncate">
-                    <span className="text-zinc-500">{open ? "▼" : "▶"}</span>{" "}
-                    <span className="font-medium">{label}</span>
-                    <span className="text-zinc-500">{sub}</span>
-                  </span>
-                  <span className="flex shrink-0 flex-col items-end gap-0.5">
-                    {status === "dirty" ? (
-                      <span className="text-xs text-blue-400">수정됨</span>
-                    ) : null}
-                    {status === "invalid" ? (
-                      <span className="text-xs text-yellow-400">이름 필요</span>
-                    ) : null}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setDeleteTarget({
-                      _key: c._key,
-                      label,
-                    })
-                  }
-                  className="shrink-0 rounded border border-red-500/30 px-2 py-1 text-xs text-red-300 hover:bg-red-950/40"
-                >
-                  🗑 삭제
-                </button>
-              </div>
-
-              {open && (
-                <div className="space-y-3 border-t border-zinc-800/80 px-3 py-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-zinc-500">
-                      이름
-                    </label>
-                    <input
-                      type="text"
-                      value={c.name}
-                      onChange={(e) =>
-                        patchCard(c._key, { name: e.target.value })
-                      }
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-zinc-500">
-                      역할
-                    </label>
-                    <select
-                      value={normalizeRoleForSidePanel(c.role)}
-                      onChange={(e) => patchCard(c._key, { role: e.target.value })}
-                      className={inputClass}
-                    >
-                      {SIDEPANEL_CHARACTER_ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-zinc-500">
-                      목표
-                    </label>
-                    <textarea
-                      value={c.goals ?? ""}
-                      onChange={(e) =>
-                        patchCard(c._key, { goals: e.target.value })
-                      }
-                      rows={4}
-                      className={textareaClass}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-zinc-500">
-                      능력
-                    </label>
-                    <textarea
-                      value={c.abilities ?? ""}
-                      onChange={(e) =>
-                        patchCard(c._key, { abilities: e.target.value })
-                      }
-                      rows={4}
-                      className={textareaClass}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-zinc-500">
-                      성격
-                    </label>
-                    <textarea
-                      value={c.personality ?? ""}
-                      onChange={(e) =>
-                        patchCard(c._key, { personality: e.target.value })
-                      }
-                      rows={4}
-                      className={textareaClass}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-zinc-500">
-                      관계
-                    </label>
-                    <textarea
-                      value={c.relationships ?? ""}
-                      onChange={(e) =>
-                        patchCard(c._key, { relationships: e.target.value })
-                      }
-                      rows={4}
-                      className={textareaClass}
-                    />
-                  </div>
-                </div>
-              )}
-            </li>
+              card={c}
+              status={status}
+              open={open}
+              onToggle={() => toggleExpand(c._key)}
+              onPatch={(patch) => patchCard(c._key, patch)}
+              onRequestDelete={() =>
+                setDeleteTarget({
+                  _key: c._key,
+                  label,
+                })
+              }
+            />
           );
         })}
       </ul>
@@ -375,25 +255,40 @@ export function CharactersTab({
       <button
         type="button"
         onClick={handleAdd}
-        className="rounded-lg border border-dashed border-zinc-600 py-2 text-sm text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+        className="rounded-lg border border-dashed py-2 text-sm"
+        style={{
+          borderColor: "var(--color-sidepanel-border-subtle)",
+          color: "var(--color-sidepanel-text-secondary)",
+        }}
       >
         + 인물 추가
       </button>
 
-      <div className="border-t border-zinc-800 pt-4">
+      <div
+        className="border-t pt-4"
+        style={{ borderColor: "var(--color-sidepanel-border-subtle)" }}
+      >
         <button
           type="button"
           disabled={saving || !hasPendingChanges}
           onClick={handleSaveAll}
-          className="w-full rounded-lg border border-cyan-600/50 bg-cyan-950/40 px-4 py-2.5 text-sm font-medium text-cyan-100 transition-colors hover:bg-cyan-950/60 disabled:cursor-not-allowed disabled:opacity-40"
+          className="w-full rounded-lg border px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40"
+          style={{
+            borderColor: "color-mix(in srgb, var(--color-sidepanel-accent) 55%, transparent)",
+            background: "color-mix(in srgb, var(--color-sidepanel-accent) 18%, var(--color-sidepanel-bg))",
+            color: "var(--color-sidepanel-text-primary)",
+          }}
         >
           {saving ? "저장 중..." : "전체 저장"}
         </button>
         {saveMessage ? (
           <p
-            className={`mt-2 text-sm ${
-              saveError ? "text-red-400/90" : "text-zinc-400"
-            }`}
+            className="mt-2 text-sm"
+            style={{
+              color: saveError
+                ? "var(--color-sidepanel-border-invalid)"
+                : "var(--color-sidepanel-text-secondary)",
+            }}
           >
             {saveMessage}
           </p>
