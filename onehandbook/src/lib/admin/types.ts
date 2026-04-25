@@ -159,3 +159,67 @@ export type AdminWithdrawalListResponse = {
 
 export const WITHDRAWAL_LIST_LIMIT_DEFAULT = 50;
 export const WITHDRAWAL_LIST_LIMIT_MAX = 200;
+
+// 1:1 문의 (ADR-0008)
+//   - inquiries 테이블 + users 잔존 컬럼(nickname, email) 조인.
+//   - 답변은 reply_content + replied_at + replied_by, 동시에 notifications INSERT.
+
+export type InquiryStatusFilter = "all" | "unreplied" | "replied";
+export type InquiryRangeFilter = "all" | "7d" | "30d" | "90d";
+
+export type AdminInquiryItem = {
+  id: string;
+  /** users.id (탈퇴 시 SET NULL — 알림 발송 불가 표지) */
+  userId: number | null;
+  /** auth.users.id 스냅샷 (탈퇴 후에도 추적 가능) */
+  userAuthId: string | null;
+  /** users.email 의 현재값 — 탈퇴 후 익명 placeholder 일 수 있음 */
+  userEmail: string | null;
+  /** users.nickname 의 현재값 */
+  userNickname: string | null;
+  title: string;
+  content: string;
+  /** 컨슈머 폼이 받은 답장 이메일 (탈퇴해도 보존) */
+  replyEmail: string;
+  /** 어드민이 작성한 답변 본문 */
+  replyContent: string | null;
+  repliedAt: string | null;
+  /** auth.users.id (어드민 본인) */
+  repliedBy: string | null;
+  createdAt: string;
+};
+
+export type AdminInquirySummary = {
+  unreplied: number;
+  unrepliedLast7d: number;
+  total: number;
+};
+
+export type AdminInquiryListQuery = {
+  status?: InquiryStatusFilter;
+  range?: InquiryRangeFilter;
+  search?: string;
+  page?: number;
+  limit?: number;
+};
+
+export type AdminInquiryListResponse = {
+  ok: true;
+  inquiries: AdminInquiryItem[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+export type AdminInquiryReplyRequest = {
+  /** 답변 본문. 빈 문자열 / 공백만 → 400 */
+  reply_content: string;
+};
+
+export type AdminInquiryReplyResponse =
+  | { ok: true; inquiry: AdminInquiryItem; notificationCreated: boolean }
+  | { ok: false; error: string };
+
+export const INQUIRY_LIST_LIMIT_DEFAULT = 50;
+export const INQUIRY_LIST_LIMIT_MAX = 200;
+export const INQUIRY_REPLY_MAX = 8000;
