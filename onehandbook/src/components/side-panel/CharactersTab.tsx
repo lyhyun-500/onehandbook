@@ -63,6 +63,7 @@ export function CharactersTab({
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState(false);
   const messageHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [saveSuccessFlash, setSaveSuccessFlash] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<{
     _key: string;
@@ -98,6 +99,7 @@ export function CharactersTab({
     messageHideRef.current = setTimeout(() => {
       setSaveMessage("");
       setSaveError(false);
+      setSaveSuccessFlash(false);
     }, MESSAGE_HIDE_MS);
   }, []);
 
@@ -130,6 +132,7 @@ export function CharactersTab({
             `${validCharacters.length}개 저장됨, ${invalidCount}개 미완성 (이름 필요)`
           );
         }
+        setSaveSuccessFlash(true);
         scheduleClearMessage();
       } catch (e: unknown) {
         console.error("[CharactersTab] commitList", e);
@@ -205,7 +208,7 @@ export function CharactersTab({
         <button
           type="button"
           onClick={handleAdd}
-          className="self-start rounded-lg border px-3 py-2 text-sm"
+          className="self-start rounded-lg border px-3 py-2 text-sm transition-colors duration-200 ease-out hover:[background:var(--color-sidepanel-card-hover)] active:scale-[0.99]"
           style={{
             borderColor: "var(--color-sidepanel-border-subtle)",
             color: "var(--color-sidepanel-text-primary)",
@@ -255,7 +258,7 @@ export function CharactersTab({
       <button
         type="button"
         onClick={handleAdd}
-        className="rounded-lg border border-dashed py-2 text-sm"
+        className="rounded-lg border border-dashed py-2 text-sm transition-colors duration-200 ease-out hover:[background:var(--color-sidepanel-card-hover)] active:scale-[0.99]"
         style={{
           borderColor: "var(--color-sidepanel-border-subtle)",
           color: "var(--color-sidepanel-text-secondary)",
@@ -272,14 +275,30 @@ export function CharactersTab({
           type="button"
           disabled={saving || !hasPendingChanges}
           onClick={handleSaveAll}
-          className="w-full rounded-lg border px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40"
+          className="w-full rounded-lg border px-4 py-2.5 text-sm font-medium transition-transform duration-100 ease-out active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
           style={{
             borderColor: "color-mix(in srgb, var(--color-sidepanel-accent) 55%, transparent)",
-            background: "color-mix(in srgb, var(--color-sidepanel-accent) 18%, var(--color-sidepanel-bg))",
+            background: saveSuccessFlash
+              ? "color-mix(in srgb, var(--color-sidepanel-accent-hover) 26%, var(--color-sidepanel-bg))"
+              : "color-mix(in srgb, var(--color-sidepanel-accent) 18%, var(--color-sidepanel-bg))",
             color: "var(--color-sidepanel-text-primary)",
           }}
         >
-          {saving ? "저장 중..." : "전체 저장"}
+          {saving ? (
+            <span className="inline-flex items-center gap-2">
+              <span
+                className="h-4 w-4 animate-spin rounded-full border-2 border-transparent"
+                style={{
+                  borderTopColor: "var(--color-sidepanel-text-primary)",
+                  borderRightColor: "var(--color-sidepanel-text-primary)",
+                  opacity: 0.8,
+                }}
+              />
+              저장 중...
+            </span>
+          ) : (
+            "전체 저장"
+          )}
         </button>
         {saveMessage ? (
           <p

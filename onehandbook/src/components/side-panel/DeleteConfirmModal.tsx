@@ -62,7 +62,7 @@ export function DeleteConfirmModal({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg border px-4 py-2 text-sm"
+            className="rounded-lg border px-4 py-2 text-sm transition-colors duration-200 ease-out hover:[background:var(--color-sidepanel-card-hover)] active:scale-[0.99]"
             style={{
               borderColor: "var(--color-sidepanel-border-subtle)",
               color: "var(--color-sidepanel-text-primary)",
@@ -74,7 +74,7 @@ export function DeleteConfirmModal({
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-lg border px-4 py-2 text-sm font-medium"
+            className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors duration-200 ease-out active:scale-[0.99]"
             style={{
               borderColor: "color-mix(in srgb, var(--color-sidepanel-danger) 40%, transparent)",
               background: "color-mix(in srgb, var(--color-sidepanel-danger) 18%, var(--color-sidepanel-bg))",

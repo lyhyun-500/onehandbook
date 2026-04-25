@@ -36,6 +36,7 @@ html {
   /* 사이드 패널 액센트 */
   --color-sidepanel-accent: #6366f1;
   --color-sidepanel-accent-hover: #818cf8;
+  --color-sidepanel-focus: rgba(129, 140, 248, 0.45);
 
   /* 역할 뱃지 색상 */
   --color-role-protagonist: #a78bfa;
@@ -58,6 +59,17 @@ html {
   --color-admin-warning: #d97706;
   --color-admin-danger: #dc2626;
   --color-admin-info: #0891b2;
+}
+
+@keyframes sidepanelDirtyAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 body {

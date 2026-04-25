@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import {
   SIDEPANEL_CHARACTER_ROLES,
   normalizeRoleForSidePanel,
@@ -40,6 +41,15 @@ export function CharacterCard({
   onPatch,
   onRequestDelete,
 }: CharacterCardProps) {
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    // a11y: prevent focus/tab + SR reading when collapsed
+    (el as any).inert = !open;
+  }, [open]);
+
   const label = card.name.trim() || "(이름 없음)";
   const displayRole = card.role?.trim() ? normalizeRoleForSidePanel(card.role) : "";
   const summaryPreview = (card.summary ?? "").trim();
@@ -68,8 +78,15 @@ export function CharacterCard({
 
   return (
     <li
-      className="overflow-hidden rounded-lg"
-      style={cardSurfaceStyle}
+      className="overflow-hidden rounded-lg border transition-colors duration-200 ease-out hover:[background:var(--color-sidepanel-card-hover)]"
+      style={{
+        background: "var(--color-sidepanel-card)",
+        borderColor: "var(--color-sidepanel-border-subtle)",
+        boxShadow:
+          status === "invalid"
+            ? "inset 4px 0 0 0 var(--color-sidepanel-danger)"
+            : "none",
+      }}
     >
       <div className="flex items-start gap-2 px-3 py-2">
         <button
@@ -104,7 +121,7 @@ export function CharacterCard({
 
             {status === "dirty" ? (
               <span
-                className="mt-1 h-2 w-2 rounded-full"
+                className="mt-1 h-2 w-2 rounded-full animate-[sidepanelDirtyAppear_250ms_ease-out_1]"
                 style={{ background: "var(--color-sidepanel-border-dirty)" }}
                 aria-label="수정됨"
                 title="수정됨"
@@ -136,54 +153,64 @@ export function CharacterCard({
         </button>
       </div>
 
-      {open ? (
-        <div
-          className="space-y-3 border-t px-3 py-3"
-          style={{ borderColor: "var(--color-sidepanel-border-subtle)" }}
-        >
-          {status === "invalid" ? (
-            <p className="text-xs" style={{ color: "var(--color-sidepanel-border-invalid)" }}>
-              이름을 입력해주세요.
-            </p>
-          ) : null}
+      <div
+        className="grid transition-[grid-template-rows] duration-250 ease-out"
+        style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div
+            ref={contentRef}
+            aria-hidden={!open}
+            className="space-y-3 border-t px-3 py-3"
+            style={{ borderColor: "var(--color-sidepanel-border-subtle)" }}
+          >
+            {status === "invalid" ? (
+              <p
+                className="text-xs"
+                style={{ color: "var(--color-sidepanel-border-invalid)" }}
+              >
+                이름을 입력해주세요.
+              </p>
+            ) : null}
 
-          <div className="space-y-1">
-            <FieldLabel>이름</FieldLabel>
-            <TextField value={card.name} onChange={(v) => onPatch({ name: v })} />
-          </div>
+            <div className="space-y-1">
+              <FieldLabel>이름</FieldLabel>
+              <TextField value={card.name} onChange={(v) => onPatch({ name: v })} />
+            </div>
 
-          <div className="space-y-1">
-            <FieldLabel>한 줄 요약</FieldLabel>
-            <TextAreaField
-              value={card.summary ?? ""}
-              onChange={(v) => onPatch({ summary: v })}
-              rows={2}
-              relaxed
-            />
-          </div>
-
-          <div className="space-y-1">
-            <FieldLabel>역할</FieldLabel>
-            <SelectField
-              value={normalizeRoleForSidePanel(card.role)}
-              onChange={(v) => onPatch({ role: v })}
-              options={SIDEPANEL_CHARACTER_ROLES}
-            />
-          </div>
-
-          {longTextFields.map((f) => (
-            <div key={f.patchKey} className="space-y-1">
-              <FieldLabel>{f.label}</FieldLabel>
+            <div className="space-y-1">
+              <FieldLabel>한 줄 요약</FieldLabel>
               <TextAreaField
-                value={f.value}
-                onChange={(v) => onPatch({ [f.patchKey]: v })}
-                rows={4}
+                value={card.summary ?? ""}
+                onChange={(v) => onPatch({ summary: v })}
+                rows={2}
                 relaxed
               />
             </div>
-          ))}
+
+            <div className="space-y-1">
+              <FieldLabel>역할</FieldLabel>
+              <SelectField
+                value={normalizeRoleForSidePanel(card.role)}
+                onChange={(v) => onPatch({ role: v })}
+                options={SIDEPANEL_CHARACTER_ROLES}
+              />
+            </div>
+
+            {longTextFields.map((f) => (
+              <div key={f.patchKey} className="space-y-1">
+                <FieldLabel>{f.label}</FieldLabel>
+                <TextAreaField
+                  value={f.value}
+                  onChange={(v) => onPatch({ [f.patchKey]: v })}
+                  rows={4}
+                  relaxed
+                />
+              </div>
+            ))}
+          </div>
         </div>
-      ) : null}
+      </div>
     </li>
   );
 }

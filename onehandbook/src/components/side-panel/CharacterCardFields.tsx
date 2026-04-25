@@ -20,7 +20,7 @@ const CONTROL_BASE: CSSProperties = {
 };
 
 const FOCUS_RING: CSSProperties = {
-  boxShadow: "0 0 0 1px rgba(245, 158, 11, 0.35)",
+  boxShadow: "0 0 0 1px var(--color-sidepanel-focus)",
 };
 
 function attachFocusRing(el: HTMLElement) {
