@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
-import { SITE_NAME } from "@/config/site";
+import { createSupabaseServiceRole } from "@/lib/supabase/serviceRole";
+import { syncAppUser } from "@/lib/supabase/appUser";
 import {
   isLikelyNonRoutableAuthEmail,
   isValidReplyRecipientEmail,
@@ -12,18 +12,14 @@ export const runtime = "nodejs";
 const TITLE_MAX = 200;
 const CONTENT_MAX = 8000;
 
-const DEFAULT_INQUIRY_TO = "agent@novelagent.kr";
-const DEFAULT_RESEND_FROM = "Novel Agent <onboarding@resend.dev>";
-
+/**
+ * ADR-0008: 1:1 문의 = 메일 발송 → DB INSERT 로 전환.
+ * 어드민이 /admin/inquiries 에서 답변을 작성하면 notifications 알림이 자동 발송된다.
+ *
+ * 검증 흐름은 기존과 동일 (제목/본문 길이, 답장 이메일 라우팅 가능 여부).
+ * INSERT 실패 시 클라이언트에 500 — 사용자가 재시도 가능하게.
+ */
 export async function POST(request: Request) {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: "메일 발송 설정(RESEND_API_KEY)이 없습니다." },
-      { status: 503 }
-    );
-  }
-
   const supabase = await createClient();
   const {
     data: { user },
@@ -31,6 +27,14 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+
+  const appUser = await syncAppUser(supabase);
+  if (!appUser) {
+    return NextResponse.json(
+      { error: "사용자 정보를 찾을 수 없습니다." },
+      { status: 403 }
+    );
   }
 
   let body: { title?: unknown; content?: unknown; replyEmail?: unknown };
@@ -44,7 +48,9 @@ export async function POST(request: Request) {
     typeof body.replyEmail === "string" ? body.replyEmail.trim() : "";
 
   const title =
-    typeof body.title === "string" ? body.title.trim().replace(/\s+/g, " ") : "";
+    typeof body.title === "string"
+      ? body.title.trim().replace(/\s+/g, " ")
+      : "";
   const content = typeof body.content === "string" ? body.content.trim() : "";
 
   if (!title || title.length > TITLE_MAX) {
@@ -71,50 +77,21 @@ export async function POST(request: Request) {
     );
   }
 
-  const to = (process.env.INQUIRY_TO_EMAIL ?? DEFAULT_INQUIRY_TO).trim();
-  const from = (process.env.RESEND_FROM ?? DEFAULT_RESEND_FROM).trim();
-
-  const sessionEmailLine =
-    user.email != null && user.email.length > 0
-      ? `로그인에 연결된 이메일(참고·SNS 플레이스홀더일 수 있음): ${user.email}`
-      : "로그인에 연결된 이메일: 없음";
-
-  const text = [
-    `[${SITE_NAME}] 1:1 문의`,
-    "",
-    `제목: ${title}`,
-    "",
-    "———— 내용 ————",
+  // inquiries 는 service_role only — RLS 정책상 authenticated 직접 INSERT 불가.
+  const service = createSupabaseServiceRole();
+  const { error: insErr } = await service.from("inquiries").insert({
+    user_id: appUser.id,
+    user_auth_id: user.id,
+    title,
     content,
-    "",
-    "———— 메타 ————",
-    `User ID (auth): ${user.id}`,
-    sessionEmailLine,
-    `답장 대상(Reply-To): ${resolvedReplyTo}`,
-  ].join("\n");
+    reply_email: resolvedReplyTo,
+  });
 
-  const resend = new Resend(apiKey);
-  try {
-    const { error } = await resend.emails.send({
-      from,
-      to: [to],
-      replyTo: resolvedReplyTo,
-      subject: `[${SITE_NAME}] ${title}`.slice(0, 998),
-      text,
-    });
-
-    if (error) {
-      console.error("resend inquiry:", error);
-      return NextResponse.json(
-        { error: "메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요." },
-        { status: 502 }
-      );
-    }
-  } catch (e) {
-    console.error("resend inquiry:", e);
+  if (insErr) {
+    console.error("inquiry insert:", insErr.message);
     return NextResponse.json(
-      { error: "메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요." },
-      { status: 502 }
+      { error: "문의 저장에 실패했습니다. 잠시 후 다시 시도해 주세요." },
+      { status: 500 }
     );
   }
 
