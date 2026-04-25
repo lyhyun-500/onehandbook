@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import {
   SIDEPANEL_CHARACTER_ROLES,
   normalizeRoleForSidePanel,
@@ -45,17 +44,16 @@ export function CharacterCard({
   const displayRole = card.role?.trim() ? normalizeRoleForSidePanel(card.role) : "";
   const summaryPreview = (card.summary ?? "").trim();
 
-  const borderStyle: CSSProperties =
-    status === "invalid"
-      ? {
-          borderColor: "var(--color-sidepanel-border-subtle)",
-          borderLeftWidth: 4,
-          borderLeftStyle: "solid",
-          borderLeftColor: "var(--color-sidepanel-danger)",
-        }
-      : {
-          borderColor: "var(--color-sidepanel-border-subtle)",
-        };
+  // Avoid mixing `borderColor` (shorthand) with `borderLeftColor` (longhand), which can
+  // trigger React dev warnings. Use an inset box-shadow for the left stripe instead.
+  const cardSurfaceStyle = {
+    background: "var(--color-sidepanel-card)",
+    border: "1px solid var(--color-sidepanel-border-subtle)",
+    boxShadow:
+      status === "invalid"
+        ? "inset 4px 0 0 0 var(--color-sidepanel-danger)"
+        : "none",
+  } as const;
 
   const longTextFields: Array<{
     label: string;
@@ -70,11 +68,8 @@ export function CharacterCard({
 
   return (
     <li
-      className="overflow-hidden rounded-lg border"
-      style={{
-        background: "var(--color-sidepanel-card)",
-        ...borderStyle,
-      }}
+      className="overflow-hidden rounded-lg"
+      style={cardSurfaceStyle}
     >
       <div className="flex items-start gap-2 px-3 py-2">
         <button
