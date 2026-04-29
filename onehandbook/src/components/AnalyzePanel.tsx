@@ -572,7 +572,8 @@ export function AnalyzePanel({
           throw new Error(
             typeof data.error === "string"
               ? data.error
-              : `휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인을 드립니다. 인증 후 이용할 수 있습니다.`
+              : `🎉 베타 오픈 기념! 휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인 즉시 지급
+인증 한 번이면 AI 분석 바로 시작할 수 있어요`
           );
         }
         if (data.code === "INSUFFICIENT_NAT") {
@@ -746,13 +747,14 @@ export function AnalyzePanel({
       {!phoneVerified && (
         <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-950/25 px-3 py-2 text-sm text-amber-100/95">
           <CopyWithBreaks as="span">
-            {`휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인을 드립니다. 인증 후 이용할 수 있습니다.`}
+            {`🎉 베타 오픈 기념! 휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인 즉시 지급
+인증 한 번이면 AI 분석 바로 시작할 수 있어요`}
           </CopyWithBreaks>{" "}
           <Link
             href="/verify-phone"
             className="font-medium text-cyan-400 underline-offset-2 hover:text-cyan-300 hover:underline"
           >
-            휴대폰 인증하기
+            휴대폰 인증하고 받기
           </Link>
         </p>
       )}
