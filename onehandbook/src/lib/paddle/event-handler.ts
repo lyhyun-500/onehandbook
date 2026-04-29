@@ -8,10 +8,8 @@
  */
 
 import { createSupabaseServiceRole } from "@/lib/supabase/serviceRole";
-import type {
-  PaddleEventType,
-  PaddleWebhookEvent,
-} from "./event-types";
+import { handleTransactionCompleted } from "@/lib/paddle/handlers/handle-transaction-completed";
+import type { PaddleWebhookEvent } from "./event-types";
 
 export type ProcessingMode = "sync" | "queue";
 
@@ -159,12 +157,14 @@ async function processQueue(
  * Step 3-4에서 타입별 핸들러로 교체 예정 (NAT 충전, users 매핑, 어드민 알림 등).
  */
 async function dispatchEventHandler(event: PaddleWebhookEvent): Promise<void> {
-  const t: PaddleEventType = event.event_type;
-
-  switch (t) {
-    case "transaction.completed":
-      console.log("[paddle event-handler] TODO Step 3-4: transaction.completed handler");
+  switch (event.event_type) {
+    case "transaction.completed": {
+      const result = await handleTransactionCompleted(event);
+      if (!result.success) {
+        throw new Error(result.reason ?? "transaction_completed_failed");
+      }
       break;
+    }
 
     case "subscription.activated":
       console.log("[paddle event-handler] TODO Step 3-4: subscription.activated handler");
