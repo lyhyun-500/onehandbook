@@ -24,7 +24,6 @@ import type { AppUser } from "@/lib/supabase/appUser";
 import { syncAppUser } from "@/lib/supabase/appUser";
 import { AnalysisProviderExhaustedError } from "@/lib/analysis/analysisErrors";
 import { HOLISTIC_CLIENT_CHUNK_SIZE } from "@/lib/analysis/holisticEpisodeChunks";
-import { runBundledEpisodesForHolisticSelection } from "@/lib/analysis/runEpisodeAnalysisBundledInHolistic";
 import { computeWorkAnalysisContextHash } from "@/lib/analysis/workAnalysisContextHash";
 import { syncPerEpisodeAnalysisFromHolisticRun } from "@/lib/analysis/syncPerEpisodeAnalysisFromHolisticRun";
 import {
@@ -166,10 +165,6 @@ export async function runHolisticBatchPipeline(
     onPhase: (phase: "ai_analyzing" | "report_writing") => Promise<void>;
     /** 비동기 잡 등에서 Supabase에 진단 행 적재 */
     pipelineDbLog?: HolisticPipelineDbLogInput;
-    /** 통합 분석 부모 `analysis_jobs.id` — 회차별 번들 이 화 분석·자식 job 연결 */
-    parentAnalysisJobId: string;
-    /** 부모 job payload.force — 원고 미변경 시에도 회차별 분석 시도 */
-    holisticForce: boolean;
   }
 ): Promise<HolisticBatchWorkerResult> {
   const {
@@ -179,8 +174,6 @@ export async function runHolisticBatchPipeline(
     opts,
     onPhase,
     pipelineDbLog,
-    parentAnalysisJobId,
-    holisticForce,
   } = params;
 
   const orderedEpisodeIds = rawEpisodeIds.map((x) => Number(x));
@@ -298,16 +291,6 @@ export async function runHolisticBatchPipeline(
   };
 
   await onPhase("ai_analyzing");
-
-  await runBundledEpisodesForHolisticSelection(
-    supabase,
-    appUser,
-    ordered,
-    requestedVersion,
-    opts,
-    parentAnalysisJobId,
-    holisticForce
-  );
 
   if (orderedEpisodeIds.length <= HOLISTIC_CLIENT_CHUNK_SIZE) {
     return finalizeSingleHolisticRun({
@@ -823,7 +806,6 @@ async function finalizeSingleHolisticRun(args: {
   }
 
   // 단일 호출(single_call) 통합 분석도 회차별 최신 점수·캐시가 맞도록 동기화한다.
-  // (청크/번들 경로는 runBundledEpisodesForHolisticSelection에서 회차별 run을 따로 생성)
   try {
     const workContextHash = computeWorkAnalysisContextHash(work, opts.includeLore);
     await syncPerEpisodeAnalysisFromHolisticRun(supabase, {
