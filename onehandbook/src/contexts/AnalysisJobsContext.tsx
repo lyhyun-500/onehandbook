@@ -71,10 +71,10 @@ function analysisHref(j: AnalysisJobListItem): string {
   return `/works/${j.work_id}/analysis?focus=${j.episode_id}`;
 }
 
-async function analysisJobRowToListItem(
-  supabase: SupabaseClient,
-  row: Record<string, unknown>
-): Promise<AnalysisJobListItem | null> {
+function analysisJobRowToListItem(
+  row: Record<string, unknown>,
+  prevJobs: AnalysisJobListItem[]
+): AnalysisJobListItem | null {
   const id = String(row.id ?? "");
   const rawEp = row.episode_id;
   const episode_id =
@@ -109,14 +109,9 @@ async function analysisJobRowToListItem(
   if (fromRow != null && !Number.isNaN(fromRow)) {
     resolvedWorkId = fromRow;
   } else {
-    const { data: ep } = await supabase
-      .from("episodes")
-      .select("work_id")
-      .eq("id", episode_id)
-      .maybeSingle();
-    const wid = ep?.work_id;
-    if (wid == null) return null;
-    resolvedWorkId = wid;
+    const cached = prevJobs.find((p) => p.episode_id === episode_id);
+    if (!cached) return null;
+    resolvedWorkId = cached.work_id;
   }
 
   const job_kind =
@@ -167,41 +162,31 @@ async function analysisJobRowToListItem(
   const readAtRaw = (row as { read_at?: unknown }).read_at;
   const read_at = typeof readAtRaw === "string" ? readAtRaw : null;
 
-  const { data: wk } = await supabase
-    .from("works")
-    .select("title")
-    .eq("id", resolvedWorkId)
-    .maybeSingle();
-
-  const { data: epRow } = await supabase
-    .from("episodes")
-    .select("title, episode_number")
-    .eq("id", episode_id)
-    .maybeSingle();
-
-  const epNumRaw = epRow?.episode_number;
-  const episode_number_ep =
-    typeof epNumRaw === "number"
-      ? epNumRaw
-      : epNumRaw != null
-        ? parseInt(String(epNumRaw), 10)
-        : null;
+  let work_title: string | null = null;
+  let episode_title: string | null = null;
+  let episode_number_ep: number | null = null;
+  for (const p of prevJobs) {
+    if (work_title == null && p.work_id === resolvedWorkId && p.work_title != null) {
+      work_title = p.work_title;
+    }
+    if (p.episode_id === episode_id) {
+      if (episode_title == null && p.episode_title != null) {
+        episode_title = p.episode_title;
+      }
+      if (episode_number_ep == null && p.episode_number != null) {
+        episode_number_ep = p.episode_number;
+      }
+    }
+    if (work_title != null && episode_title != null && episode_number_ep != null) break;
+  }
 
   return {
     id,
     episode_id,
     work_id: resolvedWorkId,
-    work_title: wk?.title ?? null,
-    episode_title:
-      job_kind === "episode" && typeof epRow?.title === "string"
-        ? epRow.title
-        : null,
-    episode_number:
-      job_kind === "episode" &&
-      episode_number_ep != null &&
-      !Number.isNaN(episode_number_ep)
-        ? episode_number_ep
-        : null,
+    work_title,
+    episode_title: job_kind === "episode" ? episode_title : null,
+    episode_number: job_kind === "episode" ? episode_number_ep : null,
     status,
     updated_at,
     created_at,
@@ -307,6 +292,11 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
   const notifiedTransitionRef = useRef<Set<string>>(new Set());
   /** Realtime postgres_changes 에서 filter 미사용 시 행 소유 검증용 */
   const realtimeExpectedAppUserIdRef = useRef<number | null>(null);
+  /** Realtime broadcast 수신 시 work_title/episode_title 캐시로 활용 */
+  const apiJobsRef = useRef<AnalysisJobListItem[]>([]);
+  useEffect(() => {
+    apiJobsRef.current = apiJobs;
+  }, [apiJobs]);
 
   const mergedJobs = useMemo(() => {
     const byId = new Map<string, AnalysisJobListItem>();
@@ -633,7 +623,7 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
         if (uid != null && uid !== expected) return;
       }
 
-      const item = await analysisJobRowToListItem(supabase, row);
+      const item = analysisJobRowToListItem(row, apiJobsRef.current);
       if (!item || cancelled) return;
 
       const was = prevJobStatusRef.current.get(item.id);
@@ -956,7 +946,7 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     if (!hasActive) return;
     const id = window.setInterval(() => {
       void refreshAnalysisJobs();
-    }, 12_000);
+    }, 30_000);
     return () => window.clearInterval(id);
   }, [mergedJobs, refreshAnalysisJobs]);
 

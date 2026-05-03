@@ -12,7 +12,9 @@ import {
  * 스테일 잡 복구 등은 `executeHolisticAnalysisJob` 의 `ANALYZE_PROCESS_MAX_DURATION_SEC` 로 조정합니다.
  */
 // Pro 이상에서 분석 워커가 60s를 넘길 수 있어 상향합니다.
-export const maxDuration = 300;
+// 5화 single_call holistic = LLM 6회 + RAG 6회 추정 360s, 10화 추정 700s.
+// staleThresholds 와 동기화: env ANALYZE_PROCESS_MAX_DURATION_SEC=800 같이 설정.
+export const maxDuration = 800;
 
 export async function POST(request: Request) {
   const secret = process.env.ANALYZE_PROCESS_SECRET;

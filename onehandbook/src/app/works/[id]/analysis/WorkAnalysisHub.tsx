@@ -208,17 +208,15 @@ function WorkAnalysisHubInner({
 
   /**
    * 일괄 분석 완료 직후 race condition 대응:
-   * analysis_jobs.completed 시점과 sync_per_episode 완료 시점 사이 race window
-   * 에서 reloadAnalysisData 가 stale 데이터를 받을 수 있음.
-   *
-   * 최근 30초 이내 완료된 holistic_batch job 이 있으면 3초 간격으로 polling.
-   * 30초 후 자동 중단 (또는 컴포넌트 unmount 시).
+   * realtime broadcast 로 panelJobs 가 갱신되면 같은 jobId 당 1회만 reload.
+   * (3초 polling 으로 N회 호출하던 것을 broadcast 1회 → reload 1회로 축소.
+   *  realtime 누락 시에는 /api/analyze/jobs 폴링이 fallback.)
    */
+  const reloadedHolisticJobIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const panelJobs = analysisJobsCtx?.panelJobs ?? [];
     const now = Date.now();
-
-    const hasRecentHolisticBatch = panelJobs.some((j) => {
+    const recentJob = panelJobs.find((j) => {
       if (j.status !== "completed") return false;
       if (j.job_kind !== "holistic_batch") return false;
       if (j.holistic_run_id == null) return false;
@@ -226,21 +224,10 @@ function WorkAnalysisHubInner({
       if (Number.isNaN(updatedMs)) return false;
       return now - updatedMs < 30000;
     });
-
-    if (!hasRecentHolisticBatch) return;
-
-    const interval = setInterval(() => {
-      void reloadAnalysisData();
-    }, 3000);
-
-    const stop = setTimeout(() => {
-      clearInterval(interval);
-    }, 30000);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(stop);
-    };
+    if (!recentJob) return;
+    if (reloadedHolisticJobIdsRef.current.has(recentJob.id)) return;
+    reloadedHolisticJobIdsRef.current.add(recentJob.id);
+    void reloadAnalysisData();
   }, [analysisJobsCtx?.panelJobs, reloadAnalysisData]);
 
   const urlTab: "single" | "batch" =
