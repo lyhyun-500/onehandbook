@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServiceRole } from "@/lib/supabase/serviceRole";
 import {
-  ANALYSIS_JOB_HOLISTIC_PROCESSING_STALE_MS,
-  ANALYSIS_JOB_PROCESSING_STALE_MS,
-} from "@/lib/analysis/recoverStaleAnalysisJob";
+  episodeProcessingStaleThresholdMs,
+  holisticProcessingStaleThresholdMs,
+} from "@/lib/analysis/staleThresholds";
 
 function requireAdminSecret(request: Request): string | null {
   const secret = process.env.COIN_ADMIN_SECRET?.trim();
@@ -58,10 +58,10 @@ export async function GET(request: Request) {
 
   const now = Date.now();
   const sinceIso = new Date(now - sinceHours * 3600_000).toISOString();
-  const cutoffEpisodeIso = new Date(now - ANALYSIS_JOB_PROCESSING_STALE_MS).toISOString();
-  const cutoffHolisticIso = new Date(
-    now - ANALYSIS_JOB_HOLISTIC_PROCESSING_STALE_MS
-  ).toISOString();
+  const episodeStaleMs = episodeProcessingStaleThresholdMs();
+  const holisticStaleMs = holisticProcessingStaleThresholdMs();
+  const cutoffEpisodeIso = new Date(now - episodeStaleMs).toISOString();
+  const cutoffHolisticIso = new Date(now - holisticStaleMs).toISOString();
 
   const base = admin
     .from("analysis_jobs")
@@ -112,8 +112,8 @@ export async function GET(request: Request) {
           : null,
     },
     stale_cutoffs: {
-      episode_ms: ANALYSIS_JOB_PROCESSING_STALE_MS,
-      holistic_ms: ANALYSIS_JOB_HOLISTIC_PROCESSING_STALE_MS,
+      episode_ms: episodeStaleMs,
+      holistic_ms: holisticStaleMs,
     },
     rows: data ?? [],
   });

@@ -9,6 +9,7 @@ import {
   parseJobPayloadRecord,
 } from "@/lib/analysis/holisticJobPayload";
 import { isStaleJobFailureMessage } from "@/lib/analysis/recoverStaleAnalysisJob";
+import { holisticProcessingStaleThresholdMs } from "@/lib/analysis/staleThresholds";
 import { parseDbInt } from "@/lib/supabase/parseDbInt";
 import { logHolisticPipelineAwait } from "@/lib/analysis/holisticPipelineLog";
 
@@ -56,16 +57,6 @@ function holisticJobHeartbeatIntervalMs(): number {
   );
   const n = Number.isFinite(sec) && sec > 0 ? sec : 60;
   return Math.max(15, Math.min(180, n)) * 1000;
-}
-
-function holisticProcessingStaleThresholdMs(): number {
-  const sec = parseInt(
-    process.env.ANALYZE_PROCESS_MAX_DURATION_SEC ?? "600",
-    10
-  );
-  const effective =
-    Number.isFinite(sec) && sec > 0 ? Math.min(sec, 800) : 600;
-  return effective * 1000 + 120_000;
 }
 
 /**

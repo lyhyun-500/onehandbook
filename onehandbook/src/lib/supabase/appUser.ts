@@ -74,18 +74,22 @@ export async function syncAppUser(
 
   const { data: existingUser } = await supabase
     .from("users")
-    .select("id")
+    .select("id, email")
     .eq("auth_id", authUser.id)
     .maybeSingle();
 
   if (existingUser) {
-    // 기존 유저도 네이버 실제 이메일이 있으면 덮어써서 최신화
-    const { error: updErr } = await supabase
-      .from("users")
-      .update({ email })
-      .eq("id", existingUser.id);
-    if (updErr) {
-      // ignore: 표시용 이메일 업데이트 실패는 치명적이지 않음
+    // 표시용 이메일이 바뀐 경우에만 UPDATE (폴링·syncAppUser 반복 호출 시 불필요한 쓰기 방지)
+    const prevEmail = existingUser.email?.trim() ?? "";
+    const nextEmail = email.trim();
+    if (prevEmail !== nextEmail) {
+      const { error: updErr } = await supabase
+        .from("users")
+        .update({ email })
+        .eq("id", existingUser.id);
+      if (updErr) {
+        // ignore: 표시용 이메일 업데이트 실패는 치명적이지 않음
+      }
     }
     return loadAppUserRow(supabase, existingUser.id, email);
   }
