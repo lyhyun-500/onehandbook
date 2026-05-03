@@ -38,3 +38,9 @@ export function loadPlatformSnippet(profile: AnalysisProfileConfig): string {
   if (platform) return platform.trim();
   return "";
 }
+
+/** 연재 구간별 체크리스트 — `prompts/analysis/serialization-segments.md` */
+export function loadSerializationSegmentGuide(): string {
+  const raw = readIfExists("serialization-segments.md");
+  return raw?.trim() ?? "";
+}

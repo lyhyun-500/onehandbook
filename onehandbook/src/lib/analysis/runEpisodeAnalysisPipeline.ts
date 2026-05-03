@@ -197,6 +197,7 @@ export async function runEpisodeAnalysisPipeline(
     const out = await runAnalysis(
       {
         manuscript: episode.content,
+        episode_number: episode.episode_number,
         genre: work.genre,
         work_title: work.title ?? undefined,
         tags: Array.isArray(work.tags) ? work.tags : undefined,

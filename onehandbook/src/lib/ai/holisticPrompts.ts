@@ -1,6 +1,10 @@
 import type { AnalysisProfileConfig } from "@/config/analysis-profiles";
 import { buildGenreEvalAxesSection } from "./genreEvalAddons";
-import { loadBaseSystem, loadPlatformSnippet } from "./loadAnalysisPrompt";
+import {
+  loadBaseSystem,
+  loadPlatformSnippet,
+  loadSerializationSegmentGuide,
+} from "./loadAnalysisPrompt";
 import type { AnalysisInput } from "./types";
 import { formatLoreContextForAnalysis } from "./prompts";
 
@@ -62,11 +66,13 @@ export function buildHolisticSystemPrompt(
   trendsContextBlock?: string | null
 ): string {
   const base = loadBaseSystem().replace(/\{\{genre\}\}/g, genre);
+  const serialization = loadSerializationSegmentGuide();
   const genreAxes = buildGenreEvalAxesSection(genre);
   const platform = loadPlatformSnippet(profile);
   const parts = [
     base,
     HOLISTIC_TASK,
+    serialization,
     genreAxes,
     platform,
     KOREAN_LINEBREAK_RULE,

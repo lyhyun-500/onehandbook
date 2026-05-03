@@ -1,6 +1,10 @@
 import type { AnalysisProfileConfig } from "@/config/analysis-profiles";
 import { buildGenreEvalAxesSection } from "./genreEvalAddons";
-import { loadBaseSystem, loadPlatformSnippet } from "./loadAnalysisPrompt";
+import {
+  loadBaseSystem,
+  loadPlatformSnippet,
+  loadSerializationSegmentGuide,
+} from "./loadAnalysisPrompt";
 import type { HolisticAnalysisResult } from "./types";
 
 const MERGE_JSON_SHAPE = `반드시 아래 키만 가진 JSON 하나만 출력하세요. 다른 설명·마크다운·코드펜스 금지.
@@ -45,6 +49,7 @@ export function buildHolisticMergeSystemPrompt(
   trendsContextBlock?: string | null
 ): string {
   const base = loadBaseSystem().replace(/\{\{genre\}\}/g, genre);
+  const serialization = loadSerializationSegmentGuide();
   const genreAxes = buildGenreEvalAxesSection(genre);
   const platform = loadPlatformSnippet(profile);
   const linebreakRule = `## 문단·줄바꿈 규칙 (필수)
@@ -54,7 +59,9 @@ export function buildHolisticMergeSystemPrompt(
   const task = `## 통합 병합 임무
 아래는 **동일 작품**의 일부 구간을 10화 단위로 나누어 각각 분석한 JSON 결과들입니다. 원고 전문은 다시 주어지지 않습니다. 배치별 점수·코멘트·요약만으로 **전체 구간의 흐름**을 일관되게 재구성한 **단일 종합 리포트** JSON을 출력하세요.`;
 
-  const parts = [base, task, genreAxes, platform, linebreakRule].filter(Boolean);
+  const parts = [base, task, serialization, genreAxes, platform, linebreakRule].filter(
+    Boolean
+  );
   const core = parts.join("\n\n");
   const trends = trendsContextBlock?.trim()
     ? `\n\n${trendsContextBlock.trim()}`

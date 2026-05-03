@@ -1,7 +1,11 @@
 import type { AnalysisProfileConfig } from "@/config/analysis-profiles";
 import type { AnalysisInput } from "./types";
 import { buildGenreEvalAxesSection } from "./genreEvalAddons";
-import { loadBaseSystem, loadPlatformSnippet } from "./loadAnalysisPrompt";
+import {
+  loadBaseSystem,
+  loadPlatformSnippet,
+  loadSerializationSegmentGuide,
+} from "./loadAnalysisPrompt";
 
 const LORE_DIMENSIONS = `## 작가 설정 대조 필수 차원
 유저 메시지에 포함된 **세계관·인물 설정**(작가가 작품 설정에 저장한 값)을 원고와 반드시 대조하세요. 해당 설정이 비어 있으면 각 차원 comment에 그 제약을 명시하세요.
@@ -41,9 +45,17 @@ export function buildSystemPrompt(
   trendsContextBlock?: string | null
 ): string {
   const base = loadBaseSystem().replace(/\{\{genre\}\}/g, genre);
+  const serialization = loadSerializationSegmentGuide();
   const genreAxes = buildGenreEvalAxesSection(genre);
   const platform = loadPlatformSnippet(profile);
-  const parts = [base, genreAxes, LORE_DIMENSIONS, platform, KOREAN_LINEBREAK_RULE].filter(Boolean);
+  const parts = [
+    base,
+    serialization,
+    genreAxes,
+    LORE_DIMENSIONS,
+    platform,
+    KOREAN_LINEBREAK_RULE,
+  ].filter(Boolean);
   const core = parts.join("\n\n");
   const trends = trendsContextBlock?.trim()
     ? `\n\n${trendsContextBlock.trim()}`
@@ -129,7 +141,12 @@ export function buildUserPrompt(input: AnalysisInput): string {
       ? `작품 태그(페르소나): 이 작품은 ${tags.map((t) => `#${t}`).join(" ")} 성격을 가진 작품이다.\n\n`
       : "";
 
-  return `${lore}${persona}${prevBlock}${continuityHint}장르: ${input.genre}
+  const epLine =
+    typeof input.episode_number === "number" && Number.isFinite(input.episode_number)
+      ? `분석 대상 회차: ${input.episode_number}화 (시스템 프롬프트의 연재 구간별 기준 적용 시 이 번호를 사용하라).\n\n`
+      : "";
+
+  return `${lore}${persona}${prevBlock}${continuityHint}${epLine}장르: ${input.genre}
 
 다음 원고를 분석해 JSON으로만 답하세요.
 
