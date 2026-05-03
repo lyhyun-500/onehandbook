@@ -16,6 +16,7 @@
     "trends:automate:dry": "tsx scripts/automate_trends.ts --dry-run",
     "trends:munpia-scrape": "tsx scripts/automate_trends.ts --munpia-scrape",
     "trends:munpia-scrape:dry": "tsx scripts/automate_trends.ts --munpia-scrape --dry-run",
+    "trends:munpia-scrape:example": "tsx scripts/automate_trends.ts --munpia-scrape --dry-run --munpia-works-file=./scripts/munpia-reader-works.example.json",
     "trends:ingest-free-episodes": "tsx scripts/ingest_free_episode_summaries.ts",
     "trends:ingest-free-episodes:dry": "tsx scripts/ingest_free_episode_summaries.ts --dry-run",
     "cookies:munpia": "tsx scripts/save_munpia_storage_state.ts",

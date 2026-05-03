@@ -9,6 +9,7 @@
 
 import { createSupabaseServiceRole } from "@/lib/supabase/serviceRole";
 import { handleTransactionCompleted } from "@/lib/paddle/handlers/handle-transaction-completed";
+import { handleSubscriptionActivated } from "@/lib/paddle/handlers/handle-subscription-activated";
 import type { PaddleWebhookEvent } from "./event-types";
 
 export type ProcessingMode = "sync" | "queue";
@@ -167,7 +168,12 @@ async function dispatchEventHandler(event: PaddleWebhookEvent): Promise<void> {
     }
 
     case "subscription.activated":
-      console.log("[paddle event-handler] TODO Step 3-4: subscription.activated handler");
+      {
+        const result = await handleSubscriptionActivated(event);
+        if (!result.success) {
+          throw new Error(result.reason ?? "subscription_activated_failed");
+        }
+      }
       break;
 
     case "customer.created":
