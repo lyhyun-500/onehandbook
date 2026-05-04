@@ -743,6 +743,27 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     };
   }, [emitJobStatusTransition]);
 
+  // 좀비 채널 방지: 탭 닫기/새로고침/외부 navigation 시 모든 realtime 채널 명시 정리.
+  // React unmount 경로(라우터 이동 등)는 위 useEffect cleanup이 처리하므로,
+  // 이 핸들러는 그 경로로 도달하지 않는 hard-unload 케이스만 보강한다.
+  // BFCache 진입(pagehide + persisted)은 skip — 복귀 시 채널 유지 위해.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const supabase = createClient();
+    const handleUnload = (e: PageTransitionEvent | BeforeUnloadEvent) => {
+      if ("persisted" in e && e.persisted) return;
+      for (const ch of supabase.getChannels()) {
+        void supabase.removeChannel(ch);
+      }
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    window.addEventListener("pagehide", handleUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleUnload);
+      window.removeEventListener("pagehide", handleUnload);
+    };
+  }, []);
+
   const registerJobStarted = useCallback((job: AnalysisJobListItem) => {
     prevJobStatusRef.current.set(job.id, job.status);
     setOptimistic((o) => {
