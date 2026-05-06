@@ -249,6 +249,8 @@ type AnalysisJobsContextValue = {
   notifications: InAppNotification[];
   markNotificationRead: (id: string) => void;
   clearNotification: (id: string) => void;
+  /** 외부 컴포넌트(결제 등)가 통합 toast 채널을 사용할 수 있도록 노출 */
+  pushToast: (t: Omit<ToastItem, "id">) => void;
 };
 
 const AnalysisJobsContext = createContext<AnalysisJobsContextValue | null>(null);
@@ -1051,6 +1053,7 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
       notifications,
       markNotificationRead,
       clearNotification,
+      pushToast,
     }),
     [
       getLatestJobForEpisode,
@@ -1062,6 +1065,7 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
       markJobOutcomeRead,
       markAllOutcomesRead,
       ingestReadOutcomes,
+      pushToast,
       cancelAnalysisJob,
       refreshAnalysisJobs,
       unreadCount,

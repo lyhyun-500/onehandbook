@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE_NAME } from "@/config/site";
+import { createClient } from "@/lib/supabase/server";
+import { StandardPlanButton } from "./StandardPlanButton";
 
 export const metadata: Metadata = {
   title: `요금 안내 · ${SITE_NAME}`,
   description: `${SITE_NAME} NAT 요금 및 플랜 안내`,
 };
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const userEmail = user?.email ?? null;
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="border-b border-cyan-500/10 bg-zinc-950/95 backdrop-blur-md">
@@ -59,6 +67,7 @@ export default function PricingPage() {
                 월 정기 구독 형태(안내용)
               </li>
             </ul>
+            <StandardPlanButton userEmail={userEmail} />
           </section>
 
           <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 shadow-sm shadow-black/20">

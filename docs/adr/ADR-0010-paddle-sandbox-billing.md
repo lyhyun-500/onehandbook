@@ -14,6 +14,7 @@
 | 버전 | 날짜 | 변경 |
 |-----|------|-----|
 | v1 | 2026-04-28 | 초안 — Paddle Billing(Sandbox) 결제 모델 + Webhook 설계 + NAT 매핑 정책 + Hybrid 처리 아키텍처 |
+| v2 | 2026-05-06 | §5 운영 룰 추가 — 새 Paddle price 추가 시 마이그레이션 선행 의무 (FK 제약으로 인한 결제 사고 방지) + production 전환 매핑 주의 |
 
 ---
 
@@ -134,6 +135,45 @@ Tier 4 (보안)
   - **NAT 충전 차단**
   - `paddle_transactions.status = 'unmapped'`
   - 어드민 알림 발송 (즉시)
+
+### 5-3. 새 Paddle Price 추가 운영 룰
+
+**배경**
+
+- `paddle_subscriptions.paddle_price_id` 는 `paddle_price_nat_mapping(paddle_price_id)` 를 **FK로 참조**한다.
+- 매핑 테이블에 없는 price_id 로 webhook 이 들어오면 `subscription.activated` 핸들러의 UPSERT 가 **FK violation 으로 실패**한다.
+- 결과: 사용자는 결제 성공했지만 시스템에 구독 row 없음, NAT 도 미지급. CS 폭발 + 환불 처리 부담.
+
+**필수 작업 순서 (반드시 이 순서로)**
+
+1. `paddle_price_nat_mapping` 에 신규 매핑을 INSERT 하는 마이그레이션 작성 + 적용
+2. 적용 확인 쿼리로 mapping 존재 검증
+3. **그 다음에** Paddle 어드민에서 신규 price 생성 (sandbox 또는 production)
+4. Paddle 어드민에서 신규 price 활성화 / checkout 노출
+
+순서가 뒤집히면 그 시점부터 결제 성공해도 구독 저장이 실패한다. **Paddle plan 생성을 먼저 하지 말 것.**
+
+**신규 price 추가 체크리스트**
+
+- [ ] 매핑 마이그레이션 작성 (`paddle_price_id`, `nat_amount`, `description`, `environment`)
+- [ ] 마이그레이션 적용 (Supabase Dashboard SQL Editor)
+- [ ] `SELECT * FROM paddle_price_nat_mapping WHERE paddle_price_id = '<새_price_id>'` 로 검증
+- [ ] Paddle 어드민에서 price 생성
+- [ ] Paddle 어드민에서 price 활성화
+- [ ] Sandbox 에서 결제 테스트 1건
+- [ ] `paddle_subscriptions` 에 row 정상 저장 확인
+- [ ] (해당 시) NAT 지급 정상 작동 확인
+
+### 5-4. Production 전환 시 매핑 주의
+
+현재 `paddle_price_nat_mapping` 은 **sandbox seed 만 존재**한다 (마이그레이션 `20260428160000_paddle_billing_phase3a.sql` 의 `pri_01kq4a0q6a25n4fsd8frdjva2e` 1건).
+
+Production 전환 시:
+
+- production 환경의 price_id 는 sandbox 와 **다른 식별자**이다.
+- `environment = 'production'` 으로 별도 매핑 row 가 필요하다.
+- production seed 마이그레이션을 **production webhook 활성화 전에** 적용해야 한다.
+- 이 작업은 ADR-0004 Go/No-Go 통과 후 production 전환 단계 (§8 Phase 3c) 의 사전 작업으로 진행한다.
 
 ---
 
