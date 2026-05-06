@@ -17,7 +17,7 @@
  *   - 수동: MUNPIA_READER_WORKS_JSON 또는 JSON 파일(--munpia-works-file / MUNPIA_READER_WORKS_PATH)
  *           [{ "title","novelKey"|"detailUrl"|"urls" }] — urls 생략 시 목차에서 회차 자동 선정
  *   data/cookies.json 세션, HEADLESS=0 권장. 부하: MUNPIA_READER_BETWEEN_WORKS_MS_MIN/MAX
- *   표준 작품 회차 수: MUNPIA_READER_EPISODES_MIN~MAX (기본 15~15, 환경변수로 하한·상한 조절)
+ *   표준 작품 회차 수: MUNPIA_READER_EPISODES_MIN~MAX (기본 10~10, 환경변수로 하한·상한 조절)
  *   회차별 조회·추천 UI 표기를 가능한 범위에서 수집 → 연독률(이탈·몰입) 알고리즘 분석용 외생 변수로 활용
  *
  * 필요: ANTHROPIC_API_KEY, SERPER_API_KEY, SUPABASE_SERVICE_ROLE_KEY,
@@ -805,10 +805,13 @@ function betweenEpisodesMs(): number {
   return randomIntInclusive(Math.min(min, max), Math.max(min, max));
 }
 
-/** 수집 회차 상한 N: [min,max] 랜덤 (기본 15~15 = 모두 15화까지). 연독률·지표 분석을 위해 상한 15에 맞춤 */
+/** 환경변수 미지정 시 표준 독자뷰 수집 회차 상한(코드 기본값) */
+const MUNPIA_READER_STANDARD_EPISODE_CAP = 10;
+
+/** 수집 회차 상한 N: [min,max] 랜덤 (기본 10~10). env 상한은 최대 15화까지(기존 목차 URL 수집 상한과 동일) */
 function randomMunpiaReaderStandardEpisodeCount(): number {
-  const defMin = 15;
-  const defMax = 15;
+  const defMin = MUNPIA_READER_STANDARD_EPISODE_CAP;
+  const defMax = MUNPIA_READER_STANDARD_EPISODE_CAP;
   const rawMin = Number(process.env.MUNPIA_READER_EPISODES_MIN ?? defMin);
   const rawMax = Number(process.env.MUNPIA_READER_EPISODES_MAX ?? defMax);
   const lo = Number.isFinite(rawMin)
@@ -828,7 +831,7 @@ function scrollMaxMs(): number {
   return Math.max(2000, Math.min(20_000, n));
 }
 
-/** Claude 요약에 넣는 뷰어 원문 상한(문자). 15화 이상·장문이면 늘리기 — 모델·요금 한도는 별도 */
+/** Claude 요약에 넣는 뷰어 원문 상한(문자). 회차 수·장문이 늘면 env로 늘리기 — 모델·요금 한도는 별도 */
 function munpiaReaderClaudeCorpusMaxChars(): number {
   const def = 96_000;
   const raw = process.env.MUNPIA_READER_CLAUDE_CORPUS_MAX_CHARS?.trim();
@@ -990,7 +993,7 @@ async function scrapeMunpiaWorkEpisodesHumanLike(
       `### [${workLabel} ${i + 1}화 뷰어 본문]\n${engagementBlock}${text}`
     );
 
-    // 긴 회차 묶음(예: 15화)에서는 중간에 목차로 나갔다가 들어오는 동작을 섞어 자연스러운 흐름을 만듭니다.
+    // 긴 회차 묶음(예: 10화 이상)에서는 중간에 목차로 나갔다가 들어오는 동작을 섞어 자연스러운 흐름을 만듭니다.
     const every = options?.exitToTocEvery ?? 0;
     if (
       every > 0 &&
@@ -1248,7 +1251,7 @@ async function scrapeMunpiaFullWorkReaderPath(
 
 /**
  * 문피아 쿠키 세션 + 베스트 자동 선정(1~20·급상승) 또는 MUNPIA_READER_WORKS_JSON 수동
- * → 작품 상세 체류 → 목차(또는 지정 URL) → 뷰어 1~N화 인간 패턴 수집(N은 기본 15, EPISODES_MIN/MAX로 조절)
+ * → 작품 상세 체류 → 목차(또는 지정 URL) → 뷰어 1~N화 인간 패턴 수집(N은 기본 10, EPISODES_MIN/MAX로 조절)
  * → Claude 요약 → data/trends/*.md + ingestData(Chroma)
  */
 export async function runMunpiaReaderScrapePipeline(options?: {
@@ -1450,7 +1453,7 @@ export async function runMunpiaReaderScrapePipeline(options?: {
         );
       } else {
         console.info(
-          `${LOG} [munpia-reader] 급상승·상위 3위 작 없음 — 일반 작도 기본 15화·지표 수집`
+          `${LOG} [munpia-reader] 급상승·상위 3위 작 없음 — 일반 작도 기본 ${MUNPIA_READER_STANDARD_EPISODE_CAP}화·지표 수집`
         );
       }
       await sleep(randomIntInclusive(2800, 4500));
@@ -1479,7 +1482,7 @@ export async function runMunpiaReaderScrapePipeline(options?: {
         `${LOG} [munpia-reader] "${task.title}" 이번 실행 수집 회차 상한 1~${desiredMax}화`
       );
 
-      // 확장(15화) 대상인데 기존 단계 분석이 있으면 본문에 추가 분석을 append
+      // 기존 5화 이상·이번 상한 미만이면 누락 회차만 스크랩 후 본문에 append
       const platform = "문피아-독자뷰요약";
       const dedupId = computeTrendDedupId(
         `${task.title} · 독자뷰 요약 (${ymdSeoul})`,
@@ -1504,20 +1507,19 @@ export async function runMunpiaReaderScrapePipeline(options?: {
 
       let raw: string;
       try {
-        if (desiredMax === 15 && existingMax >= 5 && existingMax < 15) {
-          // 요구사항: 10~15화 추가 분석만 붙이기 (기존 본문 유지)
-          const extraStart = 10;
-          const extraEnd = 15;
+        if (existingMax >= 5 && existingMax < desiredMax) {
+          const extraStart = existingMax + 1;
+          const extraEnd = desiredMax;
           const extraUrls = await munpiaReaderDiscoverEpisodeUrls(
             page,
             task.novelKey,
             extraEnd
           );
-          const slice = extraUrls.slice(extraStart - 1, extraEnd); // 10..15
+          const slice = extraUrls.slice(extraStart - 1, extraEnd);
           raw = await scrapeMunpiaWorkEpisodesHumanLike(
             page,
             slice,
-            `${task.title} (10~15화)`,
+            `${task.title} (${extraStart}~${extraEnd}화)`,
             { tocUrl: buildNovelTocUrl(task.novelKey), exitToTocEvery: 3 }
           );
         } else {
@@ -1563,9 +1565,15 @@ export async function runMunpiaReaderScrapePipeline(options?: {
         risingReason: task.risingReason,
       });
 
-      // append 모드: 기존 본문을 유지하고 "추가 분석(10~15화)"를 덧붙임
-      if (desiredMax === 15 && existing?.body && existingMax >= 5 && existingMax < 15) {
-        const appended = `\n\n---\n\n## 추가 분석 (10~15화)\n\n${analysisMd}\n`;
+      // append 모드: 기존 본문 유지 + 누락 구간만 추가 분석 덧붙임
+      if (
+        existing?.body &&
+        existingMax >= 5 &&
+        existingMax < desiredMax
+      ) {
+        const extraStart = existingMax + 1;
+        const extraEnd = desiredMax;
+        const appended = `\n\n---\n\n## 추가 분석 (${extraStart}~${extraEnd}화)\n\n${analysisMd}\n`;
         fullMd = `${String(existing.body).trim()}\n${appended}`.trim();
       }
       const fileName = `munpia-reader-${slugForMunpiaReaderFile(task.title)}-${ymdSeoul}.md`;

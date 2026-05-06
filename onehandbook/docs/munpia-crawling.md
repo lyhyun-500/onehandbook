@@ -79,15 +79,15 @@ Novel Agent 트렌드 RAG용으로 **문피아**에서 데이터를 가져오는
    - 수집 화수가 10화 이상이면 **3화마다** 목차로 나갔다가 다시 들어오는 동작(`exitToTocEvery`)을 섞음
 4. 작품 사이: `MUNPIA_READER_BETWEEN_WORKS_MS_*`
 
-### 2.7 회차 수·10~15화 추가(레거시 증분)
+### 2.7 회차 수·증분 append(부분 수집 이후)
 
-- 기본은 **`MUNPIA_READER_EPISODES_MIN` ~ `MAX` 가 15~15** → 모든 자동·일반 작품에 대해 **최대 15화**까지 동일하게 수집(환경변수로만 하한·상한 변경).
+- 기본은 **`MUNPIA_READER_EPISODES_MIN` ~ `MAX` 가 10~10** → 모든 자동·일반 작품에 대해 **최대 10화**까지 동일하게 수집(환경변수로만 하한·상한 변경, 코드 상 env 상한은 최대 15화).
 
-**이미 같은 날·같은 dedup으로 5화 이상 분석이 있고 15화 미만**이면(과거 짧은 수집 데이터), 다음 실행에서 **10~15화 구간만** 추가 스크랩 후 Claude 요약을 **기존 본문 뒤에 append** (`## 추가 분석 (10~15화)`). 메타 `episodes_analyzed_max` 등으로 판별합니다.
+**이미 같은 날·같은 dedup으로 5화 이상 분석이 있고, 이번 실행의 수집 상한(`desiredMax`) 미만**이면(과거 짧은 수집 데이터), 다음 실행에서 **(기존 마지막 화+1)~상한** 구간만 추가 스크랩 후 Claude 요약을 **기존 본문 뒤에 append** (`## 추가 분석 (N~M화)`). 메타 `episodes_analyzed_max` 등으로 판별합니다.
 
 ### 2.8 Claude 요약·저장·인제스트
 
-- 원문 코퍼스는 Claude 입력 시 **`MUNPIA_READER_CLAUDE_CORPUS_MAX_CHARS`(기본 96,000자, 상한 500,000)** 까지 잘림. 15화·장문이면 env 로 상향  
+- 원문 코퍼스는 Claude 입력 시 **`MUNPIA_READER_CLAUDE_CORPUS_MAX_CHARS`(기본 96,000자, 상한 500,000)** 까지 잘림. 회차 수·장문이면 env 로 상향  
 - 시스템/유저 프롬프트는 **독자·편집자 톤**, 고정 소제목 네 개: `문체 특징` / `주인공의 결핍` / `수집 회차 구간의 터닝포인트` / `조회·추천 지표의 회차 간 변화 (연독률 맥락)` — 마지막 절에서 회차 순 **조회·추천의 상승·하락·정체**를 서술  
 - 급상승이면 프롬프트에 `rising_reason`, 당일 순위 힌트 포함  
 - 저장 파일명: `data/trends/munpia-reader-{slug}-{YYYY-MM-DD}.md`  
@@ -138,7 +138,7 @@ Novel Agent 트렌드 RAG용으로 **문피아**에서 데이터를 가져오는
 - `MUNPIA_BEST_MOBILE_URL` — 베스트 목록 URL
 - `MUNPIA_READER_MAX_WORKS_PER_RUN`, `MUNPIA_READER_FILTER_RANKS`, `MUNPIA_READER_IGNORE_DUPLICATE`
 - `MUNPIA_READER_BETWEEN_WORKS_MS_*`, `MUNPIA_READER_EPISODE_WAIT_MS_*`, `MUNPIA_READER_BETWEEN_EPISODES_MS_*`
-- `MUNPIA_READER_EPISODES_MIN`, `MUNPIA_READER_EPISODES_MAX` — 수집 회차 상한 랜덤 구간(기본 15~15)
+- `MUNPIA_READER_EPISODES_MIN`, `MUNPIA_READER_EPISODES_MAX` — 수집 회차 상한 랜덤 구간(기본 10~10, env로 최대 15까지)
 - `MUNPIA_READER_CLAUDE_CORPUS_MAX_CHARS` — Claude에 넘기는 뷰어 원문 최대 글자수(기본 96,000, 최대 500,000)
 - `MUNPIA_READER_EPISODE_NO_SCAN_PAGES` — 목차 끝쪽(`page/9999` 근처) 스캔 페이지 수 (1~6, 기본 3)
 - `MUNPIA_READER_SCROLL_MAX_MS`, `MUNPIA_READER_BACKOFF_MS`, `MUNPIA_CRON_RANDOM_DELAY_MAX_MS`
