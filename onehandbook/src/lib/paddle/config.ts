@@ -22,6 +22,20 @@ function requiredEnv(name: string): string {
   return v;
 }
 
+/**
+ * NEXT_PUBLIC_* 전용. webpack DefinePlugin 은 `process.env.X` 형태의 literal access 만
+ * 빌드 시점에 string 으로 inline 한다. `process.env[name]` 같은 dynamic key access 는
+ * client bundle 에서 `undefined` 가 되어버리므로, 호출부에서 literal access 한 값을
+ * 인자로 전달해야 한다.
+ */
+function requiredPublicEnv(name: string, value: string | undefined): string {
+  const v = value?.trim();
+  if (!v) {
+    throw new Error(`[paddle] 환경변수 누락: ${name}`);
+  }
+  return v;
+}
+
 function readPaddleEnvironment(): PaddleEnvironment {
   const raw =
     process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT?.trim().toLowerCase() ?? "sandbox";
@@ -37,12 +51,18 @@ function readPaddleEnvironment(): PaddleEnvironment {
 }
 
 export const PADDLE_PRICES = {
-  STANDARD_MONTHLY: requiredEnv("NEXT_PUBLIC_PADDLE_PRICE_STANDARD_MONTHLY"),
+  STANDARD_MONTHLY: requiredPublicEnv(
+    "NEXT_PUBLIC_PADDLE_PRICE_STANDARD_MONTHLY",
+    process.env.NEXT_PUBLIC_PADDLE_PRICE_STANDARD_MONTHLY
+  ),
 } as const;
 
 export const PADDLE_CLIENT_CONFIG = {
   environment: readPaddleEnvironment(),
-  clientToken: requiredEnv("NEXT_PUBLIC_PADDLE_CLIENT_TOKEN"),
+  clientToken: requiredPublicEnv(
+    "NEXT_PUBLIC_PADDLE_CLIENT_TOKEN",
+    process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN
+  ),
 } as const;
 
 /**
