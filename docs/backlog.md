@@ -83,6 +83,21 @@
 - **작업 규모**: 3~4시간 (P2-004 와 동시 처리 시 효율 ↑)
 - **준비 상태**: `parent_job_id` 는 이미 쿼리/타입에 포함됨 (커밋 `eca622e`), UI 필터만 추가하면 됨
 
+### P2-007: NEXT_PUBLIC_* dynamic env access 잔존 패턴 전수 점검
+- **발견**: 2026-05-07, /pricing 결제 wire-up 배포 후 production 다운(약 1시간)
+- **증상**: 페이지 진입 시 `[paddle] 환경변수 누락: NEXT_PUBLIC_PADDLE_PRICE_STANDARD_MONTHLY` 에러. Vercel env 정상, Production 환경 체크, value 정상, 빌드 cache 해제 redeploy 모두 무효.
+- **원인**: webpack DefinePlugin 은 `process.env.X` 형태의 **literal access 만** 빌드 시점에 string 으로 inline 한다. `process.env[변수명]` 같은 dynamic key access 는 client bundle 에서 `undefined` 가 돼버린다. `requiredEnv("NEXT_PUBLIC_X")` 헬퍼가 dynamic access 였던 게 본질.
+- **해결 (당시)**: `requiredPublicEnv(name, value)` 헬퍼 신설 + `PADDLE_PRICES.STANDARD_MONTHLY`, `PADDLE_CLIENT_CONFIG.clientToken` literal access 로 변경 (commit `2cca009`)
+- **남은 작업 (이 백로그 항목)**: 코드베이스 다른 위치에 같은 함정 잔존 가능성 점검
+  ```
+  grep -rn "process.env\[" src/ | grep -v node_modules
+  grep -rn "process\.env\[\"NEXT_PUBLIC" src/
+  ```
+  → 해당 패턴 발견 시 literal access (`process.env.NEXT_PUBLIC_X`) 로 변경
+- **재발 방지**: 신규 NEXT_PUBLIC_* 추가 시 항상 literal access 패턴 사용. `requiredPublicEnv` 헬퍼 강제 사용.
+- **관련 트러블슈팅 문서**: TS-002 작성 검토 (TS-001 형식 따라, 진단 시간 길었던 사건이라 회고 가치 있음)
+- **예상 시간**: 30분 (grep + 변경 + 빌드 + 배포)
+
 ### P2-006: 탈퇴 시 스냅샷 데이터 보존
 - **발견**: 2026-04-25, 어드민 탈퇴 로그 페이지 구현 중
 - **현황**: 익명화 + 하드딜리트로 닉네임/이메일/작품수/분석횟수 손실
