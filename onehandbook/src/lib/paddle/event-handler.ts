@@ -27,40 +27,13 @@ export async function shouldProcessImmediately(
   event: PaddleWebhookEvent
 ): Promise<ProcessingDecision> {
   switch (event.event_type) {
-    case "transaction.completed": {
-      const tx = event.data;
-      const priceId = tx.items[0]?.price_id;
-      if (!priceId) {
-        return { mode: "queue", reason: "no_price_id_fallback_to_queue" };
-      }
-
-      try {
-        const supabase = createSupabaseServiceRole();
-        const { data: mapping, error } = await supabase
-          .from("paddle_price_nat_mapping")
-          .select("product_type")
-          .eq("paddle_price_id", priceId)
-          .eq("active", true)
-          .maybeSingle();
-
-        if (error) {
-          console.error("[paddle event-handler] price 매핑 조회 실패:", error.message);
-          return { mode: "queue", reason: "mapping_lookup_error_to_queue" };
-        }
-
-        if (mapping?.product_type === "one_time") {
-          return { mode: "sync", reason: "nat_purchase_immediate" };
-        }
-
-        return {
-          mode: "queue",
-          reason: mapping ? "subscription_renewal" : "unknown_price_to_queue",
-        };
-      } catch (e) {
-        console.error("[paddle event-handler] shouldProcessImmediately 예외:", e);
-        return { mode: "queue", reason: "mapping_lookup_exception_to_queue" };
-      }
-    }
+    case "transaction.completed":
+      // ADR-0010 §4-1 v3 (2026-05-07): 모든 transaction.completed sync 처리.
+      // 첫 구독 결제도 transaction.completed 로 도착하는데 product_type='subscription'
+      // 분기로 queue 에 빠져 Cron 미구현 상태에서 NAT 미충전 사고 발생(TS-003).
+      // 핸들러 멱등 가드 (status='completed') 보장되어 sync 처리 안전.
+      // queue 분기 + Cron batch 는 향후 갱신 결제 부하 증가 시 재도입 검토.
+      return { mode: "sync", reason: "transaction_completed_immediate" };
 
     case "subscription.activated":
       return { mode: "sync", reason: "first_subscription" };

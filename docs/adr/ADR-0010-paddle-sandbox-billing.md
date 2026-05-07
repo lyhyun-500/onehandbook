@@ -15,6 +15,7 @@
 |-----|------|-----|
 | v1 | 2026-04-28 | 초안 — Paddle Billing(Sandbox) 결제 모델 + Webhook 설계 + NAT 매핑 정책 + Hybrid 처리 아키텍처 |
 | v2 | 2026-05-06 | §5 운영 룰 추가 — 새 Paddle price 추가 시 마이그레이션 선행 의무 (FK 제약으로 인한 결제 사고 방지) + production 전환 매핑 주의 |
+| v3 | 2026-05-07 | §4 revision — 모든 transaction.completed sync 처리 (TS-003 후속, queue 분기 폐기) |
 
 ---
 
@@ -119,6 +120,24 @@ Tier 4 (보안)
   - 큐 fallback 기록 후 1분 주기 재처리(Cron)
 - **30초 이상 미반영**
   - 어드민 자동 알림(ADR-0008 `notifications` 활용)
+
+### 4-1. Revision (2026-05-07) — 모든 `transaction.completed` sync 처리
+
+위 Hybrid 설계 의도(갱신 결제는 queue + Cron)는 보존하되, **현재 운영 단계에선
+모든 `transaction.completed` 를 sync 로 처리한다**. 이유:
+
+- 첫 구독 결제도 `transaction.completed` 로 도착하는데 `product_type='subscription'`
+  분기로 queue 에 빠져, **Cron 워커 미구현 상태에서 NAT 영구 미충전** 사고 발생
+  (2026-05-07 sandbox 검증, TS-002 후속 발견)
+- 핸들러는 이미 멱등 (`paddle_transactions.status='completed'` 체크) → sync 처리
+  중복 호출 안전
+- 갱신 결제도 LLM/외부 호출 없는 가벼운 처리라 sync 로 충분
+
+**queue 분기 + Cron batch 는 다음 조건이 만족되면 재도입 검토**:
+- 월 결제 트랜잭션 수가 webhook 5초 응답 한계를 압박할 때
+- 또는 Cron 워커 자체가 구축돼 큐 처리 인프라가 안정화될 때
+
+**관련 인시던트**: [TS-003](../troubleshooting/TS-003-subscription-transaction-queue-trap.md)
 
 ---
 
