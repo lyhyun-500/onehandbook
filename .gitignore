@@ -42,3 +42,4 @@ scripts/experiment-*.ts
 tmp/
 portfolio-screenshots/
 **/tmp/
+.scratch/
