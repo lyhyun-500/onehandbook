@@ -97,7 +97,17 @@
 
 ## 5. 핵심 사용자 플로우 식별
 
-라우트 그룹(`(main)`)이 **없음** — 평면 라우트 구조. 인증 가드는 모두 **server-side `redirect("/login")`** 패턴.
+라우트 그룹(`(main)`)이 **없음** — 평면 라우트 구조. 인증 가드는 **`src/proxy.ts`** (Next.js 16 의 미들웨어, 이전 이름 `middleware.ts`) 에서 일괄 처리.
+
+> 정정(2026-05-08): STEP 0 초안에서 "middleware 부재 + 가드 산재" 라고 적었으나, 실제로는 Next.js 16 명명(`proxy.ts`) 으로 검색 누락. 사이트는 `src/proxy.ts` 175줄에서 다음을 일괄 가드한다:
+> - `/dashboard` → `/studio` redirect
+> - `/explore/*` → `/` redirect (현재 비활성)
+> - `/admin/*` role=admin 가드
+> - `/` 로그인 사용자 → `/studio` redirect
+> - 보호 경로(`/studio`, `/works`, `/billing`, `/notices`, `/verify-phone`) 비로그인 → `/login` redirect
+> - Supabase 세션 갱신 + `ohb_session_hint` 쿠키
+>
+> 즉 페이지 코드의 명시 `redirect("/login")` 은 `auth/welcome` 1곳뿐이고, 나머지는 proxy.ts 에서 처리됨.
 
 ### 회귀 대상 플로우 → 라우트 매핑
 
@@ -126,7 +136,7 @@
 
 ### 개편 작업 시 영향도/조치 필요 사항
 - **라우트 그룹 부재**가 개편 분리 전략을 제약. `(legacy)` / `(new)` 그룹으로 fork하기 어렵고, 컴포넌트/페이지 레벨에서 flag 분기해야 함.
-- 인증 가드가 **서버 컴포넌트마다 산재** (`redirect("/login")` 직접 호출). 미들웨어 부재라 플로우별 가드 동작 일관성 검증 필요.
+- ~~인증 가드가 **서버 컴포넌트마다 산재**~~ → **정정**: `src/proxy.ts` 에서 일괄 처리. 페이지 단위 가드 검증보다 proxy.ts 수정 회귀 테스트가 핵심.
 - realtime + polling 혼용 흐름(`AnalysisJobsContext`)은 디자인 변경 시에도 **상태 채널 보존** 필수 — 컨텍스트 자체는 디자인 무관하므로 영향 적지만 헤더 벨/토스트 UI는 직결.
 
 ---

@@ -21,32 +21,32 @@
 | `/auth/welcome` | `src/app/auth/welcome/page.tsx` | RSC | `redirect("/login")` 직접 호출 | dynamic | 약관 동의 모달 |
 | `/auth/signout` | `src/app/auth/signout/route.ts` | route handler | — | dynamic | 로그아웃 처리 |
 | `/auth/callback/naver` | `src/app/auth/callback/naver/route.ts` | route handler | — | dynamic | 네이버 OAuth 콜백 |
-| `/studio` | `src/app/studio/page.tsx` | RSC | 명시 가드 없음 (layout 또는 내부 처리) | static | **작가 대시보드** (CLAUDE.md 핵심) |
-| `/works/[id]` | `src/app/works/[id]/page.tsx` | RSC | 명시 가드 없음 | dynamic | **작품 상세** — 시안 2번 화면 |
-| `/works/[id]/settings` | `src/app/works/[id]/settings/page.tsx` | RSC | 명시 가드 없음 | dynamic | 작품 설정 |
-| `/works/[id]/analysis` | `src/app/works/[id]/analysis/page.tsx` | RSC | 명시 가드 없음 | dynamic | **분석 결과 페이지** — 시안 3번 |
-| `/works/[id]/episodes/new` | `src/app/works/[id]/episodes/new/page.tsx` | RSC | 명시 가드 없음 | dynamic | 회차 등록 |
-| `/works/[id]/episodes/[episodeId]` | `src/app/works/[id]/episodes/[episodeId]/page.tsx` | RSC | 명시 가드 없음 | dynamic | 회차 상세 |
-| `/works/[id]/episodes/[episodeId]/edit` | `src/app/works/[id]/episodes/[episodeId]/edit/page.tsx` | RSC | 명시 가드 없음 | dynamic | 회차 편집 |
+| `/studio` | `src/app/studio/page.tsx` | RSC | proxy.ts 가드 | static | **작가 대시보드** (CLAUDE.md 핵심) |
+| `/works/[id]` | `src/app/works/[id]/page.tsx` | RSC | proxy.ts 가드 | dynamic | **작품 상세** — 시안 2번 화면 |
+| `/works/[id]/settings` | `src/app/works/[id]/settings/page.tsx` | RSC | proxy.ts 가드 | dynamic | 작품 설정 |
+| `/works/[id]/analysis` | `src/app/works/[id]/analysis/page.tsx` | RSC | proxy.ts 가드 | dynamic | **분석 결과 페이지** — 시안 3번 |
+| `/works/[id]/episodes/new` | `src/app/works/[id]/episodes/new/page.tsx` | RSC | proxy.ts 가드 | dynamic | 회차 등록 |
+| `/works/[id]/episodes/[episodeId]` | `src/app/works/[id]/episodes/[episodeId]/page.tsx` | RSC | proxy.ts 가드 | dynamic | 회차 상세 |
+| `/works/[id]/episodes/[episodeId]/edit` | `src/app/works/[id]/episodes/[episodeId]/edit/page.tsx` | RSC | proxy.ts 가드 | dynamic | 회차 편집 |
 | `/explore` | `src/app/explore/page.tsx` (+ `layout.tsx`) | RSC | 없음 (layout에서 별도 처리) | static | 작품 탐색 |
-| `/explore/[id]` | `src/app/explore/[id]/page.tsx` | RSC | 명시 가드 없음 | dynamic | 탐색 상세 |
+| `/explore/[id]` | `src/app/explore/[id]/page.tsx` | RSC | proxy.ts 가드 | dynamic | 탐색 상세 |
 | `/explore/[id]/episodes/[episodeId]` | `src/app/explore/[id]/episodes/[episodeId]/page.tsx` | RSC | `auth.getUser()` 사용 | dynamic | 회차 상세 (탐색용) |
 | `/pricing` | `src/app/pricing/page.tsx` (+ `StandardPlanButton.tsx` CC) | RSC + CC 부분 | `auth.getUser()` (props 전달용, 가드 X) | dynamic | 요금 안내 + 결제 진입 (paddle) |
-| `/billing` | `src/app/billing/page.tsx` | RSC | 명시 가드 없음 | dynamic | NAT 잔량/이력 |
-| `/account` | `src/app/account/page.tsx` | RSC | 명시 가드 없음 | dynamic | 계정/마이페이지 |
-| `/account/inquiries` | `src/app/account/inquiries/page.tsx` | RSC | 명시 가드 없음 | dynamic | 1:1 문의 목록 |
+| `/billing` | `src/app/billing/page.tsx` | RSC | proxy.ts 가드 | dynamic | NAT 잔량/이력 |
+| `/account` | `src/app/account/page.tsx` | RSC | proxy.ts 가드 | dynamic | 계정/마이페이지 |
+| `/account/inquiries` | `src/app/account/inquiries/page.tsx` | RSC | proxy.ts 가드 | dynamic | 1:1 문의 목록 |
 | `/notices` | `src/app/notices/page.tsx` | RSC | 없음 | static | 공지사항 |
 | `/terms` | `src/app/terms/page.tsx` | RSC | 없음 | static | 이용약관 |
 | `/privacy` | `src/app/privacy/page.tsx` | RSC | 없음 | static | 개인정보 |
 | `/refund` | `src/app/refund/page.tsx` | RSC | 없음 | static | 환불 정책 |
-| `/verify-phone` | `src/app/verify-phone/page.tsx` | RSC | 명시 가드 없음 | dynamic | 휴대폰 인증 |
+| `/verify-phone` | `src/app/verify-phone/page.tsx` | RSC | proxy.ts 가드 | dynamic | 휴대폰 인증 |
 | `/admin` | `src/app/admin/page.tsx` (+ `layout.tsx`) | RSC | `requireAdmin()` (layout 또는 직접) | dynamic | 어드민 진입 |
 | `/admin/users` | `src/app/admin/users/page.tsx` | RSC | `requireAdmin()` | dynamic | 유저 목록 |
 | `/admin/users/[id]` | `src/app/admin/users/[id]/page.tsx` | RSC | `requireAdmin()` | dynamic | 유저 상세 |
 | `/admin/inquiries` | `src/app/admin/inquiries/page.tsx` | RSC | `requireAdmin()` | dynamic | 문의 목록 |
 | `/admin/withdrawals` | `src/app/admin/withdrawals/page.tsx` | RSC | `requireAdmin()` | dynamic | 탈퇴 로그 |
 
-### 1-2. `/dashboard` — 빈 디렉토리 (작동 라우트 아님)
+### 1-2. `/dashboard` — 빈 디렉토리 (proxy.ts redirect 처리됨)
 
 ```
 src/app/dashboard/
@@ -55,23 +55,36 @@ src/app/dashboard/
 
 git log 추적:
 - 첫 등장: commit `13eccd3 feat: Novel Agent 앱(onehandbook) 및 문서·마이그레이션 추가` (4월 초)
-- 이후 `da346fc feat: 분석 백그라운드`, `79dad85 feat(trends): add Munpia reader ingest pipeline` 에서 디렉토리 자체는 잔류
-- **page.tsx 작성된 적 없음** — 초기 구상 placeholder가 그대로 잔재
+- **page.tsx 작성된 적 없음** — 초기 구상 placeholder
 
-**조치 권장**: 빈 디렉토리 삭제 (별도 작업, 이번 범위 외). Next.js에서 빈 디렉토리는 라우트로 인식 안 됨 → 즉시 영향은 없지만 코드베이스 노이즈.
+**proxy.ts 처리**: `src/proxy.ts:32-38` 에서 `/dashboard*` 진입 요청을 `/studio` 로 redirect. 즉 빈 디렉토리는 영향 0 (외부 요청은 proxy 가 가로챔). 다만 디렉토리 자체는 redundant.
+
+**조치 권장**: 빈 디렉토리 삭제 (별도 작업, 이번 범위 외). 단 proxy.ts 의 redirect 분기는 외부 북마크 보존을 위해 유지.
 
 ### 1-3. 인증 가드 패턴 분포
 
+> **정정(2026-05-08)**: 초안에서 "middleware 부재" 적었으나 Next.js 16 의 `proxy.ts` 검색 누락. 실제로는 `src/proxy.ts` (175줄) 에서 일괄 가드.
+
 | 패턴 | 사용처 |
 |---|---|
-| `redirect("/login")` 직접 호출 | `auth/welcome/page.tsx` (1곳) |
-| `requireAdmin()` (`src/lib/admin/requireAdmin.ts`) | admin 4개 page (users 목록/상세, inquiries, withdrawals) |
+| **`src/proxy.ts` (Next.js 16 proxy = 미들웨어)** | **사이트 전반 — 라우트별 path 분기로 일괄 처리** |
+| `redirect("/login")` 페이지 직접 호출 | `auth/welcome/page.tsx` (1곳) — proxy 통과 후 추가 가드 |
+| `requireAdmin()` (`src/lib/admin/requireAdmin.ts`) | admin 4개 page (proxy 1차 + 페이지 내부 2차) |
 | `auth.getUser()` 명시 호출 (가드 + props) | `pricing`, `explore/[id]/episodes/[episodeId]` |
-| middleware 기반 | **없음** (`src/middleware.ts` 부재) |
-| `getOrCreateAppUser` (`src/lib/supabase/appUser.ts:156` redirect 포함) | 검색 결과 0건 — 정의는 있으나 page.tsx에선 미사용 |
-| 명시 가드 없음 | 그 외 대부분 (`/studio`, `/works/[id]/*`, `/billing`, `/account` 등) |
+| `getOrCreateAppUser` | 정의 존재 (`appUser.ts`), page.tsx 직접 호출 0건 |
 
-**관찰**: `/studio`, `/works/[id]/*`, `/billing`, `/account` 같은 보호 대상 페이지에 **명시 가드 없음**. 페이지 내부에서 데이터 로드 시 anon 사용자에게 빈 상태 또는 fallback 노출하는 패턴으로 추정 (page.tsx 직접 정독 필요 시 별도 점검).
+### 1-3-1. `src/proxy.ts` 가드 매트릭스
+
+| 분기 | 동작 | proxy.ts 라인 |
+|---|---|---|
+| `/dashboard*` → `/studio` | redirect | 32-38 |
+| `/explore*` → `/` | redirect (현재 매대 비활성) | 41-43 |
+| `/admin*` 권한 체크 | role=admin 만 통과, 비로그인 → `/login`, 비-admin → `/` | 81, 112-136 |
+| `/` (로그인) → `/studio` | redirect | 138-146 |
+| `/studio`, `/works/*`, `/billing`, `/notices`, `/verify-phone` (비로그인) → `/login` | redirect | 148-163 |
+| 그 외 + 세션 쿠키 갱신 | `NextResponse.next()` | 165 |
+
+**관찰**: 페이지 코드의 "명시 가드 없음"은 사실 **proxy 통과 후 보호된 상태**. 보호 자체는 작동.
 
 ---
 
