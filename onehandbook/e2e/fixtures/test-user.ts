@@ -1,27 +1,39 @@
 import { test as base, type Browser, type Page } from '@playwright/test';
-import { ensureStorageState, getTestEmail, type TestRole } from './auth';
+import { ensureStorageState, type TestRole } from './auth';
 
-type SeededUser = {
+type WriterUser = {
   page: Page;
+  role: 'writer';
   email: string;
-  role: TestRole;
+  userId: number;
+  authUserId: string;
+  seededWorkId: number;
+};
+
+type AdminUser = {
+  page: Page;
+  role: 'admin';
+  email: string;
+  userId: number;
+  authUserId: string;
 };
 
 type Fixtures = {
-  writer: SeededUser;
-  admin: SeededUser;
+  writer: WriterUser;
+  admin: AdminUser;
 };
 
-async function provideUser(
+async function provideUser<T extends WriterUser | AdminUser>(
   role: TestRole,
   browser: Browser,
-  use: (value: SeededUser) => Promise<void>,
+  use: (value: T) => Promise<void>,
+  build: (page: Page, meta: Awaited<ReturnType<typeof ensureStorageState>>['meta']) => T,
 ): Promise<void> {
-  const path = await ensureStorageState(role);
-  const context = await browser.newContext({ storageState: path });
+  const { storageStatePath, meta } = await ensureStorageState(role);
+  const context = await browser.newContext({ storageState: storageStatePath });
   const page = await context.newPage();
   try {
-    await use({ page, email: getTestEmail(role), role });
+    await use(build(page, meta));
   } finally {
     await context.close();
   }
@@ -29,10 +41,28 @@ async function provideUser(
 
 export const test = base.extend<Fixtures>({
   writer: async ({ browser }, use) => {
-    await provideUser('writer', browser, use);
+    await provideUser<WriterUser>('writer', browser, use, (page, meta) => {
+      if (meta.seededWorkId === undefined) {
+        throw new Error('writer fixture meta missing seededWorkId');
+      }
+      return {
+        page,
+        role: 'writer',
+        email: meta.email,
+        userId: meta.userId,
+        authUserId: meta.authUserId,
+        seededWorkId: meta.seededWorkId,
+      };
+    });
   },
   admin: async ({ browser }, use) => {
-    await provideUser('admin', browser, use);
+    await provideUser<AdminUser>('admin', browser, use, (page, meta) => ({
+      page,
+      role: 'admin',
+      email: meta.email,
+      userId: meta.userId,
+      authUserId: meta.authUserId,
+    }));
   },
 });
 
