@@ -1,15 +1,8 @@
 import Link from "next/link";
-import { Noto_Sans_KR } from "next/font/google";
 import { GenreScoreCounter } from "@/components/GenreScoreCounter";
 import { LandingHeroCoverSliders } from "@/components/LandingCoverDrift";
 import { SITE_NAME } from "@/config/site";
 import { getLandingCoverBackdrop } from "@/lib/landing-covers";
-
-const notoSansKr = Noto_Sans_KR({
-  subsets: ["latin"],
-  weight: ["600", "700", "800", "900"],
-  display: "swap",
-});
 
 const genreCards = [
   { genre: "로맨스", score: 86, hint: "최근 분석 평균" },
@@ -24,7 +17,7 @@ export default async function HomePage() {
 
   return (
     <div
-      className={`${notoSansKr.className} flex min-h-screen flex-col gap-0 bg-[#000000] text-zinc-100`}
+      className="flex min-h-screen flex-col gap-0 bg-[#000000] text-zinc-100"
     >
       <header className="fixed inset-x-0 top-0 z-30 m-0 min-h-[var(--ohb-landing-header-h)] border-b border-white/[0.06] bg-[#000000]/90 p-0 backdrop-blur-md">
         <div className="mx-auto flex h-full min-h-[var(--ohb-landing-header-h)] max-w-7xl items-center justify-between px-6 py-4">
