@@ -77,8 +77,8 @@ export default function AtomsPreviewPage() {
               </p>
             </CardContent>
             <CardFooter className="gap-2">
-              <Button variant="primary" size="sm">확인</Button>
-              <Button variant="ghost" size="sm">취소</Button>
+              <Button variant="primary" size="md">확인</Button>
+              <Button variant="ghost" size="md">취소</Button>
             </CardFooter>
           </Card>
         </section>

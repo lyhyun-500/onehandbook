@@ -143,6 +143,22 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+/*
+ * Input autofill override (ADR-0024 시각 검증으로 발견된 함정):
+ * 브라우저 user-agent stylesheet 가 autofill 시 연보라 배경/검정 글자 강제 박음.
+ * box-shadow inset 트릭 + transition 5000s 로 토큰 색상 유지.
+ * 사이트 전역 input 모두 영향 — atoms 외 native input 도 일관 보호.
+ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--foreground);
+  -webkit-box-shadow: 0 0 0 1000px var(--background) inset;
+  caret-color: var(--foreground);
+  transition: background-color 5000s ease-in-out 0s;
+}
+
 /* Agent Score 카드 / NAT 확인 모달 — 스캔 라인(가로 광선) */
 .ohb-scan-beam {
   position: absolute;

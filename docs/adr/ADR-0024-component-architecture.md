@@ -136,12 +136,37 @@ disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none
 - `pointer-events-none` 박아 hover 효과도 차단.
 - variant 마다 별도 disabled style 박지 않음 — opacity-50 가 일관 표시.
 
+### 결정 7-bis — Ghost variant 클릭 어포던스: `border-border` 박음 (Commit 3.5 보정)
+
+초안의 ghost = `bg-transparent text-foreground hover:bg-accent-muted` 만으로는 **클릭 어포던스 0** — 다크 배경 위에서 hover 전엔 영역이 보이지 않음 (atoms-preview 시각 검증으로 발견).
+
+**보정**: ghost 에 `border border-border` 추가.
+```
+ghost: "border border-border bg-transparent text-foreground hover:bg-accent-muted"
+```
+
+- secondary (`bg-muted`) 와 시각 차별화 — secondary 는 채워진 면, ghost 는 outline.
+- hover 시 `bg-accent-muted` 박혀 더 명확한 인터랙션 표시.
+- 라이트 모드에서도 `--border` 토큰이 자동 override 되어 일관 작동.
+
 ### 결정 8 — 시각 검증 정책 — `atoms-preview` 페이지 갱신 의무
 
 - `src/app/dev/atoms-preview/page.tsx` — 페이즈 1 Commit 3 에서 박음.
 - `/dev/*` 는 proxy.ts (ADR-0018) 의 production 자동 차단 정책 적용 — production 빌드에서 404, dev 환경에서만 접근 가능.
 - **atoms 추가 / 변경 시 본 페이지 갱신 의무** — 시각 회귀 잡는 1 차 안전망.
 - 향후 visual baseline (페이즈 1 Commit 5) 또는 페이즈 4~5 토글 도입 시 본 페이지에 토글 박음.
+
+#### 강화 사례 (Commit 3.5 — 시각 검증으로 발견된 함정 3 건)
+
+페이즈 1 Commit 3 직후 atoms-preview 시각 확인에서 본 ADR 의 정책이 의도대로 작동:
+
+| # | 함정 | 발견 경위 | 보정 |
+|---|------|-----------|------|
+| 1 | Input autofill 시 브라우저가 토큰 무시 → 연보라 배경 | atoms-preview 의 Input 매트릭스에 autofill 트리거 시점 발견 | `globals.css` 에 `input:-webkit-autofill` override 박음 (사이트 전역 input 보호) |
+| 2 | Ghost Button 영역 시각적으로 안 보임 (클릭 어포던스 0) | atoms-preview 의 ghost 행이 빈 셀처럼 보임 | 결정 7-bis 박음 (`border border-border` 추가) |
+| 3 | atoms-preview 데모 코드의 Card 내부 버튼 size="sm" 부적절 | atoms-preview 자체 검토 | 데모 코드 size="md" 로 보정 (atoms 본체 문제 아님) |
+
+**메타 회귀**: atoms-preview 시각 검증이 atoms 자체의 함정을 잡아냄 — 결정 8 의 "시각 회귀 1 차 안전망" 정책이 첫 박힘 직후 의도대로 작동. visual baseline (페이즈 1 Commit 5) 박기 전에 atoms 정상 상태 확정 필수 — 버그 박힌 채로 baseline 박으면 회귀 슈트가 버그를 "정상" 으로 인식.
 
 ### 결정 9 — 페이즈 2~5 atoms 추가 시 따를 정책
 
