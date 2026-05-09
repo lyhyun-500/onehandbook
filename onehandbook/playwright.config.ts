@@ -35,7 +35,8 @@ export default defineConfig({
   globalTimeout: 5 * 60_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  // dev 모드 동시 부하로 spec 04 test 3 ECONNRESET 가 1 회 관찰됨 → 로컬도 retry: 1.
+  retries: process.env.CI ? 2 : 1,
   reporter: process.env.CI ? 'list' : 'html',
   use: {
     baseURL,
@@ -66,6 +67,10 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.E2E_SUPABASE_ANON_KEY!,
       SUPABASE_SERVICE_ROLE_KEY: process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!,
       NEXT_PUBLIC_SITE_URL: baseURL,
+      // /api/analyze 의 isProviderConfigured 검증을 통과시키되, 실제 Anthropic API 호출은
+      // 가짜 키 → 401 fail 로 끝나도록. e2e 가 검증하는 건 jobs INSERT + NAT 차감 (background
+      // worker 의 LLM 호출 결과는 비범위). 실 키가 노출되거나 비용이 발생할 위험 0.
+      ANTHROPIC_API_KEY: 'sk-ant-e2e-fake-not-real',
     },
   },
 });
