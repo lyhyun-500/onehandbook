@@ -1,10 +1,31 @@
 @import "tailwindcss";
 
+/*
+ * 디자인 토큰 (ADR-0022):
+ * - default = 다크 (현 사이트 강제 다크 동작 보존, 코드 변경 0)
+ * - :root.light override = 페이즈 4~5 토글 도입 시 활성
+ * - 시그니처 액센트 = 잉크 블루 (Tailwind blue-600 라이트 / blue-500 다크)
+ * - hover 방향: 라이트는 어두워지는 방향, 다크는 밝아지는 방향
+ */
 :root {
   --background: #0a0a0a;
   --foreground: #fafafa;
   /* 랜딩 fixed 헤더 높이 — py-4 + 한 줄 타이틀 기준 */
   --ohb-landing-header-h: 4.5rem;
+
+  /* 시그니처 액센트 — 다크 톤 (default) */
+  --accent: #3b82f6;             /* blue-500 */
+  --accent-foreground: #f8fafc;  /* slate-50 */
+  --accent-hover: #60a5fa;       /* blue-400 — 다크 hover 는 밝아지는 방향 */
+  --accent-muted: #1e3a8a;       /* blue-900 — 다크 subtle 박스 */
+}
+
+:root.light {
+  /* 라이트 override — 페이즈 4~5 토글 도입 시 <html class="light"> 박으면 활성 */
+  --accent: #2563eb;             /* blue-600 */
+  --accent-foreground: #ffffff;
+  --accent-hover: #1e40af;       /* blue-800 — 라이트 hover 는 어두워지는 방향 */
+  --accent-muted: #dbeafe;       /* blue-100 */
 }
 
 html {
@@ -15,8 +36,20 @@ html {
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  /* 시그니처 액센트 4 단 (Tailwind 노출용 매핑) */
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-muted: var(--accent-muted);
+
+  /* 폰트 fallback chain — ADR-0023 의 한국어 시스템 폰트 약속 이행 */
+  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont,
+               "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic",
+               "Noto Sans CJK KR", system-ui, sans-serif;
+  --font-serif: "Newsreader", "Source Serif Pro", Georgia, serif;
+  /* ⚠ Newsreader 토큰 선언만 — 실 import 는 페이즈 2 LCP A/B 측정 후 결정 (ADR-0022 결정 6) */
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, Monaco, monospace;
 
   /* 사이드 패널 배경/구조 */
   --color-sidepanel-bg: #0b0e14;
