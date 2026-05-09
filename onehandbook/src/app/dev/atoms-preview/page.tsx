@@ -1,13 +1,20 @@
+"use client";
+
 /**
- * atoms-preview — 페이즈 1 atoms (Button / Input / Card) 시각 검증 페이지.
+ * atoms-preview — 페이즈 1 atoms 시각 검증 페이지.
  * /dev/* 는 proxy.ts 의 production 차단 정책 적용 — production 빌드에서 404.
  * 페이즈 4~5 다크/라이트 토글 도입 시 본 페이지에 토글 박음 (현재는 다크 default 만).
  */
+import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Modal, ModalHeader, ModalContent, ModalFooter } from "@/components/ui/Modal";
 
 export default function AtomsPreviewPage() {
+  const [modalOpen, setModalOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-background text-foreground p-8">
       <div className="mx-auto max-w-4xl space-y-12">
@@ -81,6 +88,61 @@ export default function AtomsPreviewPage() {
               <Button variant="ghost" size="md">취소</Button>
             </CardFooter>
           </Card>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold">Badge — variant × size</h2>
+          <div className="grid grid-cols-3 gap-4 items-center">
+            <span className="text-xs text-muted-foreground">default</span>
+            <Badge variant="default" size="sm">Small</Badge>
+            <Badge variant="default" size="md">Medium</Badge>
+
+            <span className="text-xs text-muted-foreground">secondary</span>
+            <Badge variant="secondary" size="sm">Small</Badge>
+            <Badge variant="secondary" size="md">Medium</Badge>
+
+            <span className="text-xs text-muted-foreground">outline</span>
+            <Badge variant="outline" size="sm">Small</Badge>
+            <Badge variant="outline" size="md">Medium</Badge>
+
+            <span className="text-xs text-muted-foreground">destructive</span>
+            <Badge variant="destructive" size="sm">Small</Badge>
+            <Badge variant="destructive" size="md">Medium</Badge>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold">Modal — ESC / backdrop / scroll lock / 포커스 복원</h2>
+          <p className="text-sm text-muted-foreground">
+            trigger 버튼 → 열림. ESC 또는 backdrop 클릭으로 닫기. body scroll lock + 닫힘 시 포커스 복원.
+            포커스 트랩은 미박음 (페이즈 2~3 도입 트리거).
+          </p>
+          <Button variant="primary" size="md" onClick={() => setModalOpen(true)}>
+            Modal 열기
+          </Button>
+          <Modal open={modalOpen} onClose={() => setModalOpen(false)} labelledBy="modal-demo-title">
+            <ModalHeader>
+              <h3 id="modal-demo-title" className="text-base font-semibold">
+                Modal 데모
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                ESC 또는 backdrop 클릭으로 닫힙니다. content 영역 클릭은 닫지 않음 (stopPropagation).
+              </p>
+            </ModalHeader>
+            <ModalContent>
+              <p className="text-sm">
+                다크 backdrop (bg-black/50) + 카드 톤 content. createPortal 로 document.body 에 렌더.
+              </p>
+            </ModalContent>
+            <ModalFooter>
+              <Button variant="ghost" size="md" onClick={() => setModalOpen(false)}>
+                취소
+              </Button>
+              <Button variant="primary" size="md" onClick={() => setModalOpen(false)}>
+                확인
+              </Button>
+            </ModalFooter>
+          </Modal>
         </section>
       </div>
     </div>

@@ -168,6 +168,39 @@ ghost: "border border-border bg-transparent text-foreground hover:bg-accent-mute
 
 **메타 회귀**: atoms-preview 시각 검증이 atoms 자체의 함정을 잡아냄 — 결정 8 의 "시각 회귀 1 차 안전망" 정책이 첫 박힘 직후 의도대로 작동. visual baseline (페이즈 1 Commit 5) 박기 전에 atoms 정상 상태 확정 필수 — 버그 박힌 채로 baseline 박으면 회귀 슈트가 버그를 "정상" 으로 인식.
 
+### 결정 8-bis — Modal 정책 (Commit 4 박음)
+
+페이즈 1 Commit 4 에서 Modal 박을 때 0 dep 정책 (결정 2) 유지 + 다음 5 항목 박음:
+
+#### a. 0 dep 직접 구현
+- Radix Dialog / Headless UI Dialog 미도입.
+- ESC / backdrop click / body scroll lock / 포커스 복원 / aria 모두 직접 박음.
+- `createPortal` 은 React 표준 (dep 추가 없음).
+
+#### b. createPortal 사용 정책
+- `createPortal(content, document.body)` — Modal 이 부모 컴포넌트의 z-index / overflow 영향 받지 않음.
+- **SSR 호환 가드**: `useEffect + useState(mounted)` 패턴. 첫 렌더 시 `document` 미정의이므로 `mounted = false` → null 반환, hydration 후 `mounted = true` 박힘.
+
+#### c. 포커스 트랩 미박음 (도입 트리거 명시)
+- 페이즈 1 범위 외 — 50~100 줄 추가 박는 무거운 부분.
+- **도입 트리거**: Modal 접근성 이슈 보고 누적 시 또는 페이지 작업 중 포커스 이탈 사례 발생 시.
+- 발동 시 별도 commit + ADR-0024 갱신 (또는 신규 ADR).
+
+#### d. z-index 정책
+- backdrop + content: `z-50`.
+- 페이즈 2~5 진행 중 다른 fixed 요소 (Header / FloatingButton 등) 와 충돌 시 ADR-0024 갱신.
+- 현 사이트의 fixed 요소 점검: `FloatingInquiryButton` (랜딩 우하단), `Header` (랜딩 fixed) — z-50 보다 낮은 순위로 박혀 있어 충돌 없음 (페이즈 1 시점).
+
+#### e. backdrop 톤 — `bg-black/50`
+- LEE 명시 후보 2 종 중 채택:
+  - **`bg-black/50` ⭐**: 다크/라이트 모드 모두 어둡게 가림 — 표준 패턴, 모드 일관.
+  - `bg-foreground/40` 비채택: 다크 모드에서 foreground=흰색이라 backdrop 이 흰색 반투명 → 의도 반대.
+- 별도 토큰 (`--backdrop`) 박지 않음 — Modal 만 사용하는 색상, over-engineering 회피.
+
+#### f. imperative API — Modal root 는 forwardRef 미박음 (결정 3 의 예외)
+- `Modal` root 는 `open` / `onClose` props 받는 imperative 패턴 — ref 부여 의미 없음.
+- 서브컴포넌트 (`ModalHeader` / `ModalContent` / `ModalFooter`) 는 일반 div 라 forwardRef + displayName 박음.
+
 ### 결정 9 — 페이즈 2~5 atoms 추가 시 따를 정책
 
 - 위치: `src/components/ui/<NewAtom>.tsx`.
