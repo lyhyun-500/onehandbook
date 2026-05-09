@@ -197,3 +197,55 @@
 3. Playwright 회귀 시나리오 (광범위 변경 안전망)
 
 이 3개가 갖춰지면 개편 작업을 안전하게 시작할 수 있다.
+
+---
+
+## 디자인 개편 안전망 진행 상태 (2026-05-09 기준)
+
+진단 시점 (위 종합 요약) 의 가장 시급한 3 개 안전망이 모두 충족됐다 — 디자인 페이즈 1 진입 가능.
+
+### 누적 commit (15 개 — `feat/redesign`, STEP 0 진단부터)
+
+| commit | 내용 |
+|--------|------|
+| `247969b` | STEP 0 진단 리포트 (이 문서의 원본) |
+| `9a811d0` | 02 라우트 인벤토리 정식화 |
+| `cb0be97` | `proxy.ts` 존재 반영하여 진단 리포트 정정 |
+| `495aa4b` | `/dev/*` production 차단 + Feature flag 시스템 (7 개) |
+| `15cfed6` | 03 E2E 회귀 테스트 전략 박제 |
+| `fa02daf` | e2e Supabase schema 복제 자동화 스크립트 |
+| `5a5c6a2` | 04 e2e Supabase 복제 결과 보고서 |
+| `4fcc48a` | Playwright E2E 인프라 + dev server 환경 격리 |
+| `010ea85` | 00 proxy 가드 회귀 spec — 작업 2 체크리스트 7 개 자동화 |
+| `f6cf9b5` | E2E fixture 보강 — 시드 + 인증 클라이언트 |
+| `1cb38f4` | 01 landing + 02 auth-flow 회귀 spec |
+| `6338b5f` | 06 nat-balance 회귀 spec |
+| `c21b198` | 03 novel-create 회귀 spec |
+| `3a0bd2e` | 04 analysis-request + 05 report-view 회귀 spec |
+| `46ccbe6` | 05 visual baseline 도입 보류 결정 박제 |
+
+> 페이즈 4 (작업 4) 의 ADR + reference + README/CONTRIBUTING + 본 문서 갱신 commits 가 곧 추가됨 (페이즈 4-6 commit split 단계).
+
+### 안전망 충족 매트릭스 (진단 시점 → 현재)
+
+| 영역 | 진단 시점 | 현재 (2026-05-09) |
+|---|---|---|
+| 롤백 (Git) | 🟡 중 — clean state, 태그 zero | 🟢 — `v-pre-redesign` 태그 + `feat/redesign` 분기 |
+| Feature flag | 🔴 zero | 🟢 — 7 flag + 4-tier priority (ADR-0018) |
+| 회귀 테스트 | 🔴 zero | 🟢 — 7 spec / 20 active tests / ~1.7m (ADR-0019, ADR-0020) |
+| 디자인 토큰 | 🟢 부분 도입 | 🟡 — 추가 토큰 + hex 직박 이주는 디자인 페이즈 1 작업 |
+| 라우트 분리 | 🟡 평면 구조 | 🟡 — 컴포넌트 단위 flag 분기로 처리 (라우트 fork 없음) |
+| 성능 측정 | 🔴 zero | ⏳ — 디자인 페이즈 1 진입 직전 build output + Lighthouse 1 회 측정 예정 |
+| CI/CD | 🟡 Vercel only | 🟡 — GitHub Actions 도입 보류 ([`docs/redesign/06-ci-workflow-deferred.md`](./06-ci-workflow-deferred.md) 참조, 적용 트리거 박힘) |
+
+### 작업 4 종료 후 다음
+- `feat/redesign` → `main` PR 준비.
+- **디자인 페이즈 1 진입 가능** — 토큰 + 공통 atoms.
+- 디자인 페이즈 1 진입 직전 build output + Lighthouse 측정 (성능 baseline).
+
+### 관련 문서
+- ADR 인덱스: [`docs/adr/README.md`](../adr/README.md) (ADR-0001 ~ ADR-0021)
+- 기여 가이드: [`docs/CONTRIBUTING.md`](../CONTRIBUTING.md)
+- NAT 도메인 reference: [`docs/reference/nat-domain.md`](../reference/nat-domain.md)
+- E2E 전략: [`docs/redesign/03-e2e-strategy.md`](./03-e2e-strategy.md)
+- e2e Supabase 복제 보고서: [`docs/redesign/04-e2e-supabase-replication-report.md`](./04-e2e-supabase-replication-report.md)
