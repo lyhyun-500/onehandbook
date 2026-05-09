@@ -156,7 +156,7 @@ ghost: "border border-border bg-transparent text-foreground hover:bg-accent-mute
 - **atoms 추가 / 변경 시 본 페이지 갱신 의무** — 시각 회귀 잡는 1 차 안전망.
 - 향후 visual baseline (페이즈 1 Commit 5) 또는 페이즈 4~5 토글 도입 시 본 페이지에 토글 박음.
 
-#### 강화 사례 (Commit 3.5 — 시각 검증으로 발견된 함정 3 건)
+#### 강화 사례 1차 (Commit 3.5 — 시각 검증으로 발견된 함정 3 건)
 
 페이즈 1 Commit 3 직후 atoms-preview 시각 확인에서 본 ADR 의 정책이 의도대로 작동:
 
@@ -166,7 +166,24 @@ ghost: "border border-border bg-transparent text-foreground hover:bg-accent-mute
 | 2 | Ghost Button 영역 시각적으로 안 보임 (클릭 어포던스 0) | atoms-preview 의 ghost 행이 빈 셀처럼 보임 | 결정 7-bis 박음 (`border border-border` 추가) |
 | 3 | atoms-preview 데모 코드의 Card 내부 버튼 size="sm" 부적절 | atoms-preview 자체 검토 | 데모 코드 size="md" 로 보정 (atoms 본체 문제 아님) |
 
-**메타 회귀**: atoms-preview 시각 검증이 atoms 자체의 함정을 잡아냄 — 결정 8 의 "시각 회귀 1 차 안전망" 정책이 첫 박힘 직후 의도대로 작동. visual baseline (페이즈 1 Commit 5) 박기 전에 atoms 정상 상태 확정 필수 — 버그 박힌 채로 baseline 박으면 회귀 슈트가 버그를 "정상" 으로 인식.
+#### 강화 사례 2차 (Commit 4.5 — Badge 시각 검증)
+
+페이즈 1 Commit 4 직후 atoms-preview 시각 확인에서 발견된 함정 3 건:
+
+| # | 함정 | 발견 경위 | 보정 |
+|---|------|-----------|------|
+| 1 | Badge 가 grid 안에서 행 풀로 박힘 (가로 100%) | atoms-preview 의 grid cell 이 stretch 박혀 inline-flex 의도 묻힘 | 데모 페이지 grid → flex 변경 + Badge base 에 `justify-center whitespace-nowrap` 보강 |
+| 2 | Badge size 가 라벨에 비해 큰 사이즈 | sm/md 에 height 미명시 → 실제 텍스트 사이즈만으로 박힌 사이즈가 라벨 의도보다 큼 | size Record 갱신: `sm = h-5 px-2 text-xs`, `md = h-6 px-2.5 text-sm` (작은 캡슐 라벨 표준) |
+| 3 | Outline variant border 가 다크 배경 위에서 약함 | `--border` (zinc-800) 가 다크 배경 (#0a0a0a) 대비 매우 약함 | Badge outline 한정 `border-foreground/20` 박음 (ADR-0022 토큰 보정 보류, Badge 한정 처리) |
+
+##### Badge 정책 박제 (Commit 4.5 결과)
+
+- **base 클래스**: `inline-flex items-center justify-center whitespace-nowrap` — Badge 가 inline 컨텍스트에서 의도대로 박힘 보장.
+- **size scale**: 작은 캡슐 라벨 표준 (h-5 / h-6) — Button 의 size 와 분리. Badge 의 의도된 사용 (텍스트 옆 라벨, "NEW" / "Beta" / "Error" 등) 에 부합.
+- **outline border 톤**: Badge 한정 `border-foreground/20` 박음 — 다크/라이트 호환 + 토큰 의존성 없음.
+- **`--border` 토큰 자체 보정**: 보류 (페이즈 2~5 다른 outline 컴포넌트 발생 시 일괄 결정 — ADR-0022 갱신 트리거).
+
+**메타 회귀**: atoms-preview 시각 검증이 atoms 자체의 함정을 두 번째로 잡아냄 — 결정 8 의 "시각 회귀 1 차 안전망" 정책이 atoms 박힐 때마다 작동. visual baseline (페이즈 1 Commit 5) 박기 전 atoms 정상 상태 확정 필수 — 버그 박힌 채로 baseline 박으면 회귀 슈트가 버그를 "표준" 으로 인식하고 페이즈 2~5 보정 시 baseline 깨짐 = 회귀 안전망 의미 없음.
 
 ### 결정 8-bis — Modal 정책 (Commit 4 박음)
 

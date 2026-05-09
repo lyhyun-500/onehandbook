@@ -91,24 +91,35 @@ export default function AtomsPreviewPage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold">Badge — variant × size</h2>
-          <div className="grid grid-cols-3 gap-4 items-center">
-            <span className="text-xs text-muted-foreground">default</span>
-            <Badge variant="default" size="sm">Small</Badge>
-            <Badge variant="default" size="md">Medium</Badge>
-
-            <span className="text-xs text-muted-foreground">secondary</span>
-            <Badge variant="secondary" size="sm">Small</Badge>
-            <Badge variant="secondary" size="md">Medium</Badge>
-
-            <span className="text-xs text-muted-foreground">outline</span>
-            <Badge variant="outline" size="sm">Small</Badge>
-            <Badge variant="outline" size="md">Medium</Badge>
-
-            <span className="text-xs text-muted-foreground">destructive</span>
-            <Badge variant="destructive" size="sm">Small</Badge>
-            <Badge variant="destructive" size="md">Medium</Badge>
+          <h2 className="text-lg font-semibold">Badge — variant × size (작은 캡슐 라벨)</h2>
+          <p className="text-sm text-muted-foreground">
+            inline-flex 동작 — 가로 풀 차지 X, 텍스트 사이즈만큼만 박힘. 한 줄에 여러 개 박아 검증.
+          </p>
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground w-24">default (sm/md)</span>
+              <Badge variant="default" size="sm">NEW</Badge>
+              <Badge variant="default" size="md">NEW</Badge>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground w-24">secondary</span>
+              <Badge variant="secondary" size="sm">Beta</Badge>
+              <Badge variant="secondary" size="md">Beta</Badge>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground w-24">outline</span>
+              <Badge variant="outline" size="sm">Draft</Badge>
+              <Badge variant="outline" size="md">Draft</Badge>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground w-24">destructive</span>
+              <Badge variant="destructive" size="sm">Error</Badge>
+              <Badge variant="destructive" size="md">Error</Badge>
+            </div>
           </div>
+          <p className="text-sm">
+            텍스트 옆 인라인 사용 예시: 회차 1화 <Badge variant="default" size="sm">NEW</Badge> 분석 완료 <Badge variant="secondary" size="sm">Beta</Badge> 상태.
+          </p>
         </section>
 
         <section className="space-y-4">
