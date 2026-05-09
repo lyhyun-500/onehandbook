@@ -93,6 +93,7 @@ npm run test:e2e:regression
 | spec 04 NAT pipeline 미검증 | ADR-0019 | `3a0bd2e` |
 | spec 04 ↔ spec 02/06 NAT race | ADR-0019 | `3a0bd2e` |
 | `router.refresh()` / 모달 닫힘 race | (commit 메시지) | `c21b198` |
+| storageState `access_token` 만료 → RPC 직접 호출 fail (`JWT expired`) | ADR-0019 (post-merge 섹션) + `isAccessTokenExpired` helper | (이번 commit) |
 
 > commit hash 로 `git show <hash>` 하면 함정 발견 → 해결 흐름이 박혀 있음.
 

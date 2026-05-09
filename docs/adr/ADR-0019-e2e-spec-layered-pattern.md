@@ -204,3 +204,17 @@ test.describe.configure({ mode: 'serial' });
 - 추정 원인: dev server cold start 직후 fixture 시드 + 첫 spec 실행이 부하 집중.
 - 결정: `playwright.config.ts` 에 `retries: process.env.CI ? 2 : 1` — 네트워크 일시 오류는 자동 재시도, 재시도해도 실패하면 진짜 회귀.
 - 영향: 실행 시간 약간 증가 (실패한 test 만 재시도).
+
+### Discovered post-merge: storageState access_token 만료 함정
+
+- **발견 시점**: 작업 4 페이즈 4-7 (main PR pre-merge 회귀 첫 가동, 2026-05-09).
+- **증상**: spec 04 test 2 (`consume_nat` RPC 직접 호출) 에서 `JWT expired` — retry 1 회도 동일.
+- **분석**:
+  - `e2e/.auth/writer.json` storageState 가 약 2 시간 전 globalSetup 시점에 발급된 access_token 박힘.
+  - Supabase access_token TTL ≈ 1 h. `STORAGE_TTL_MS` (24 h, mtime 캐시) 와 **TTL 불일치**.
+  - **page navigation 기반 spec 들** (01/02/03/06) 은 dev server 가 만료된 cookie 받으면 자동 refresh → 통과.
+  - **RPC 직접 호출 spec** (spec 04 test 2) 은 `getAuthenticatedClient` 가 storageState 의 만료된 `access_token` 을 그대로 `Authorization: Bearer` 헤더에 박음 → `JWT expired`.
+  - 즉 ADR-0019 의 핵심 결정 (RPC 직접 호출로 NAT pipeline 검증) 자체가 만료 토큰 노출 경로를 새로 만든 셈. **ADR-0019 의 그림자 영역**.
+- **해결**: `e2e/fixtures/auth.ts` 에 `isAccessTokenExpired(path)` helper 신설 — JWT `payload.exp` 디코드 후 5 분 buffer 검사. `ensureStorageState` 가 mtime + token expiry 둘 다 검증, 하나라도 만료면 강제 재발급.
+- **재발 방지**: 5 분 buffer 로 spec 실행 도중 만료 진입 차단.
+- **메타 회귀**: 회귀 슈트 **첫 가동** 에서 안전망이 정확히 의도대로 작동 — fail → 함정 발견 → 박제 → 근본 해결 → 재실행 green. ADR-0021 의 "함정 발견 가능성 높은 작업" 트리거에 부합.

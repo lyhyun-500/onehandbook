@@ -33,6 +33,49 @@ export async function isStorageStateExpired(path: string): Promise<boolean> {
   return Date.now() - s.mtimeMs > STORAGE_TTL_MS;
 }
 
+// Supabase access_token TTL (~1h) is shorter than STORAGE_TTL_MS (24h), so mtime alone
+// can't tell whether the persisted token is still usable for direct RPC calls. Page-nav
+// specs survive expiry via dev-server refresh, but RPC-direct specs (consume_nat etc.)
+// surface the stale token as 'JWT expired'. Decode the JWT exp here and force re-issue
+// when we're within 5 min of expiry.
+export async function isAccessTokenExpired(path: string): Promise<boolean> {
+  try {
+    if (!existsSync(path)) return true;
+    const raw = JSON.parse(await readFile(path, 'utf8')) as {
+      cookies: Array<{ name: string; value: string }>;
+    };
+    const supabaseUrl = new URL(process.env.E2E_SUPABASE_URL!);
+    const projectRef = supabaseUrl.hostname.split('.')[0];
+    const baseName = `sb-${projectRef}-auth-token`;
+    const chunks = raw.cookies
+      .filter((c) => c.name === baseName || c.name.startsWith(`${baseName}.`))
+      .sort((a, b) => {
+        if (a.name === baseName) return -1;
+        if (b.name === baseName) return 1;
+        const ai = parseInt(a.name.slice(baseName.length + 1), 10);
+        const bi = parseInt(b.name.slice(baseName.length + 1), 10);
+        return ai - bi;
+      });
+    if (chunks.length === 0) return true;
+    let combined = chunks.map((c) => c.value).join('');
+    if (combined.startsWith('base64-')) combined = combined.slice('base64-'.length);
+    const session = JSON.parse(Buffer.from(combined, 'base64url').toString('utf8')) as {
+      access_token?: string;
+    };
+    if (!session.access_token) return true;
+    const payloadB64 = session.access_token.split('.')[1];
+    if (!payloadB64) return true;
+    const payload = JSON.parse(
+      Buffer.from(payloadB64, 'base64url').toString('utf8'),
+    ) as { exp?: number };
+    if (typeof payload.exp !== 'number') return true;
+    const nowWithBuffer = Math.floor(Date.now() / 1000) + 300;
+    return payload.exp < nowWithBuffer;
+  } catch {
+    return true;
+  }
+}
+
 function validateServiceRoleKey(key: string): void {
   if (key.startsWith('eyJ') && key.length >= 200) return;
   if (key.startsWith('sb_secret_') && key.length >= 41) return;
@@ -300,7 +343,12 @@ async function createAuthArtifacts(role: TestRole): Promise<AuthContext> {
 export async function ensureStorageState(role: TestRole): Promise<AuthContext> {
   const sp = getStorageStatePath(role);
   const mp = getMetaPath(role);
-  if (existsSync(sp) && existsSync(mp) && !(await isStorageStateExpired(sp))) {
+  if (
+    existsSync(sp) &&
+    existsSync(mp) &&
+    !(await isStorageStateExpired(sp)) &&
+    !(await isAccessTokenExpired(sp))
+  ) {
     const meta = JSON.parse(await readFile(mp, 'utf8')) as AuthMeta;
     return { storageStatePath: sp, meta };
   }
