@@ -43,3 +43,6 @@ tmp/
 portfolio-screenshots/
 **/tmp/
 .scratch/
+
+# Claude Code memory directory (per-project agent memory, not source)
+.claude/
