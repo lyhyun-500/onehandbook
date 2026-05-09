@@ -67,7 +67,7 @@ e2e/regression/
 └── 06-nat-balance.spec.ts       # NAT 잔량 + 충전 페이지 진입
 
 e2e/baseline/
-└── visual-baseline.spec.ts      # 스크린샷 비주얼 기준선
+└── visual-baseline.spec.ts      # 스크린샷 비주얼 기준선 — 도입 보류, docs/redesign/05-visual-baseline-deferred.md 참조
 
 e2e/fixtures/
 ├── auth.ts                      # createUser + magiclink + storageState 헬퍼
