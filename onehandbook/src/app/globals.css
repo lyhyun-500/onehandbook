@@ -18,6 +18,16 @@
   --accent-foreground: #f8fafc;  /* slate-50 */
   --accent-hover: #60a5fa;       /* blue-400 — 다크 hover 는 밝아지는 방향 */
   --accent-muted: #1e3a8a;       /* blue-900 — 다크 subtle 박스 */
+
+  /* atoms 용 시스템 토큰 — 다크 default (ADR-0024) */
+  --muted: #1f2937;              /* gray-800 — secondary 버튼 / disabled bg */
+  --muted-foreground: #9ca3af;   /* gray-400 — placeholder, secondary text */
+  --destructive: #ef4444;        /* red-500 — destructive 버튼 / error border */
+  --destructive-foreground: #fef2f2; /* red-50 */
+  --border: #27272a;             /* zinc-800 — input/card border */
+  --card: #0c0c0e;               /* 살짝 elevated 다크 */
+  --card-foreground: #fafafa;
+  --ring: #3b82f6;               /* focus ring = accent (현 다크 톤). 향후 분리 가능 */
 }
 
 :root.light {
@@ -26,6 +36,16 @@
   --accent-foreground: #ffffff;
   --accent-hover: #1e40af;       /* blue-800 — 라이트 hover 는 어두워지는 방향 */
   --accent-muted: #dbeafe;       /* blue-100 */
+
+  /* atoms 용 시스템 토큰 — 라이트 override */
+  --muted: #f4f4f5;              /* zinc-100 */
+  --muted-foreground: #71717a;   /* zinc-500 */
+  --destructive: #dc2626;        /* red-600 */
+  --destructive-foreground: #ffffff;
+  --border: #e4e4e7;             /* zinc-200 */
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --ring: #2563eb;               /* focus ring = accent (라이트) */
 }
 
 html {
@@ -42,6 +62,16 @@ html {
   --color-accent-foreground: var(--accent-foreground);
   --color-accent-hover: var(--accent-hover);
   --color-accent-muted: var(--accent-muted);
+
+  /* atoms 시스템 토큰 (Tailwind 노출용) — ADR-0024 */
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-ring: var(--ring);
 
   /* 폰트 fallback chain — ADR-0023 의 한국어 시스템 폰트 약속 이행 */
   --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont,

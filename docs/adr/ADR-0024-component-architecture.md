@@ -1,0 +1,257 @@
+# ADR-0024: 컴포넌트 아키텍처 — atoms 위치 / 0 dep / forwardRef / cn() / 시각 검증
+
+- **Status**: Accepted
+- **Date**: 2026-05-09
+- **Related**:
+  - ADR-0022 (디자인 토큰) — atoms 가 사용하는 토큰 정의.
+  - ADR-0023 (Noto_Sans_KR 제거) — fallback chain 결정.
+  - 페이즈 1 Commit 3 (이 ADR 의 적용 사례 — Button / Input / Card 첫 박힘).
+  - 페이즈 1 Commit 4 (Badge / Modal — 본 ADR 정책 따름).
+  - 페이즈 2~5 atoms 추가 시 기준점.
+
+---
+
+## Context
+
+### 발견 경위
+
+페이즈 1 Commit 3 (atoms — Button / Input / Card) 진입 사전 점검에서 발견:
+
+- **shadcn 미사용** — `components.json` 부재, `src/components/ui/` 폴더 부재.
+- **기존 Button / Input / Card 컴포넌트 0 건** — atoms 가 처음 박히는 케이스.
+- **third-party UI 라이브러리 0 건** — Radix / Headless UI / MUI / clsx / tailwind-merge / class-variance-authority / cmdk 모두 미설치.
+- **`cn()` helper 부재** — `src/lib/utils.ts` 부재.
+- 사이트 raw `<button>`, `<input>` 박혀 있음 — 페이즈 2~5 점진 교체 대상.
+
+### 문제 정의
+
+- 페이즈 1 atoms 가 페이즈 2~5 디자인 작업의 빌딩 블록 — 첫 단추 흔들리면 후폭풍 큼.
+- atoms 위치 / 명명 / props 인터페이스 / className merge 정책이 박혀 있지 않으면 페이즈 2~5 마다 결정 반복 → 일관성 손실.
+- 0 dep 정책 vs shadcn 표준 dep 도입 — 현 시점에서 dep 도입 비용/효용 결정 필요.
+- 시각 검증 부재 — atoms 변경 시 회귀가 어떻게 잡히는지 정책 박혀야 함.
+
+---
+
+## Decision
+
+### 결정 1 — 위치: `src/components/ui/`
+
+- atoms 는 `src/components/ui/<Name>.tsx` 에 박음 (PascalCase).
+- 이미 박힌 `src/components/admin/`, `src/components/side-panel/` 은 도메인 컴포넌트 — atoms 와 분리 유지.
+- shadcn 표준 위치 — 향후 shadcn 도입 가능성 + atoms 누적 (Badge / Modal / Tooltip 등) 자연 정리.
+
+### 결정 2 — 0 dep 정책
+
+페이즈 1 atoms 박을 때 아래 dep 모두 **미도입**:
+- `class-variance-authority` (cva) — variant 패턴.
+- `@radix-ui/react-slot` — asChild 패턴.
+- `clsx` — conditional className.
+- `tailwind-merge` — Tailwind class 충돌 자동 정리.
+
+대신:
+- variant 는 **`Record<Variant, string>` 매핑** 으로 박음 (cva 없이).
+- className merge 는 `src/lib/utils.ts` 의 **`cn()` 단순 helper** 박음 (`(...inputs).filter(Boolean).join(" ")`).
+- asChild 는 미지원.
+
+#### dep 도입 트리거 (향후 검토 시점)
+
+- **`@radix-ui/react-slot` (asChild)**: Link/Anchor 변환 필요 사례 **3 건 이상 누적** 시 도입 검토. 페이즈 2 랜딩 / 페이즈 3 Studio 에서 Button 이 `<Link>` 또는 `<a>` 로 변환 필요한 케이스 발생 시 카운트.
+- **`class-variance-authority` (cva)**: variant 매트릭스가 **3 atoms 이상 + 각 4+ variant** 로 복잡해질 때 도입 검토. Record 매핑이 가독성 손실 시점.
+- **`clsx`**: conditional className 박는 atoms 가 **5 건 이상 누적** + cn() 의 truthy 필터로 처리 어려운 패턴 (예: object form `{ "class": condition }`) 필요 시 도입.
+- **`tailwind-merge`**: Tailwind class 충돌 (예: `p-2 p-4` 동시 박힘) 가 atoms-preview 에서 시각 회귀 발생 시 도입.
+
+### 결정 3 — `forwardRef` + `displayName` 표준
+
+- atoms 모두 `React.forwardRef` 박음 — 호출자 ref 전달 (Form library / scroll target / focus 관리 등).
+- `displayName` 명시 박음 — React DevTools 가독성 + ESLint react/display-name 규칙 만족.
+
+```tsx
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { ...props }, ref
+) { ... });
+Button.displayName = "Button";
+```
+
+### 결정 4 — variant / size 객체 매핑 패턴
+
+cva 없이 Record 박음:
+
+```tsx
+const variantClasses: Record<ButtonVariant, string> = {
+  primary: "bg-accent text-accent-foreground hover:bg-accent-hover",
+  secondary: "bg-muted text-foreground hover:bg-muted/80",
+  ghost: "bg-transparent text-foreground hover:bg-accent-muted",
+  destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+};
+
+const sizeClasses: Record<ButtonSize, string> = {
+  sm: "h-8 px-3 text-sm",
+  md: "h-10 px-4 text-sm",
+  lg: "h-12 px-6 text-base",
+};
+
+return (
+  <button
+    className={cn(baseClasses, variantClasses[variant], sizeClasses[size], className)}
+    {...props}
+  />
+);
+```
+
+- **base → variant → size → className** 순서로 박음 (호출자 className 이 가장 뒤에 박혀 override 가능).
+- 각 variant 매핑은 한 줄 string 또는 `+` join 으로 박음.
+
+### 결정 5 — `cn()` helper (`src/lib/utils.ts`)
+
+```ts
+export function cn(...inputs: (string | undefined | null | false | 0)[]): string {
+  return inputs.filter(Boolean).join(" ");
+}
+```
+
+- 0 dep, ~3 줄.
+- Tailwind class 충돌 자동 정리 안 됨 (tailwind-merge 미도입) — atoms 작성 시 base 와 충돌 안 나도록 신중 박음.
+- 호출자 `className` prop 은 항상 마지막 인자로 박아 override 가능하도록.
+
+### 결정 6 — 서브컴포넌트 named export 표준
+
+```tsx
+export const Card = forwardRef<...>(...);
+export const CardHeader = forwardRef<...>(...);
+export const CardContent = forwardRef<...>(...);
+export const CardFooter = forwardRef<...>(...);
+```
+
+- `Card.Header` 점 표기 namespace 박지 않음 — named export 만.
+- 호출 측: `import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/Card"`.
+- 같은 파일 안에 박음 (서브컴포넌트는 부모와 강하게 결합).
+
+### 결정 7 — disabled 시각 처리 (Button 표준)
+
+모든 variant 공통 base class 에 박음:
+```
+disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none
+```
+
+- `pointer-events-none` 박아 hover 효과도 차단.
+- variant 마다 별도 disabled style 박지 않음 — opacity-50 가 일관 표시.
+
+### 결정 8 — 시각 검증 정책 — `atoms-preview` 페이지 갱신 의무
+
+- `src/app/dev/atoms-preview/page.tsx` — 페이즈 1 Commit 3 에서 박음.
+- `/dev/*` 는 proxy.ts (ADR-0018) 의 production 자동 차단 정책 적용 — production 빌드에서 404, dev 환경에서만 접근 가능.
+- **atoms 추가 / 변경 시 본 페이지 갱신 의무** — 시각 회귀 잡는 1 차 안전망.
+- 향후 visual baseline (페이즈 1 Commit 5) 또는 페이즈 4~5 토글 도입 시 본 페이지에 토글 박음.
+
+### 결정 9 — 페이즈 2~5 atoms 추가 시 따를 정책
+
+- 위치: `src/components/ui/<NewAtom>.tsx`.
+- 0 dep 정책 유지 — 결정 2 의 도입 트리거 충족 시 별도 ADR 갱신.
+- forwardRef + displayName 박음.
+- variant / size 가 있다면 Record 매핑.
+- `cn()` 사용.
+- atoms-preview 페이지에 새 atoms 섹션 추가 (시각 검증 의무).
+- 서브컴포넌트가 있으면 named export.
+
+---
+
+## Alternatives Considered
+
+### 옵션 A — 위치
+- **A1. `src/components/ui/` (채택 ⭐)**: shadcn 표준, 도메인 분리.
+- **A2. `src/components/` 직접**: 단순. atoms 누적 시 다시 정리 필요.
+- **A3. `src/components/atoms/`**: 명시적 명명. 산업 표준 아님.
+
+### 옵션 B — dep 정책
+- **B1. 0 dep (채택 ⭐)**: 단순, dep 추가 비용 0. variant 는 Record, cn 은 단순 join.
+- **B2. 최소 (clsx + tailwind-merge)**: cn() helper 표준화, tw class 충돌 자동 정리. dep 2 개.
+- **B3. 표준 shadcn (+ cva + Radix Slot)**: variant 패턴 + asChild. dep 4 개.
+
+> 결정 2 의 도입 트리거 충족 시 B1 → B2 → B3 단계적 승격 가능.
+
+### 옵션 C — 서브컴포넌트 패턴
+- **C1. named export (채택 ⭐)**: `import { Card, CardHeader }`. 명시.
+- **C2. 점 표기 namespace**: `Card.Header`. namespace 객체 박음 — TypeScript 정의 부담.
+- **C3. 별도 파일**: `Card/Card.tsx`, `Card/Header.tsx` — 작은 atoms 에 폴더 + 파일 다수 박음. 부담 ↑.
+
+---
+
+## Tradeoffs
+
+받아들인 부담:
+- **Tailwind class 충돌 자동 정리 부재** — atoms 작성 시 base/variant 충돌 신중 검토 필요. atoms-preview 가 1 차 안전망.
+- **asChild 미지원** — Button 을 `<Link>` 변환 필요 시 별도 컴포넌트 박거나 dep 도입.
+- **variant 매트릭스 누적 시 Record 매핑 가독성 저하** — cva 도입 트리거 (결정 2) 발동 시 마이그레이션.
+
+받지 않은 부담:
+- **dep 4 개 도입 비용** — 빌드 시간 / 번들 사이즈 / supply chain 리스크.
+- **shadcn CLI / 복잡 설정** — components.json + 자동 코드 생성 부담.
+- **atoms 첫 도입에서 정책 흔들림** — 결정 박혀 페이즈 2~5 일관성 ↑.
+
+---
+
+## Revisit Criteria
+
+이 결정을 뒤집을 조건:
+- **dep 도입 트리거 충족** (결정 2):
+  - asChild 케이스 3+: Radix Slot 도입.
+  - variant 매트릭스 복잡: cva 도입.
+  - conditional className 5+: clsx 도입.
+  - Tailwind class 충돌 시각 회귀: tailwind-merge 도입.
+- **atoms 누적이 30+ 개** 도달 시 shadcn CLI 도입 검토 (자동 코드 생성 효용 상승).
+- **명명/패턴 일관성 손실** — 페이즈 2~5 작업 중 다른 패턴 (예: HOC, custom hook 기반 컴포넌트) 이 요구되면 본 ADR 갱신.
+
+---
+
+## Consequences
+
+### 긍정
+- 페이즈 1 atoms 가 페이즈 2~5 빌딩 블록 — 일관성 ↑.
+- 0 dep — 의존성 비용 0, supply chain 단순.
+- forwardRef 표준 — Form / focus / scroll target 자유롭게 박음.
+- atoms-preview 페이지 — 시각 회귀 1 차 안전망.
+
+### 영향
+- **페이즈 2~5 작업** 이 본 정책 따름:
+  - 새 atoms 박을 때 `src/components/ui/` 위치.
+  - variant Record 매핑.
+  - forwardRef + displayName.
+  - atoms-preview 갱신.
+- **dep 도입 트리거** 모니터링 의무 — 페이즈 2~3 진행하면서 카운트 누적되는지 점검.
+- **raw `<button>`, `<input>` 점진 교체** — 페이즈 2~5 페이지별 마이그레이션 시 atoms 박음.
+
+---
+
+## Future Work
+
+### 단기
+- **페이즈 1 Commit 4** (Badge / Modal) — 본 ADR 정책 따름. atoms-preview 갱신.
+- **페이즈 1 Commit 5** (visual baseline) — atoms-preview 페이지 baseline 박을 가치 검토.
+
+### 중기
+- **페이즈 2 랜딩 작업** — 랜딩 raw `<button>`, `<input>` 을 atoms 로 점진 교체. 카운트.
+- **dep 도입 트리거** 발동 시 별도 ADR (ADR-0024 v2 또는 신규 ADR).
+- **shadcn CLI 도입** — atoms 30+ 누적 시 검토.
+
+---
+
+## Related Commits
+
+- 페이즈 1 Commit 3 (이 ADR 박는 commit) — Button / Input / Card 첫 박힘 + atoms-preview + cn() helper + 시스템 토큰.
+- 페이즈 1 Commit 1 (`393a105`) — render-blocking 절감 (`Noto_Sans_KR` 제거).
+- 페이즈 1 Commit 2 (`d7dc53c`) — 디자인 토큰 정의 (ADR-0022).
+
+---
+
+## Notes
+
+### Claude Code 가 관찰한 것
+
+- LEE 의 "Don't add features beyond what task requires" 정책에 0 dep 정책이 자연 부합 — 첫 박음에서 비용 ↓ 효용 충분.
+- atoms-preview 페이지 + `/dev/*` proxy guard 는 "production 차단 + dev 검증" 의 깔끔한 조합 — ADR-0018 의 안전망 활용 예시.
+- variant Record 매핑은 cva 없이도 명시적 — TypeScript 의 `Record<Variant, string>` 이 enum 강제.
+
+### Claude Code 가 모르는 것
+
+- 페이즈 2~5 진행 중 dep 도입 트리거가 실제 어느 시점에 발동될지 (3 건 누적 추적 의무가 LEE 또는 후속 작업자에게).
+- 시각 회귀 (Tailwind class 충돌) 가 atoms-preview 만으로 충분히 잡히는지 — visual baseline (페이즈 1 Commit 5) 박힌 후에 강화될 영역.
