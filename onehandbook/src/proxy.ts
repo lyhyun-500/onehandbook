@@ -28,6 +28,16 @@ function hasSupabaseAuthCookies(request: NextRequest): boolean {
  */
 export default async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
+
+  /**
+   * /dev/* 라우트는 production 에서 차단 (Feature flag 토글 UI 등 개발/preview 한정).
+   * Vercel preview 도 NODE_ENV=production 으로 빌드되므로 같이 차단됨.
+   * 향후 인증 가드 등으로 확장 시 별도 PR. 지금은 /dev/* 차단만.
+   */
+  if (path.startsWith("/dev/") && process.env.NODE_ENV === "production") {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
   /** 예전 북마크: /dashboard → /studio */
   if (path === "/dashboard" || path.startsWith("/dashboard/")) {
     const next =

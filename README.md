@@ -174,6 +174,37 @@ npm run dev
 **제품 요구사항(PRD):** [docs/PRD.md](docs/PRD.md)  
 **백로그·일정:** [docs/BACKLOG.md](docs/BACKLOG.md)
 
+---
+
+## 디자인 전면 개편 (2026-05~)
+
+이 프로젝트는 디자인 전면 개편 진행 중입니다. 작업 분기는 `feat/redesign` 브랜치.
+
+### 진행 상태
+- ✅ 작업 1: Git 기준선 + `v-pre-redesign` 태그
+- ✅ 작업 2: Feature flag 시스템 (7 flag) + `/dev/*` production 차단
+- ✅ Mini: e2e Supabase 자동 복제 (별도 격리 환경)
+- ✅ 작업 3: Playwright E2E 회귀 슈트
+  - 7 spec 파일, 20 active tests, ~1.7m 실행
+  - `npm run test:e2e:regression` 한 줄로 매 변경 검증
+- ✅ 작업 4: ADR 6개 + Reference + 운영 문서
+- ⏳ 디자인 페이즈 1: 토큰 + 공통 atoms
+- ⏳ 디자인 페이즈 2: 저위험 페이지 (랜딩/로그인/스피너)
+- ⏳ 디자인 페이즈 3: 중위험 (Studio/Work Detail)
+- ⏳ 디자인 페이즈 5: 고위험 (Analysis Report 머니패스)
+
+### 관련 문서
+- ADR: [docs/adr/README.md](docs/adr/README.md)
+- E2E 전략: [docs/redesign/03-e2e-strategy.md](docs/redesign/03-e2e-strategy.md)
+- e2e Supabase 복제 보고서: [docs/redesign/04-e2e-supabase-replication-report.md](docs/redesign/04-e2e-supabase-replication-report.md)
+- NAT 도메인 reference: [docs/reference/nat-domain.md](docs/reference/nat-domain.md)
+- 기여 가이드: [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)
+
+### 신규 spec 추가 시
+[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) 의 "신규 spec 작성 가이드" 참조.
+
+---
+
 ### Cursor IDE 참고
 
 - **채팅에서 사용하는 모델 이름(프리셋)을 바꿔도** 이전 대화 내용이 자동으로 지워지지는 않습니다. 이후 메시지를 어떤 모델이 처리할지만 바뀝니다. (저장소·DB 데이터와는 무관합니다.)

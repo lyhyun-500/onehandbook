@@ -21,7 +21,12 @@
     "trends:ingest-free-episodes:dry": "tsx scripts/ingest_free_episode_summaries.ts --dry-run",
     "cookies:munpia": "tsx scripts/save_munpia_storage_state.ts",
     "munpia:unlock": "tsx scripts/clear_munpia_reader_lock.ts",
-    "coins:stats:refresh": "tsx scripts/refresh-coin-stats.ts"
+    "coins:stats:refresh": "tsx scripts/refresh-coin-stats.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:regression": "playwright test e2e/regression",
+    "test:e2e:baseline": "playwright test e2e/baseline",
+    "test:e2e:update-baseline": "playwright test --update-snapshots"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -48,6 +53,7 @@
     "solapi": "^5.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@types/md5": "^2.3.6",
     "@types/node": "^20",
