@@ -346,6 +346,39 @@ skip 박은 발견은 반드시 **ADR 박제** — 페이지 마이그레이션 
 
 LEE 시각 검증이 atom 추출 commit 의 빈틈 자체를 잡아냄 — 결정 8 의 "시각 회귀 1차 안전망" 정책이 사용처 보정 commit 에서도 작동. atoms-preview 갱신 + 사용처 시각 확인 박은 LEE 게이트가 commit 진단의 핵심 layer.
 
+### 결정 13 — dev preview 페이지 명명 정책 (페이즈 2-B-3 박음)
+
+페이즈 1 의 `atoms-preview` 박힌 시각 검증 페이지가 페이즈 2~5 도메인 컴포넌트 박힐 때 재사용 박음. 명명 표준 박음.
+
+#### 명명 패턴
+
+```
+src/app/dev/<domain>-preview/page.tsx
+```
+
+| 페이즈 | 도메인 | 경로 | 박힌 컴포넌트 |
+|---|---|---|---|
+| 1 | atoms | `src/app/dev/atoms-preview/page.tsx` | Button / Input / Card / Badge / Modal / Spinner |
+| 2-B | landing | `src/app/dev/landing-preview/page.tsx` | LiveScoreCard (2-B-3) |
+| 3+ (예정) | studio / analysis / ... | `src/app/dev/<domain>-preview/page.tsx` | 도메인 컴포넌트 박힐 때 신설 |
+
+#### 박힌 정책
+
+- **격리 시각 검증** — 도메인 컴포넌트 박을 때 페이지 마이그레이션 전 단독 시각 확인 박음. 시안 일치 + 인터랙션 동작 박힘 확인.
+- **/dev/* proxy 차단 재사용** — proxy.ts 박힌 production 차단 정책 (NODE_ENV=production redirect) 그대로 적용. Vercel preview 도 차단됨.
+- **시안 의도 톤 보존** — preview 페이지 자체 박음 시안의 배경/톤 박음 (예: stone-950 + radial gradient). 컴포넌트가 실제 박힐 페이지의 톤을 가짜로 박지 말 것 — 컴포넌트가 톤에 의존하면 컴포넌트 자체에 박힘.
+- **신설 시점** — 도메인 컴포넌트 박는 commit 에 동시 박음. 페이지 마이그레이션 commit 박힐 때 preview 페이지 박지 않음 (preview 는 컴포넌트 시각 검증 용도, 페이지 자체 검증은 visual baseline 박음).
+
+#### scoreColor 사용 정책 (LiveScoreCard 박음 첫 사용처 — 부수 메모)
+
+페이즈 2-B-2 박힌 `scoreColor` utility 의 사용 범위:
+
+- **6축 (객관 평가) — `scoreColor` 사용**: 90+ emerald / 80+ amber-200 / 70+ amber-300/90 / 60+ orange / <60 rose. 시안 명세 톤 그대로.
+- **종합 점수 (후한 톤) — 인라인 분기 박음**: >=80 emerald / else amber-200. 시안 박힌 한 단계 후한 톤 박음 (사용자에게 종합 점수는 더 관대하게 박힘 — 마케팅 의도). `scoreColor` 박지 않음.
+- **막대그래프 fill — oklch 인라인 + `style.background`**: Tailwind class 박을 수 없는 240ms transition + 부드러운 색상 보간 박음 박힘. `scoreColor.bg` 박지 않음.
+
+페이즈 4 (Analysis Report) 박힐 때 본 정책 재검토 박음 — Analysis Report 의 종합 점수가 객관 톤 박음일지 후한 톤 박음일지 결정 박힐 시점.
+
 ---
 
 ## Alternatives Considered
