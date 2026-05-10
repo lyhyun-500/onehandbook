@@ -30,7 +30,15 @@ const inheritedEnv = Object.fromEntries(
 export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,
-  expect: { timeout: 5_000 },
+  expect: {
+    timeout: 5_000,
+    // Visual baseline 비교 옵션. ADR-0025 참조.
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.02,
+      animations: 'disabled',
+      caret: 'hide',
+    },
+  },
   globalSetup: './e2e/global-setup.ts',
   globalTimeout: 5 * 60_000,
   fullyParallel: true,
