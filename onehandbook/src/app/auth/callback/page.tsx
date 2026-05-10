@@ -4,22 +4,13 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { SITE_NAME } from "@/config/site";
+import { Spinner } from "@/components/ui/Spinner";
 
 const MESSAGES = [
   "스튜디오 불러오는 중...",
   "펜에 잉크 채우는 중..",
   "맞춤법 검수중..",
 ] as const;
-
-function Spinner() {
-  return (
-    <div
-      className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-600 border-t-cyan-400"
-      role="status"
-      aria-label="로딩 중"
-    />
-  );
-}
 
 function AuthCallbackLoadingPage() {
   const searchParams = useSearchParams();
@@ -57,7 +48,7 @@ function AuthCallbackLoadingPage() {
         <p className="mt-1 text-xs text-zinc-500">Novel Agent</p>
 
         <div className="mt-8 flex justify-center">
-          <Spinner />
+          <Spinner size="lg" />
         </div>
 
         {!error ? (
@@ -93,11 +84,7 @@ export default function AuthCallbackPage() {
             </p>
             <p className="mt-1 text-xs text-zinc-500">Novel Agent</p>
             <div className="mt-8 flex justify-center">
-              <div
-                className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-600 border-t-cyan-400"
-                role="status"
-                aria-label="로딩 중"
-              />
+              <Spinner size="lg" />
             </div>
             <p className="mt-5 text-sm text-zinc-400" aria-live="polite">
               스튜디오 불러오는 중...

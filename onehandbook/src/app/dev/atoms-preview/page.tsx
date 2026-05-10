@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/Input";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Modal, ModalHeader, ModalContent, ModalFooter } from "@/components/ui/Modal";
+import { Spinner } from "@/components/ui/Spinner";
 
 export default function AtomsPreviewPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -154,6 +155,31 @@ export default function AtomsPreviewPage() {
               </Button>
             </ModalFooter>
           </Modal>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold">Spinner — size 매트릭스 (잉크 블루 토큰)</h2>
+          <p className="text-sm text-muted-foreground">
+            border-current/20 + border-t-current + text-accent 박음 — currentColor 기반.
+            className override 로 색상 변경 가능 (호출처 컨텍스트별).
+          </p>
+          <div className="flex items-center gap-8">
+            <div className="flex flex-col items-center gap-2">
+              <Spinner size="sm" />
+              <span className="text-xs text-muted-foreground">sm (h-4)</span>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <Spinner size="md" />
+              <span className="text-xs text-muted-foreground">md (h-6, default)</span>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <Spinner size="lg" />
+              <span className="text-xs text-muted-foreground">lg (h-10) — /auth/callback 사용</span>
+            </div>
+          </div>
+          <p className="text-sm">
+            텍스트 옆 인라인 사용 예시: <Spinner size="sm" /> 분석 중...
+          </p>
         </section>
       </div>
     </div>
