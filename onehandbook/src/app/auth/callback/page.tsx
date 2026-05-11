@@ -1,31 +1,17 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
-import { SITE_NAME } from "@/config/site";
-import { Spinner } from "@/components/ui/Spinner";
-
-const MESSAGES = [
-  "스튜디오 불러오는 중...",
-  "펜에 잉크 채우는 중..",
-  "맞춤법 검수중..",
-] as const;
+import { LoginSpinner } from "@/components/auth/LoginSpinner";
 
 function AuthCallbackLoadingPage() {
   const searchParams = useSearchParams();
-  const [idx, setIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const code = searchParams.get("code");
   const provider = searchParams.get("provider");
-
-  const message = useMemo(() => MESSAGES[idx % MESSAGES.length], [idx]);
-
-  useEffect(() => {
-    const t = window.setInterval(() => setIdx((v) => v + 1), 3000);
-    return () => window.clearInterval(t);
-  }, []);
 
   useEffect(() => {
     if (!code) {
@@ -39,62 +25,39 @@ function AuthCallbackLoadingPage() {
     window.location.replace(`/api/auth/oauth-complete?${q.toString()}`);
   }, [code, provider]);
 
-  return (
-    <div className="flex h-screen w-full flex-col items-center justify-center bg-zinc-950 px-6 text-zinc-100">
-      <div className="w-full max-w-sm rounded-2xl border border-zinc-800/90 bg-zinc-900/40 p-10 text-center shadow-xl backdrop-blur-sm">
-        <p className="text-2xl font-bold tracking-tight text-zinc-100">
-          {SITE_NAME}
+  if (error) {
+    return (
+      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-stone-950 px-6 text-stone-200">
+        <Image
+          src="/logo.svg"
+          alt="Novel Agent"
+          width={68}
+          height={48}
+          priority
+        />
+        <p
+          className="mt-7 max-w-sm rounded-lg bg-red-500/10 px-4 py-3 text-center text-[13px] text-red-300"
+          aria-live="polite"
+        >
+          {error}
         </p>
-        <p className="mt-1 text-xs text-zinc-500">Novel Agent</p>
-
-        <div className="mt-8 flex justify-center">
-          <Spinner size="lg" />
-        </div>
-
-        {!error ? (
-          <p className="mt-5 text-sm text-zinc-400" aria-live="polite">
-            {message}
-          </p>
-        ) : (
-          <div className="mt-5 space-y-3">
-            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
-              {error}
-            </p>
-            <Link
-              href="/login"
-              className="inline-block text-sm font-medium text-cyan-300 underline-offset-2 hover:text-cyan-200 hover:underline"
-            >
-              로그인 페이지로 돌아가기
-            </Link>
-          </div>
-        )}
+        <Link
+          href="/"
+          className="mt-5 text-[12px] text-stone-400 underline-offset-2 hover:text-sky-200 hover:underline"
+        >
+          홈으로 돌아가기
+        </Link>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return <LoginSpinner stage="auth" />;
 }
 
 export default function AuthCallbackPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex h-screen w-full flex-col items-center justify-center bg-zinc-950 px-6 text-zinc-100">
-          <div className="w-full max-w-sm rounded-2xl border border-zinc-800/90 bg-zinc-900/40 p-10 text-center shadow-xl backdrop-blur-sm">
-            <p className="text-2xl font-bold tracking-tight text-zinc-100">
-              {SITE_NAME}
-            </p>
-            <p className="mt-1 text-xs text-zinc-500">Novel Agent</p>
-            <div className="mt-8 flex justify-center">
-              <Spinner size="lg" />
-            </div>
-            <p className="mt-5 text-sm text-zinc-400" aria-live="polite">
-              스튜디오 불러오는 중...
-            </p>
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<LoginSpinner stage="auth" />}>
       <AuthCallbackLoadingPage />
     </Suspense>
   );
 }
-

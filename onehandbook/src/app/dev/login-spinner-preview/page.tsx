@@ -31,7 +31,7 @@ export default function LoginSpinnerPreviewPage() {
 
   return (
     <div className="relative min-h-screen w-full bg-stone-950 text-stone-200">
-      <div className="fixed bottom-6 right-6 z-10 flex flex-col gap-1.5 rounded-md border border-stone-700 bg-stone-900/95 p-3 text-[11px]">
+      <div className="fixed top-6 right-6 z-50 flex flex-col gap-1.5 rounded-md border border-stone-700 bg-stone-900/95 p-3 text-[11px]">
         <div className="text-stone-400">stage 토글</div>
         {STAGES.map((s) => (
           <button
