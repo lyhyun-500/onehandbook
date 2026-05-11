@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SITE_NAME, CONTACT_EMAIL } from "@/config/site";
+import { SITE_NAME } from "@/config/site";
 import { LiveScoreCard } from "@/components/landing/LiveScoreCard";
 
 const FEATURE_BLOCKS: { kicker: string; title: string; body: string; accent: string }[] = [
@@ -31,9 +31,6 @@ const HOW_STEPS: { n: string; t: string; d: string }[] = [
 ];
 
 export default function HomePage() {
-  const year = new Date().getFullYear();
-  const mailtoHref = CONTACT_EMAIL ? `mailto:${CONTACT_EMAIL}` : undefined;
-
   return (
     <div className="relative min-h-screen w-full overflow-x-hidden bg-stone-950 text-stone-200">
       {/* ambient radial gradient — 시안 line 179-181 */}
@@ -68,7 +65,7 @@ export default function HomePage() {
               <span className="block text-[14px] font-medium tracking-tight text-stone-100">
                 {SITE_NAME}
               </span>
-              <span className="block text-[10px] text-stone-500">
+              <span className="block text-[10px] text-stone-400">
                 웹소설 흥행 분석
               </span>
             </span>
@@ -113,6 +110,7 @@ export default function HomePage() {
           </Link>
         </header>
 
+        <main>
         {/* HERO */}
         <section className="px-6 pt-12 pb-16 lg:px-12 lg:pt-20">
           <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.05fr] lg:gap-14">
@@ -149,7 +147,7 @@ export default function HomePage() {
                   분석 샘플 보기 →
                 </a>
               </div>
-              <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-stone-500">
+              <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-stone-400">
                 <span>베타 운영 중 · 가입 즉시 <span className="text-stone-300 tabular-nums">20 NAT</span></span>
                 <span className="hidden h-3 w-px bg-stone-800 sm:inline-block" aria-hidden="true" />
                 <span>장르별 에이전트 <span className="text-stone-300 tabular-nums">6종</span> · 6축 분석</span>
@@ -180,7 +178,7 @@ export default function HomePage() {
                 <span className="text-stone-400 italic">감이 아니라 패턴.</span>
               </h2>
             </div>
-            <p className="max-w-[360px] text-[12.5px] leading-relaxed text-stone-500">
+            <p className="max-w-[360px] text-[12.5px] leading-relaxed text-stone-400">
               플랫폼 출간 전 작가가 가장 알고 싶은 것 — &ldquo;이 회차가
               통할까?&rdquo; 를 정량으로 답합니다.
             </p>
@@ -189,7 +187,7 @@ export default function HomePage() {
           <div className="grid gap-px overflow-hidden rounded-xl border border-stone-800/80 bg-stone-800/60 md:grid-cols-3">
             {FEATURE_BLOCKS.map((f) => (
               <div key={f.kicker} className="bg-stone-950/60 p-7">
-                <div className="font-mono text-[10px] tracking-widest text-stone-500">
+                <div className="font-mono text-[10px] tracking-widest text-stone-400">
                   {f.kicker}
                 </div>
                 <h3 className="mt-3 font-serif text-[20px] text-stone-100">
@@ -222,7 +220,7 @@ export default function HomePage() {
                 className="relative rounded-lg border border-stone-800/80 bg-stone-900/30 p-5"
               >
                 <div className="mb-3 flex items-center justify-between">
-                  <span className="font-serif text-[28px] leading-none tabular-nums text-stone-700">
+                  <span className="font-serif text-[28px] leading-none tabular-nums text-stone-400">
                     {s.n}
                   </span>
                   {i < HOW_STEPS.length - 1 && (
@@ -235,7 +233,7 @@ export default function HomePage() {
                 <div className="font-serif text-[15px] text-stone-100">
                   {s.t}
                 </div>
-                <div className="mt-1 text-[11.5px] leading-relaxed text-stone-500">
+                <div className="mt-1 text-[11.5px] leading-relaxed text-stone-400">
                   {s.d}
                 </div>
               </div>
@@ -255,30 +253,12 @@ export default function HomePage() {
           >
             가입하고 20 NAT 받기
           </Link>
-          <div className="mt-3 text-[11px] text-stone-500">
+          <div className="mt-3 text-[11px] text-stone-400">
             가입 즉시 지급 · 소셜 계정으로 간편 시작
           </div>
         </section>
-
-        {/* FOOTER */}
-        <footer className="border-t border-stone-800/60 px-6 py-8 lg:px-12">
-          <div className="flex flex-col items-start gap-3 text-[11px] text-stone-500 sm:flex-row sm:items-center sm:justify-between">
-            <div>© {year} {SITE_NAME} · 한국어 웹소설 흥행 분석</div>
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-              <Link href="/terms" className="hover:text-stone-300">
-                이용약관
-              </Link>
-              <Link href="/privacy" className="hover:text-stone-300">
-                개인정보처리방침
-              </Link>
-              {mailtoHref && (
-                <a href={mailtoHref} className="hover:text-stone-300">
-                  {CONTACT_EMAIL}
-                </a>
-              )}
-            </div>
-          </div>
-        </footer>
+        </main>
+        {/* footer 는 layout.tsx 의 <SiteFooter /> 사용 (사이트 전역 통일) */}
       </div>
     </div>
   );

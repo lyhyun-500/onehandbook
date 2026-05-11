@@ -312,6 +312,27 @@ border-2 border-current/20 border-t-current text-accent
 
 **박제 이유**: 발견 자체가 자산. 빈틈 박지 않으면 페이즈 2-D 진입 시 잊힘 → ADR 박혀있어야 트리거.
 
+#### 빈틈 사례 #2 — 페이즈 2-B-4 의 SiteFooter 누락 (페이지 마이그레이션 시점)
+
+페이지 마이그레이션 (page.tsx 풀 마이그레이션) 시점에 발견:
+
+| 영역 | 누락 내용 | 발견 경위 | 처리 |
+|---|---|---|---|
+| `src/components/SiteFooter.tsx` | zinc palette 박힌 footer (Phase 1 이전 톤). `layout.tsx` 가 모든 페이지에 렌더 — 랜딩 박음 page.tsx 자체 footer 추가하면서 footer 2개 동시 노출 | LEE 의 Lighthouse Accessibility audit (CONTRAST fail) 가 SiteFooter 의 zinc 톤 잡아냄 — Phase 2-B-4 의 자체 footer 가 아니라 layout 의 SiteFooter 가 함정 | Phase 2-B-4.5 에서 SiteFooter 박음 stone 마이그레이션 + page.tsx 자체 footer 제거 |
+
+**누락 사유**: page.tsx 마이그레이션 시점에 layout.tsx 박힌 컴포넌트 (SiteFooter / FloatingInquiryButton / AnalysisJobsProvider) 박음 인지 못함. 페이지 단위로만 사고하면 사이트 전역 컴포넌트 (footer/header/floating UI) 가 시야에서 빠짐.
+
+**정책 강화 (페이즈 3+ 페이지 마이그레이션 시점 적용)**:
+
+페이지 마이그레이션 사전 점검 표준 (LEE 인사이트):
+
+1. **layout.tsx 박음 검토 의무** — 마이그레이션 대상 페이지가 들어가는 layout 박힌 컴포넌트 모두 list-up. 시안과 톤/항목 비교.
+2. **같은 영역 (footer/header/sidebar) 컴포넌트 중복 검사** — 페이지 자체 footer/header 박을 때 layout 박힌 동일 영역 컴포넌트 박혀있는지 검색. 중복 박힐 시 통일 우선 (자체 박지 않고 layout 컴포넌트 마이그레이션).
+3. **사이트 전역 영향 검토** — layout 컴포넌트 마이그레이션 시 다른 페이지 (`/login`, `/pricing`, `/terms` 등) 박음 시각 영향 list-up. commit body 박음 명시.
+4. **사전 보고 박음 표준 항목 추가** — "layout.tsx 박힌 영역 검토 결과: ___" 박음 + "사이트 전역 영향: ___" 박음.
+
+**Lighthouse 가 잡은 안전망**: LEE 의 Lighthouse Accessibility audit 박힌 정확한 selector 식별이 본 빈틈 발견의 핵심 layer. atoms-preview 시각 검증 (결정 8) + Lighthouse audit (Phase 2-B 박음 도입) 두 layer 박힘 박음 페이지 마이그레이션 commit 의 안전망 강화.
+
 ### 결정 12 — atom 추출 시 사용처 보정 범위 + ROI 게이트 (페이즈 2-A LEE 인사이트 박제)
 
 페이즈 2-A 의 빈틈 사례 박힌 후 정책 강화:

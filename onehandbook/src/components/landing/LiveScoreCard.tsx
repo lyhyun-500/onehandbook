@@ -152,7 +152,7 @@ export const LiveScoreCard = forwardRef<HTMLDivElement, LiveScoreCardProps>(
             <span className="h-2.5 w-2.5 rounded-full bg-stone-700" />
             <span className="h-2.5 w-2.5 rounded-full bg-stone-700" />
           </div>
-          <div className="font-mono text-[10px] tracking-widest text-stone-500">
+          <div className="font-mono text-[10px] tracking-widest text-stone-400">
             novelagent.kr/studio/.../analysis/46
           </div>
           <div className="w-12" />
@@ -165,7 +165,7 @@ export const LiveScoreCard = forwardRef<HTMLDivElement, LiveScoreCardProps>(
               <span className="rounded border border-stone-800 bg-stone-900/60 px-1.5 py-0.5 font-mono text-[10px] tracking-widest text-amber-200/80">
                 로맨스 판타지
               </span>
-              <span className="text-[11px] text-stone-500">
+              <span className="text-[11px] text-stone-400">
                 46화 · 황비의 마지막 카드
               </span>
             </div>
@@ -185,7 +185,7 @@ export const LiveScoreCard = forwardRef<HTMLDivElement, LiveScoreCardProps>(
               <LiveOverallScore initial={87} />
               <div className="leading-tight">
                 <div className="text-[12px] text-stone-300">상위 12%</div>
-                <div className="text-[10.5px] text-stone-500">
+                <div className="text-[10.5px] text-stone-400">
                   로맨스 판타지 · 47화 기준
                 </div>
               </div>
@@ -205,9 +205,9 @@ export const LiveScoreCard = forwardRef<HTMLDivElement, LiveScoreCardProps>(
 
           {/* right — axes */}
           <div>
-            <div className="mb-3 flex items-center justify-between text-[11px] tracking-wider text-stone-500">
+            <div className="mb-3 flex items-center justify-between text-[11px] tracking-wider text-stone-400">
               <span>6개 축 분석</span>
-              <span className="font-mono text-[9.5px] tracking-widest text-stone-600">
+              <span className="font-mono text-[9.5px] tracking-widest text-stone-400">
                 실시간 측정 중…
               </span>
             </div>
