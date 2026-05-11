@@ -82,21 +82,21 @@ export function AddWorkButton({ userId }: { userId: number }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-lg bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-cyan-500/20 transition-colors hover:bg-cyan-400"
+        className="rounded-lg bg-sky-500 px-5 py-2.5 text-sm font-semibold text-stone-950 shadow-lg shadow-sky-500/20 transition-colors hover:bg-sky-400"
       >
         작품 등록
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]">
-          <div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-xl border border-cyan-500/10 bg-zinc-900 p-6 shadow-2xl shadow-black/40">
-            <h2 className="mb-6 text-lg font-semibold text-zinc-100">
+          <div className="max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-xl border border-sky-500/10 bg-stone-900 p-6 shadow-2xl shadow-black/40">
+            <h2 className="mb-6 text-lg font-semibold text-stone-100">
               새 작품 등록
             </h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+                <label className="mb-1.5 block text-sm font-medium text-stone-300">
                   제목
                 </label>
                 <input
@@ -106,18 +106,18 @@ export function AddWorkButton({ userId }: { userId: number }) {
                   required
                   maxLength={200}
                   placeholder="작품 제목을 입력하세요"
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 placeholder-zinc-500 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                  className="w-full rounded-lg border border-stone-700 bg-stone-800 px-4 py-2.5 text-stone-100 placeholder-stone-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
                 />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+                <label className="mb-1.5 block text-sm font-medium text-stone-300">
                   장르
                 </label>
                 <select
                   value={genre}
                   onChange={(e) => setGenre(e.target.value)}
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                  className="w-full rounded-lg border border-stone-700 bg-stone-800 px-4 py-2.5 text-stone-100 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
                 >
                   {GENRES.map((g) => (
                     <option key={g} value={g}>
@@ -128,7 +128,7 @@ export function AddWorkButton({ userId }: { userId: number }) {
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+                <label className="mb-1.5 block text-sm font-medium text-stone-300">
                   연재 상태
                 </label>
                 <select
@@ -136,7 +136,7 @@ export function AddWorkButton({ userId }: { userId: number }) {
                   onChange={(e) =>
                     setStatus(e.target.value as "연재중" | "완결" | "휴재")
                   }
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                  className="w-full rounded-lg border border-stone-700 bg-stone-800 px-4 py-2.5 text-stone-100 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
                 >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>
@@ -147,7 +147,7 @@ export function AddWorkButton({ userId }: { userId: number }) {
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+                <label className="mb-1.5 block text-sm font-medium text-stone-300">
                   계약 여부
                 </label>
                 <select
@@ -155,7 +155,7 @@ export function AddWorkButton({ userId }: { userId: number }) {
                   onChange={(e) =>
                     setContractStatus(e.target.value as (typeof CONTRACT_STATUSES)[number])
                   }
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                  className="w-full rounded-lg border border-stone-700 bg-stone-800 px-4 py-2.5 text-stone-100 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
                 >
                   {CONTRACT_STATUSES.map((s) => (
                     <option key={s} value={s}>
@@ -165,16 +165,16 @@ export function AddWorkButton({ userId }: { userId: number }) {
                 </select>
               </div>
 
-              <div className="rounded-lg border border-zinc-800 bg-zinc-950/30 px-4 py-3">
+              <div className="rounded-lg border border-stone-800 bg-stone-950/30 px-4 py-3">
                 <label
-                  className="flex cursor-pointer items-start gap-3 text-sm text-zinc-400"
+                  className="flex cursor-pointer items-start gap-3 text-sm text-stone-400"
                   aria-disabled="true"
                 >
                   <input
                     type="checkbox"
                     checked={managementOfferOptIn}
                     onChange={(e) => setManagementOfferOptIn(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 rounded border-zinc-700 bg-zinc-800 text-cyan-600 opacity-80"
+                    className="mt-0.5 h-4 w-4 rounded border-stone-700 bg-stone-800 text-sky-600 opacity-80"
                   />
                   <span className="leading-snug">
                     매니지먼트 계약 제의를 받겠습니다 (현재 서비스 개발 중)
@@ -183,10 +183,10 @@ export function AddWorkButton({ userId }: { userId: number }) {
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+                <label className="mb-1.5 block text-sm font-medium text-stone-300">
                   태그
                 </label>
-                <p className="mb-2 text-sm text-zinc-500">
+                <p className="mb-2 text-sm text-stone-400">
                   엔터로 추가하고, 칩의 ×로 삭제합니다. 예: #회귀물 #먼치킨 #전문직
                 </p>
                 <TagInput value={tags} onChange={setTags} />
@@ -202,14 +202,14 @@ export function AddWorkButton({ userId }: { userId: number }) {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="flex-1 rounded-lg border border-zinc-600 bg-zinc-950/50 px-4 py-2.5 text-sm font-medium text-zinc-200 transition-colors hover:border-zinc-500 hover:bg-zinc-800/80"
+                  className="flex-1 rounded-lg border border-stone-600 bg-stone-950/50 px-4 py-2.5 text-sm font-medium text-stone-200 transition-colors hover:border-stone-500 hover:bg-stone-800/80"
                 >
                   취소
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 rounded-lg bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 shadow-md shadow-cyan-500/15 transition-colors hover:bg-cyan-400 disabled:opacity-50"
+                  className="flex-1 rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-semibold text-stone-950 shadow-md shadow-sky-500/15 transition-colors hover:bg-sky-400 disabled:opacity-50"
                 >
                   {loading ? "등록 중..." : "등록"}
                 </button>
