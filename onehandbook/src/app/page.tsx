@@ -50,10 +50,6 @@ export default function HomePage() {
         <section className="px-6 pt-12 pb-16 lg:px-12 lg:pt-20">
           <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.05fr] lg:gap-14">
             <div>
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-400/[0.06] px-3 py-1 text-[11px] text-sky-200">
-                <span className="h-1.5 w-1.5 rounded-full bg-sky-300" aria-hidden="true" />
-                v1.4 · 장르별 에이전트 6종 출시
-              </div>
               <h1 className="font-serif text-[40px] font-medium leading-[1.05] tracking-tight text-stone-100 sm:text-[48px] lg:text-[58px]">
                 내 작품이
                 <br />
