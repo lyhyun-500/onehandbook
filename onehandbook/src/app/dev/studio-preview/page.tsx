@@ -13,6 +13,73 @@
  */
 
 import { Sparkline } from "@/components/studio/Sparkline";
+import {
+  StudioWorkCard,
+  type StudioWorkData,
+} from "@/components/studio/StudioWorkCard";
+
+const MOCK_WORKS: StudioWorkData[] = [
+  {
+    id: 1,
+    title: "황실의 그림자, 검은 장미",
+    genre: "로맨스",
+    status: "연재중",
+    totalEpisodes: 47,
+    agentScore: 84,
+    lastAnalyzedAt: "2026-05-04",
+    recentScores: [78, 82, 89, 84, 87],
+  },
+  {
+    id: 2,
+    title: "검신: 다시 태어난 무제",
+    genre: "무협",
+    status: "연재중",
+    totalEpisodes: 122,
+    agentScore: 91,
+    lastAnalyzedAt: "2026-05-06",
+    recentScores: [88, 90, 89, 92, 91],
+  },
+  {
+    id: 3,
+    title: "회귀자의 편의점",
+    genre: "현대물",
+    status: "연재중",
+    totalEpisodes: 33,
+    agentScore: 76,
+    lastAnalyzedAt: "2026-05-02",
+    recentScores: [72, 75, 74, 78, 76],
+  },
+  {
+    id: 4,
+    title: "마지막 마법사의 일기",
+    genre: "판타지",
+    status: "휴재",
+    totalEpisodes: 18,
+    agentScore: 68,
+    lastAnalyzedAt: "2026-04-21",
+    recentScores: [62, 68, 70, 65, 68],
+  },
+  {
+    id: 5,
+    title: "구단주의 백서",
+    genre: "스포츠",
+    status: "연재중",
+    totalEpisodes: 9,
+    agentScore: null,
+    lastAnalyzedAt: null,
+    recentScores: null,
+  },
+  {
+    id: 6,
+    title: "북풍의 검",
+    genre: "무협",
+    status: "완결",
+    totalEpisodes: 240,
+    agentScore: 88,
+    lastAnalyzedAt: "2026-03-18",
+    recentScores: [85, 88, 89, 87, 90],
+  },
+];
 
 const MOCK_SCORE_PATTERNS: { label: string; scores: number[] }[] = [
   { label: "high (emerald 90+)", scores: [88, 90, 92, 91, 95, 93, 90] },
@@ -63,6 +130,46 @@ export default function StudioPreviewPage() {
               <span className="text-[10px] text-stone-500">
                 (Sparkline 박지 않음)
               </span>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-12 space-y-6">
+          <h2 className="text-[11px] tracking-widest text-sky-300/85">
+            StudioWorkCard — card variant (Phase 2-D-3)
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {MOCK_WORKS.map((w) => (
+              <StudioWorkCard key={w.id} work={w} layout="card" />
+            ))}
+          </div>
+
+          <h2 className="mt-8 text-[11px] tracking-widest text-sky-300/85">
+            StudioWorkCard — list variant
+          </h2>
+          <div className="space-y-3">
+            {MOCK_WORKS.map((w) => (
+              <StudioWorkCard key={w.id} work={w} layout="list" />
+            ))}
+          </div>
+
+          <h2 className="mt-8 text-[11px] tracking-widest text-sky-300/85">
+            density 분기 (compact / dense / default)
+          </h2>
+          <div className="space-y-3">
+            <StudioWorkCard work={MOCK_WORKS[0]} layout="list" density="compact" />
+            <StudioWorkCard work={MOCK_WORKS[0]} layout="list" density="dense" />
+            <StudioWorkCard work={MOCK_WORKS[0]} layout="list" density="default" />
+          </div>
+
+          <h2 className="mt-8 text-[11px] tracking-widest text-sky-300/85">
+            workAnalyzing pulse 박음 (시안 외 — 기존 기능 보존)
+          </h2>
+          <div className="space-y-3">
+            <StudioWorkCard work={MOCK_WORKS[0]} layout="list" workAnalyzing />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <StudioWorkCard work={MOCK_WORKS[0]} layout="card" workAnalyzing />
+              <StudioWorkCard work={MOCK_WORKS[1]} layout="card" workAnalyzing />
             </div>
           </div>
         </section>
