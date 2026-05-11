@@ -25,7 +25,7 @@ test.describe('Visual baseline (snapshot, phase-2-end) — landing', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/', { waitUntil: 'networkidle' });
     await page.getByRole('heading', { name: /에이전트가 먼저 읽습니다/ }).waitFor();
-    await page.getByRole('link', { name: '가입하고 20 NAT 받기' }).first().waitFor();
+    await page.getByRole('button', { name: '가입하고 20 NAT 받기' }).first().waitFor();
 
     await expect(page).toHaveScreenshot('landing.png', {
       mask: [
