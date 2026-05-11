@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 /**
  * studio-preview — 페이즈 2-D /studio 컴포넌트 시각 검증 페이지.
  * /dev/* 는 proxy.ts 의 production 차단 정책 적용 (ADR-0018).
@@ -16,7 +18,13 @@ import { Sparkline } from "@/components/studio/Sparkline";
 import {
   StudioWorkCard,
   type StudioWorkData,
+  type StudioWorkLayout,
 } from "@/components/studio/StudioWorkCard";
+import { StudioStatsStrip } from "@/components/studio/StudioStatsStrip";
+import {
+  StudioFilters,
+  type StudioWorkFilter,
+} from "@/components/studio/StudioFilters";
 
 const MOCK_WORKS: StudioWorkData[] = [
   {
@@ -92,7 +100,26 @@ const MOCK_SCORE_PATTERNS: { label: string; scores: number[] }[] = [
   { label: "mixed (5단계 mix)", scores: [62, 75, 88, 92, 80, 70, 65, 58] },
 ];
 
+function computeStats(works: StudioWorkData[]) {
+  const totalWorks = works.length;
+  const totalEpisodes = works.reduce((s, w) => s + w.totalEpisodes, 0);
+  const ongoingCount = works.filter((w) => w.status === "연재중").length;
+  const analyzedWorks = works.filter((w) => w.agentScore != null);
+  const totalAnalyzed = analyzedWorks.length;
+  const avgScore =
+    analyzedWorks.length > 0
+      ? Math.round(
+          analyzedWorks.reduce((s, w) => s + (w.agentScore ?? 0), 0) /
+            analyzedWorks.length,
+        )
+      : null;
+  return { totalWorks, totalEpisodes, totalAnalyzed, avgScore, ongoingCount };
+}
+
 export default function StudioPreviewPage() {
+  const [filter, setFilter] = useState<StudioWorkFilter>("전체");
+  const [layout, setLayout] = useState<StudioWorkLayout>("card");
+
   return (
     <div className="relative min-h-screen w-full bg-stone-950 text-stone-200">
       <div className="mx-auto max-w-3xl px-12 py-16">
@@ -160,6 +187,24 @@ export default function StudioPreviewPage() {
             <StudioWorkCard work={MOCK_WORKS[0]} layout="list" density="compact" />
             <StudioWorkCard work={MOCK_WORKS[0]} layout="list" density="dense" />
             <StudioWorkCard work={MOCK_WORKS[0]} layout="list" density="default" />
+          </div>
+
+          <h2 className="mt-12 text-[11px] tracking-widest text-sky-300/85">
+            StudioStatsStrip (Phase 2-D-4)
+          </h2>
+          <StudioStatsStrip stats={computeStats(MOCK_WORKS)} />
+
+          <h2 className="mt-8 text-[11px] tracking-widest text-sky-300/85">
+            StudioFilters (Phase 2-D-4) — interactive
+          </h2>
+          <StudioFilters
+            filter={filter}
+            onFilterChange={setFilter}
+            layout={layout}
+            onLayoutChange={setLayout}
+          />
+          <div className="text-[11px] text-stone-400">
+            현재 state: filter={filter} / layout={layout}
           </div>
 
           <h2 className="mt-8 text-[11px] tracking-widest text-sky-300/85">
