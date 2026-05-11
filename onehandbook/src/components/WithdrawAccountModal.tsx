@@ -101,20 +101,20 @@ export function WithdrawAccountModal({ open, onClose }: WithdrawAccountModalProp
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelId}
-        className="relative z-10 w-full max-w-md rounded-2xl border border-zinc-700 bg-zinc-900 p-6 shadow-2xl"
+        className="relative z-10 w-full max-w-md rounded-2xl border border-stone-700 bg-stone-900 p-6 shadow-2xl"
       >
-        <h2 id={labelId} className="text-lg font-semibold text-zinc-100">
+        <h2 id={labelId} className="text-lg font-semibold text-stone-100">
           회원 탈퇴
         </h2>
-        <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+        <p className="mt-3 text-sm leading-relaxed text-stone-400">
           탈퇴 시 모든 작품, 회차, 분석 결과, 소유{" "}
-          <span className="font-semibold text-cyan-300">NAT 코인</span>
+          <span className="font-semibold text-sky-300">NAT 코인</span>
           이 삭제되며 복구할 수 없습니다.
         </p>
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           {step === 1 ? (
             <div className="space-y-3">
-              <p className="text-sm font-medium text-zinc-200">탈퇴 이유를 선택해 주세요.</p>
+              <p className="text-sm font-medium text-stone-200">탈퇴 이유를 선택해 주세요.</p>
               <div className="space-y-2">
                 {REASONS.map((r) => {
                   const checked = reason === r.value;
@@ -124,8 +124,8 @@ export function WithdrawAccountModal({ open, onClose }: WithdrawAccountModalProp
                       className={[
                         "flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors",
                         checked
-                          ? "border-red-500/50 bg-red-500/10 text-zinc-100"
-                          : "border-zinc-700 bg-zinc-950/10 text-zinc-200 hover:bg-zinc-800/50",
+                          ? "border-red-500/50 bg-red-500/10 text-stone-100"
+                          : "border-stone-700 bg-stone-950/10 text-stone-200 hover:bg-stone-800/50",
                       ].join(" ")}
                     >
                       <input
@@ -143,7 +143,7 @@ export function WithdrawAccountModal({ open, onClose }: WithdrawAccountModalProp
               </div>
               {reason === "기타" && (
                 <div className="pt-1">
-                  <label htmlFor={detailId} className="mb-1.5 block text-sm text-zinc-300">
+                  <label htmlFor={detailId} className="mb-1.5 block text-sm text-stone-300">
                     기타 사유를 입력해 주세요.
                   </label>
                   <textarea
@@ -151,7 +151,7 @@ export function WithdrawAccountModal({ open, onClose }: WithdrawAccountModalProp
                     value={reasonDetail}
                     onChange={(e) => setReasonDetail(e.target.value)}
                     rows={3}
-                    className="w-full resize-none rounded-lg border border-zinc-600 bg-zinc-800 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-red-500/60 focus:outline-none focus:ring-1 focus:ring-red-500/40"
+                    className="w-full resize-none rounded-lg border border-stone-600 bg-stone-800 px-3 py-2.5 text-sm text-stone-100 placeholder-stone-500 focus:border-red-500/60 focus:outline-none focus:ring-1 focus:ring-red-500/40"
                     placeholder="예) 기능이 부족해서요"
                   />
                 </div>
@@ -159,14 +159,14 @@ export function WithdrawAccountModal({ open, onClose }: WithdrawAccountModalProp
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm font-medium text-zinc-200">마지막으로 확인해 주세요.</p>
-              <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-400">
+              <p className="text-sm font-medium text-stone-200">마지막으로 확인해 주세요.</p>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-stone-400">
                 <li>탈퇴 시 작품/회차/분석 결과/NAT 코인이 삭제되며 복구할 수 없습니다.</li>
                 <li>탈퇴 후 동일 계정으로 재가입하더라도 이전 데이터는 복구되지 않습니다.</li>
               </ul>
               <label
                 htmlFor={agreeId}
-                className="mt-2 flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-700 bg-zinc-950/10 px-3 py-3 text-sm text-zinc-200 hover:bg-zinc-800/50"
+                className="mt-2 flex cursor-pointer items-start gap-3 rounded-xl border border-stone-700 bg-stone-950/10 px-3 py-3 text-sm text-stone-200 hover:bg-stone-800/50"
               >
                 <input
                   id={agreeId}
@@ -197,7 +197,7 @@ export function WithdrawAccountModal({ open, onClose }: WithdrawAccountModalProp
                   onClose();
                 }
               }}
-              className="flex-1 rounded-lg border border-zinc-600 bg-zinc-800/80 py-2.5 text-sm font-medium text-zinc-200 hover:bg-zinc-800"
+              className="flex-1 rounded-lg border border-stone-600 bg-stone-800/80 py-2.5 text-sm font-medium text-stone-200 hover:bg-stone-800"
             >
               {step === 2 ? "이전" : "취소"}
             </button>

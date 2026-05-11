@@ -78,18 +78,18 @@ export function AppShellHeaderClient({
 
   return (
     <>
-      <header className="sticky top-0 z-30 shrink-0 border-b border-cyan-500/10 bg-zinc-950/95 backdrop-blur-md">
+      <header className="sticky top-0 z-30 shrink-0 border-b border-stone-800/60 bg-stone-950/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:gap-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-4 sm:gap-6">
             <Link
               href="/"
-              className="truncate text-lg font-bold tracking-tight text-zinc-100"
+              className="truncate text-lg font-bold tracking-tight text-stone-100"
             >
               {SITE_NAME}
             </Link>
             <Link
               href="/studio"
-              className="hidden shrink-0 text-sm font-medium text-cyan-200 sm:inline"
+              className="hidden shrink-0 text-sm font-medium text-sky-200 sm:inline"
             >
               스튜디오
             </Link>
@@ -97,14 +97,14 @@ export function AppShellHeaderClient({
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <Link
               href="/billing"
-              className="rounded-lg border border-cyan-500/30 bg-cyan-950/35 px-2.5 py-1.5 text-xs tabular-nums text-cyan-200 transition-colors hover:border-cyan-400/50 hover:bg-cyan-950/50 sm:px-3 sm:text-sm"
+              className="rounded-lg border border-sky-400/30 bg-sky-950/35 px-2.5 py-1.5 text-xs tabular-nums text-sky-200 transition-colors hover:border-sky-400/50 hover:bg-sky-950/50 sm:px-3 sm:text-sm"
             >
               {natBalance.toLocaleString("ko-KR")} NAT
             </Link>
             <HeaderAnalysisBell />
             <Link
               href="/notices"
-              className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-800/80 hover:text-cyan-200"
+              className="rounded-lg p-2 text-stone-400 transition-colors hover:bg-stone-800/80 hover:text-sky-200"
               aria-label="공지사항"
               title="공지사항"
             >
@@ -113,7 +113,7 @@ export function AppShellHeaderClient({
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
-              className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-800/80 hover:text-zinc-100"
+              className="rounded-lg p-2 text-stone-400 transition-colors hover:bg-stone-800/80 hover:text-stone-100"
               aria-expanded={menuOpen}
               aria-controls={panelId}
               aria-label="메뉴 열기"
@@ -135,14 +135,14 @@ export function AppShellHeaderClient({
           />
           <div
             id={panelId}
-            className="absolute right-0 top-0 flex h-full w-[min(100%,20rem)] flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl"
+            className="absolute right-0 top-0 flex h-full w-[min(100%,20rem)] flex-col border-l border-stone-800 bg-stone-950 shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-              <span className="text-sm font-semibold text-zinc-100">메뉴</span>
+            <div className="flex items-center justify-between border-b border-stone-800 px-4 py-3">
+              <span className="text-sm font-semibold text-stone-100">메뉴</span>
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}
-                className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+                className="rounded-lg p-2 text-stone-400 hover:bg-stone-800 hover:text-stone-200"
                 aria-label="닫기"
               >
                 <svg
@@ -162,65 +162,65 @@ export function AppShellHeaderClient({
               </button>
             </div>
             <div className="flex flex-1 flex-col gap-1 overflow-y-auto px-4 py-4">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-400">
                 로그인 계정
               </p>
               <Link
                 href="/account"
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-300 transition-colors hover:border-cyan-500/30 hover:bg-zinc-900/80 hover:text-zinc-100"
+                className="flex items-center justify-between gap-3 rounded-lg border border-stone-800 bg-stone-900/50 px-3 py-2 text-sm text-stone-300 transition-colors hover:border-sky-400/30 hover:bg-stone-900/80 hover:text-stone-100"
               >
                 <span className="break-all">{email}</span>
-                <span className="shrink-0 text-xs text-cyan-400/90">
+                <span className="shrink-0 text-xs text-sky-300/90">
                   내 계정 →
                 </span>
               </Link>
-              <nav className="mt-4 flex flex-col gap-1 border-t border-zinc-800 pt-4">
+              <nav className="mt-4 flex flex-col gap-1 border-t border-stone-800 pt-4">
                 <Link
                   href="/account"
                   onClick={() => setMenuOpen(false)}
-                  className="rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"
+                  className="rounded-lg px-3 py-2.5 text-sm text-stone-300 hover:bg-stone-800/80 hover:text-stone-100"
                 >
                   마이페이지
                 </Link>
                 <Link
                   href="/account/inquiries"
                   onClick={() => setMenuOpen(false)}
-                  className="rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"
+                  className="rounded-lg px-3 py-2.5 text-sm text-stone-300 hover:bg-stone-800/80 hover:text-stone-100"
                 >
                   내 문의
                 </Link>
                 <Link
                   href="/studio"
                   onClick={() => setMenuOpen(false)}
-                  className="rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"
+                  className="rounded-lg px-3 py-2.5 text-sm text-stone-300 hover:bg-stone-800/80 hover:text-stone-100"
                 >
                   스튜디오
                 </Link>
                 <Link
                   href="/notices"
                   onClick={() => setMenuOpen(false)}
-                  className="rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"
+                  className="rounded-lg px-3 py-2.5 text-sm text-stone-300 hover:bg-stone-800/80 hover:text-stone-100"
                 >
                   공지사항
                 </Link>
                 <Link
                   href="/billing"
                   onClick={() => setMenuOpen(false)}
-                  className="rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"
+                  className="rounded-lg px-3 py-2.5 text-sm text-stone-300 hover:bg-stone-800/80 hover:text-stone-100"
                 >
                   NAT 충전
                 </Link>
                 <Link
                   href="/terms"
                   onClick={() => setMenuOpen(false)}
-                  className="rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"
+                  className="rounded-lg px-3 py-2.5 text-sm text-stone-300 hover:bg-stone-800/80 hover:text-stone-100"
                 >
                   이용약관
                 </Link>
               </nav>
             </div>
-            <div className="border-t border-zinc-800 p-4 space-y-2">
+            <div className="border-t border-stone-800 p-4 space-y-2">
               <button
                 type="button"
                 onClick={() => setWithdrawOpen(true)}
@@ -231,7 +231,7 @@ export function AppShellHeaderClient({
               <form action="/auth/signout" method="post">
                 <button
                   type="submit"
-                  className="w-full rounded-lg border border-zinc-600 bg-zinc-900/80 px-4 py-3 text-sm font-medium text-zinc-100 transition-colors hover:border-zinc-500 hover:bg-zinc-800"
+                  className="w-full rounded-lg border border-stone-600 bg-stone-900/80 px-4 py-3 text-sm font-medium text-stone-100 transition-colors hover:border-stone-500 hover:bg-stone-800"
                 >
                   로그아웃
                 </button>
