@@ -4,13 +4,17 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { LoginModal, type LoginProvider } from "@/components/auth/LoginModal";
+import { signInWithProvider } from "@/lib/auth/oauth";
 
 export function SiteHeader() {
   const [loginOpen, setLoginOpen] = useState(false);
 
-  const handleLogin = (provider: LoginProvider) => {
-    // 실 OAuth 연결은 Phase 2-C-3b 박음 (UI wiring 만 본 commit 박음).
-    console.log("[SiteHeader] login provider:", provider);
+  const handleLogin = async (provider: LoginProvider) => {
+    try {
+      await signInWithProvider(provider);
+    } catch (err) {
+      console.error("[SiteHeader] OAuth error:", err);
+    }
   };
 
   return (
