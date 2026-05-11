@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import Link from "next/link";
-import { BookOpen, X } from "lucide-react";
+import { X } from "lucide-react";
 
 export type LoginProvider = "google" | "naver";
 
@@ -74,22 +75,25 @@ export function LoginModal({ open, onClose, onLogin }: LoginModalProps) {
         </button>
 
         <div className="px-8 pb-6 pt-9 text-center">
-          <div className="mx-auto mb-4 flex h-9 w-9 items-center justify-center rounded-md bg-gradient-to-br from-sky-300/90 to-sky-500/80 text-stone-950">
-            <BookOpen size={16} aria-hidden="true" />
-          </div>
-          <div className="text-[11px] tracking-widest text-sky-300/85">
-            NOVEL AGENT
+          <div className="mx-auto mb-4 flex justify-center">
+            <Image
+              src="/logo.svg"
+              alt="Novel Agent"
+              width={68}
+              height={48}
+              priority
+            />
           </div>
           <h2
             id={TITLE_ID}
-            className="mt-2 font-serif text-[22px] leading-tight text-stone-100"
+            className="mt-4 font-serif text-[22px] leading-tight text-stone-100"
           >
-            계정에 들어와
+            간편 소셜 가입으로
             <br />
-            <span className="italic text-stone-400">분석을 이어가세요.</span>
+            <span className="italic text-stone-400">분석을 이어가세요</span>
           </h2>
           <p id={DESC_ID} className="mt-2 text-[11.5px] text-stone-400">
-            신규 가입 시 30 NAT가 무료로 지급됩니다.
+            신규 가입 시 20 NAT가 무료로 지급됩니다.
           </p>
         </div>
 
