@@ -1,6 +1,10 @@
-import Link from "next/link";
+"use client";
+
+import { useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { LiveScoreCard } from "@/components/landing/LiveScoreCard";
+import { LoginModal, type LoginProvider } from "@/components/auth/LoginModal";
+import { signInWithProvider } from "@/lib/auth/oauth";
 
 const FEATURE_BLOCKS: { kicker: string; title: string; body: string; accent: string }[] = [
   {
@@ -31,6 +35,16 @@ const HOW_STEPS: { n: string; t: string; d: string }[] = [
 ];
 
 export default function HomePage() {
+  const [loginOpen, setLoginOpen] = useState(false);
+
+  const handleLogin = async (provider: LoginProvider) => {
+    try {
+      await signInWithProvider(provider);
+    } catch (err) {
+      console.error("[HomePage] OAuth error:", err);
+    }
+  };
+
   return (
     <div className="relative min-h-screen w-full overflow-x-hidden bg-stone-950 text-stone-200">
       {/* ambient radial gradient — 시안 line 179-181 */}
@@ -65,12 +79,13 @@ export default function HomePage() {
                 돌려줍니다.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Link
-                  href="/login"
+                <button
+                  type="button"
+                  onClick={() => setLoginOpen(true)}
                   className="rounded-md bg-sky-400 px-5 py-2.5 text-[13.5px] font-medium text-stone-950 hover:bg-sky-300"
                 >
                   가입하고 20 NAT 받기
-                </Link>
+                </button>
                 <a
                   href="#sample"
                   className="rounded-md border border-stone-800 bg-stone-900/40 px-5 py-2.5 text-[13.5px] text-stone-200 hover:border-stone-700"
@@ -178,12 +193,13 @@ export default function HomePage() {
             한 회차를 백 번 고치는 대신,{" "}
             <span className="italic text-stone-400">먼저 데이터를 보세요.</span>
           </h2>
-          <Link
-            href="/login"
+          <button
+            type="button"
+            onClick={() => setLoginOpen(true)}
             className="mt-8 inline-block rounded-md bg-sky-400 px-6 py-3 text-[14px] font-medium text-stone-950 hover:bg-sky-300"
           >
             가입하고 20 NAT 받기
-          </Link>
+          </button>
           <div className="mt-3 text-[11px] text-stone-400">
             가입 즉시 지급 · 소셜 계정으로 간편 시작
           </div>
@@ -191,6 +207,11 @@ export default function HomePage() {
         </main>
         {/* footer 는 layout.tsx 의 <SiteFooter /> 사용 (사이트 전역 통일) */}
       </div>
+      <LoginModal
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onLogin={handleLogin}
+      />
     </div>
   );
 }
