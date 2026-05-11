@@ -12,6 +12,9 @@ import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/Card"
 import { Badge } from "@/components/ui/Badge";
 import { Modal, ModalHeader, ModalContent, ModalFooter } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
+import { GenreTag } from "@/components/atoms/GenreTag";
+import { StatusDot } from "@/components/atoms/StatusDot";
+import { ScoreText } from "@/components/atoms/ScoreText";
 
 export default function AtomsPreviewPage() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -179,6 +182,66 @@ export default function AtomsPreviewPage() {
           </div>
           <p className="text-sm">
             텍스트 옆 인라인 사용 예시: <Spinner size="sm" /> 분석 중...
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">GenreTag — 5장르 + 기타 fallback</h2>
+          <div className="flex flex-wrap gap-2">
+            <GenreTag genre="로맨스" />
+            <GenreTag genre="판타지" />
+            <GenreTag genre="무협" />
+            <GenreTag genre="현대물" />
+            <GenreTag genre="스포츠" />
+            <GenreTag genre="기타장르" />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            fallback (기타) = bg-stone-700/40 text-stone-300. ADR-0027 정합.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">StatusDot — 3 status</h2>
+          <div className="flex items-center gap-6 text-sm">
+            <span className="flex items-center gap-1.5"><StatusDot status="연재중" />연재중</span>
+            <span className="flex items-center gap-1.5"><StatusDot status="휴재" />휴재</span>
+            <span className="flex items-center gap-1.5"><StatusDot status="완결" />완결</span>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">ScoreText — 5단계 × 3 size</h2>
+          <div className="space-y-3">
+            <div className="flex items-baseline gap-6">
+              <ScoreText score={94} size="sm" />
+              <ScoreText score={84} size="sm" />
+              <ScoreText score={74} size="sm" />
+              <ScoreText score={64} size="sm" />
+              <ScoreText score={54} size="sm" />
+              <ScoreText score={null} size="sm" />
+              <span className="text-xs text-muted-foreground">sm</span>
+            </div>
+            <div className="flex items-baseline gap-6">
+              <ScoreText score={94} size="md" />
+              <ScoreText score={84} size="md" />
+              <ScoreText score={74} size="md" />
+              <ScoreText score={64} size="md" />
+              <ScoreText score={54} size="md" />
+              <ScoreText score={null} size="md" />
+              <span className="text-xs text-muted-foreground">md (default)</span>
+            </div>
+            <div className="flex items-baseline gap-6">
+              <ScoreText score={94} size="lg" />
+              <ScoreText score={84} size="lg" />
+              <ScoreText score={74} size="lg" />
+              <ScoreText score={64} size="lg" />
+              <ScoreText score={54} size="lg" />
+              <ScoreText score={null} size="lg" />
+              <span className="text-xs text-muted-foreground">lg</span>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            scoreColor utility 박힘 (Phase 2-B-2) 정합 — 5단계 + alpha 박음. null = "-" (stone-400).
           </p>
         </section>
       </div>
