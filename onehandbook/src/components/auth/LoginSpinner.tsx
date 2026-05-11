@@ -36,7 +36,7 @@ export function LoginSpinner({ stage = "auth" }: LoginSpinnerProps) {
   const idx = STAGE_ORDER.indexOf(stage);
 
   return (
-    <div className="flex h-full min-h-screen w-full items-center justify-center bg-stone-950 text-stone-200">
+    <main className="flex h-full min-h-screen w-full items-center justify-center bg-stone-950 text-stone-200">
       <div className="text-center">
         <div className="mx-auto mb-7 flex justify-center">
           <Image
@@ -48,7 +48,10 @@ export function LoginSpinner({ stage = "auth" }: LoginSpinnerProps) {
           />
         </div>
 
-        <div className="relative mx-auto h-14 w-14">
+        <div
+          className="relative mx-auto h-14 w-14"
+          data-testid="login-spinner-circle"
+        >
           <svg viewBox="0 0 50 50" className="h-full w-full -rotate-90">
             <circle
               cx="25"
@@ -145,6 +148,6 @@ export function LoginSpinner({ stage = "auth" }: LoginSpinnerProps) {
           잠시만 기다려주세요…
         </div>
       </div>
-    </div>
+    </main>
   );
 }
