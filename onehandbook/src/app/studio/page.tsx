@@ -36,12 +36,6 @@ function computeStats(works: StudioWorkData[]): StudioStats {
   return { totalWorks, totalEpisodes, totalAnalyzed, avgScore, ongoingCount };
 }
 
-function formatLastAnalyzedAt(iso: string | null): string | null {
-  if (!iso) return null;
-  // ISO → YYYY-MM-DD 박음 (시안 정합 — "마지막 분석 · 2026-05-04")
-  return iso.slice(0, 10);
-}
-
 export default async function StudioPage() {
   const supabase = await createClient();
   const { id: userId, email: userEmail, coin_balance, phone_verified } =
@@ -91,7 +85,7 @@ export default async function StudioPage() {
     status: w.status,
     totalEpisodes: w.total_episodes,
     agentScore: agentScores[w.id] ?? null,
-    lastAnalyzedAt: formatLastAnalyzedAt(lastAnalyzedAt[w.id] ?? null),
+    lastAnalyzedAt: lastAnalyzedAt[w.id] ?? null,
     recentScores: recentScores[w.id] ?? null,
   }));
 

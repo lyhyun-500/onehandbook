@@ -6,6 +6,7 @@ import { GenreTag } from "@/components/atoms/GenreTag";
 import { StatusDot } from "@/components/atoms/StatusDot";
 import { ScoreText } from "@/components/atoms/ScoreText";
 import { Sparkline } from "@/components/studio/Sparkline";
+import { LastAnalyzedRelative } from "@/components/studio/LastAnalyzedRelative";
 
 export type StudioWorkLayout = "card" | "list";
 export type StudioWorkDensity = "compact" | "dense" | "default";
@@ -83,7 +84,10 @@ export const StudioWorkCard = forwardRef<HTMLAnchorElement, StudioWorkCardProps>
               </span>
               <span>{work.totalEpisodes}화</span>
               {work.lastAnalyzedAt && (
-                <span>마지막 분석 · {work.lastAnalyzedAt}</span>
+                <span>
+                  마지막 분석 ·{" "}
+                  <LastAnalyzedRelative iso={work.lastAnalyzedAt} />
+                </span>
               )}
             </div>
           </div>
