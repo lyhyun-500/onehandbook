@@ -4,7 +4,7 @@ import { dirname } from 'node:path';
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
 import { seedEmptyWork } from './seed';
 
-export type TestRole = 'writer' | 'admin';
+export type TestRole = 'writer' | 'admin' | 'empty';
 
 const STORAGE_DIR = './e2e/.auth';
 const STORAGE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -23,6 +23,9 @@ function getMetaPath(role: TestRole): string {
 export function getTestEmail(role: TestRole): string {
   if (role === 'writer') {
     return process.env.E2E_TEST_WRITER_EMAIL ?? 'e2e_test_writer@novelagent.kr';
+  }
+  if (role === 'empty') {
+    return process.env.E2E_TEST_EMPTY_EMAIL ?? 'e2e_test_empty@novelagent.kr';
   }
   return process.env.E2E_TEST_ADMIN_EMAIL ?? 'e2e_test_admin@novelagent.kr';
 }
@@ -232,6 +235,8 @@ async function bootstrapSession(role: TestRole): Promise<{
     await resetAndCreditNat(admin, userId, WRITER_NAT_BALANCE);
     seededWorkId = await seedEmptyWork(authUserId, undefined, admin);
   }
+  // empty role은 의도적으로 NAT credit + work seed 스킵. /studio 진입 시 빈 상태 baseline용.
+  // terms_agreed_at + phone_verified_at은 ensureAppUserRow가 모든 role에 동일 적용.
 
   // generateLink yields a hashed_token alongside the action_link. We don't follow
   // the action_link (Supabase admin-issued magic links are implicit-flow — tokens land
