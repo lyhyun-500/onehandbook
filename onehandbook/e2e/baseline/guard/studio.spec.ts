@@ -14,11 +14,17 @@ import { seedStudioBaselineWorks } from '../../fixtures/seed';
  *  3. 베타 카피 변종 (writer with phone_verified_at 임시 null)
  *  4. 빈 상태 (empty role fixture)
  *
+ * 시간 결정성: page.clock.install 로 KST 정오 (2026-05-13T12:00:00+09:00) 고정.
+ * seedStudioBaselineWorks 의 analysis_runs.created_at 매핑과 맞물려
+ * lastAnalyzedAt 라벨 = "1일 전" / "1주 전" / "2주 전" / "3개월 전" 4 단계 결정적.
+ *
  * mask:
  *  - 헤더 이메일/NAT 배지: 환경별 다름 → 마스킹
  *  - 알림 벨: HeaderAnalysisBell 폴링/aria-live → 마스킹
  *  - Next.js dev indicator: dev 모드 잔존 요소
  */
+
+const FIXED_CLOCK_TIME = '2026-05-13T12:00:00+09:00';
 
 const HEADER_MASK_SELECTORS = (page: import('@playwright/test').Page) => [
   page.locator('[data-next-mark]'),
@@ -35,6 +41,7 @@ test.describe('Visual baseline (guard) — /studio', () => {
   test('작품 있는 / filter=전체 / layout=card', async ({ writer }) => {
     await seedStudioBaselineWorks(writer.authUserId);
     await writer.page.emulateMedia({ reducedMotion: 'reduce' });
+    await writer.page.clock.install({ time: FIXED_CLOCK_TIME });
     await writer.page.goto('/studio');
     // Hero heading 등장으로 server fetch + render 완료 신호
     await writer.page.getByRole('heading', { name: /오늘도 작업실을 엽니다/ }).waitFor();
@@ -52,6 +59,7 @@ test.describe('Visual baseline (guard) — /studio', () => {
   test('작품 있는 / filter=완결 / layout=list', async ({ writer }) => {
     await seedStudioBaselineWorks(writer.authUserId);
     await writer.page.emulateMedia({ reducedMotion: 'reduce' });
+    await writer.page.clock.install({ time: FIXED_CLOCK_TIME });
     await writer.page.goto('/studio');
     await writer.page.getByRole('heading', { name: /오늘도 작업실을 엽니다/ }).waitFor();
 
@@ -85,6 +93,7 @@ test.describe('Visual baseline (guard) — /studio', () => {
 
     try {
       await writer.page.emulateMedia({ reducedMotion: 'reduce' });
+      await writer.page.clock.install({ time: FIXED_CLOCK_TIME });
       await writer.page.goto('/studio');
       await writer.page.getByRole('heading', { name: /오늘도 작업실을 엽니다/ }).waitFor();
 
@@ -111,6 +120,7 @@ test.describe('Visual baseline (guard) — /studio', () => {
 
   test('빈 상태 — empty role / StudioEmptyState', async ({ empty }) => {
     await empty.page.emulateMedia({ reducedMotion: 'reduce' });
+    await empty.page.clock.install({ time: FIXED_CLOCK_TIME });
     await empty.page.goto('/studio');
     // 빈 상태 hero heading 등장
     await empty.page.getByRole('heading', { name: /작업실에 오신 걸 환영해요/ }).waitFor();

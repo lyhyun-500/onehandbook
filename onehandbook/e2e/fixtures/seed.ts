@@ -131,12 +131,17 @@ export async function seedEpisode(
 
 /**
  * Always inserts a new analysis_runs row (no business UNIQUE). Caller manages cleanup.
+ *
+ * createdAt 미지정 시 Postgres NOW() (E2E Supabase 서버 시간) 적용.
+ * 명시 시 ISO 8601 형식 + timezone suffix 필수 (예: '2026-05-12T00:00:00Z',
+ * '2026-05-12T09:00:00+09:00'). Postgres timestamptz 컬럼이 UTC 로 정규화.
  */
 export async function seedAnalysisRun(
   episodeId: number,
   workId: number,
   mockResult?: MockSixAxisScores | Record<string, unknown>,
   client: SupabaseClient = getAdminClient(),
+  createdAt?: string,
 ): Promise<number> {
   const result_json =
     mockResult && typeof mockResult === 'object' && 'dimensions' in mockResult
@@ -149,6 +154,7 @@ export async function seedAnalysisRun(
       work_id: workId,
       agent_version: 'e2e-mock-v1',
       result_json,
+      ...(createdAt ? { created_at: createdAt } : {}),
     })
     .select('id')
     .single();
@@ -163,6 +169,12 @@ type StudioBaselineWorkSpec = {
   genre: string;
   status: '연재중' | '휴재' | '완결';
   scores: number[]; // 회차당 overall_score (Sparkline + agentScore)
+  /**
+   * 작품 내 모든 analysis_runs 의 created_at 고정값 (ISO 8601, UTC suffix 권장).
+   * 결정성 확보 — page.clock 의 mock 시점과 매핑되어 baseline 라벨 ("X일 전" 등) 안정화.
+   * lastAnalyzedAt = MAX(created_at) 라 모든 run 동일 시점으로 두어도 결과 동일.
+   */
+  createdAt: string;
 };
 
 /**
@@ -181,30 +193,36 @@ export async function seedStudioBaselineWorks(
   authUserId: string,
   client: SupabaseClient = getAdminClient(),
 ): Promise<number[]> {
+  // clock fixed = '2026-05-13T12:00:00+09:00' 기준 라벨 매핑:
+  //   2026-05-12 → "1일 전" / 2026-05-06 → "1주 전" / 2026-04-23 → "2주 전" / 2026-02-12 → "3개월 전"
   const specs: StudioBaselineWorkSpec[] = [
     {
       title: 'E2E baseline · 황실의 그림자',
       genre: '로맨스',
       status: '연재중',
       scores: [78, 82, 89, 84, 87],
+      createdAt: '2026-05-12T00:00:00Z',
     },
     {
       title: 'E2E baseline · 검신 무제',
       genre: '무협',
       status: '연재중',
       scores: [88, 90, 89, 92, 91, 93],
+      createdAt: '2026-05-06T00:00:00Z',
     },
     {
       title: 'E2E baseline · 마지막 마법사',
       genre: '판타지',
       status: '휴재',
       scores: [62, 68, 70, 65],
+      createdAt: '2026-04-23T00:00:00Z',
     },
     {
       title: 'E2E baseline · 구단주의 백서',
       genre: '스포츠',
       status: '완결',
       scores: [85, 88, 89, 87, 90, 88],
+      createdAt: '2026-02-12T00:00:00Z',
     },
   ];
 
@@ -278,6 +296,7 @@ export async function seedStudioBaselineWorks(
           originality: spec.scores[i],
         },
         client,
+        spec.createdAt,
       );
     }
   }
