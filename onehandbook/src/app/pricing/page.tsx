@@ -118,7 +118,6 @@ export default async function PricingPage({
               분석을 계속하려면 NAT가 필요합니다
             </div>
             <div className="mt-0.5 text-[11.5px] text-amber-200/70">
-              <span className="font-mono">402 · INSUFFICIENT_NAT</span> ·
               마지막으로 시도한 회차는 충전 후 자동 재개됩니다.
             </div>
           </div>

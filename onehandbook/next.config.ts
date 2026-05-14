@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/billing", destination: "/pricing", permanent: true },
+      { source: "/login", destination: "/", permanent: true },
     ];
   },
 };
