@@ -1,3 +1,6 @@
+"use client";
+
+import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { getAnalysisScoreColor } from "@/lib/analysisScoreColor";
 import {
@@ -47,6 +50,8 @@ function formatTimestamp(iso: string): string {
  * mode = "report" | "no-runs" 본질만.
  */
 export function HolisticTab({ workId, runs, currentRunId }: HolisticTabProps) {
+  const router = useRouter();
+
   if (runs.length === 0) {
     // mode = "no-runs"
     return (
@@ -92,7 +97,7 @@ export function HolisticTab({ workId, runs, currentRunId }: HolisticTabProps) {
               const params = new URLSearchParams();
               params.set("tab", "holistic");
               params.set("run", id);
-              window.location.href = `/works/${workId}/analysis?${params.toString()}`;
+              router.push(`/works/${workId}/analysis?${params.toString()}`);
             }}
           />
         )}
@@ -105,9 +110,6 @@ export function HolisticTab({ workId, runs, currentRunId }: HolisticTabProps) {
             <h2 className="font-serif text-[20px] text-stone-100">
               일괄 분석 종합 점수
             </h2>
-            <p className="mt-1 font-serif text-[12px] leading-relaxed text-stone-500">
-              {current.scoreBasis}
-            </p>
           </div>
           <div className="flex items-end gap-8">
             <div className="text-right">
@@ -140,19 +142,11 @@ export function HolisticTab({ workId, runs, currentRunId }: HolisticTabProps) {
         </header>
       </section>
 
-      {/* Executive Summary */}
+      {/* Executive Summary — 서브타이틀 영역 일괄 삭제 (LEE 결정 정합), p text 영역만 보존 */}
       {current.executiveSummary && (
         <section className="mt-7 rounded-lg border border-stone-800/60 bg-stone-950/40 px-6 py-5">
-          <div className="flex items-baseline justify-between">
-            <h2 className="font-serif text-[15px] font-medium text-stone-100">
-              작품 흐름 요약
-            </h2>
-            <span className="font-mono text-[9.5px] uppercase tracking-[0.25em] text-stone-500">
-              EXECUTIVE SUMMARY
-            </span>
-          </div>
           <p
-            className="mt-3 font-serif text-[13.5px] leading-[1.85] text-stone-300"
+            className="font-serif text-[13.5px] leading-[1.85] text-stone-300"
             style={{ textWrap: "pretty" }}
           >
             {current.executiveSummary}
@@ -167,10 +161,6 @@ export function HolisticTab({ workId, runs, currentRunId }: HolisticTabProps) {
             <h2 className="font-serif text-[17px] text-stone-100">
               회차별 점수 추이
             </h2>
-            <p className="mt-1 text-[11.5px] text-stone-500">
-              선택 회차 {current.episodeScores.length}건 · 단일 LLM 호출 결과의
-              회차 overview
-            </p>
           </header>
           <div className="rounded-lg border border-stone-800/60 bg-stone-950/40 p-4">
             <EpisodeTrendChart data={current.episodeScores} />
@@ -185,9 +175,6 @@ export function HolisticTab({ workId, runs, currentRunId }: HolisticTabProps) {
             <h2 className="font-serif text-[17px] text-stone-100">
               항목별 종합 평가
             </h2>
-            <p className="mt-1 text-[11.5px] text-stone-500">
-              작품 단위 dimensions · 회차 평균이 아닌 흐름 기반 평가
-            </p>
           </header>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {current.dimensions.map((d) => (

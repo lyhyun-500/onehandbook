@@ -5,6 +5,7 @@ import {
   type AnalysisRunRow,
 } from "@/lib/analysisSummary";
 import { formatDimensionLabel } from "@/lib/analysis/dimensionLabel";
+import { getAgentPlatformLabel } from "@/lib/agentPlatform";
 import { getAnalysisScoreColor } from "@/lib/analysisScoreColor";
 import { DimensionLocked } from "@/components/atoms/DimensionLocked";
 import { ScoreRangeLegend } from "@/components/atoms/ScoreRangeLegend";
@@ -31,6 +32,8 @@ interface EpisodeRow {
   episodeNumber: number;
   title: string;
   source: "individual" | "holistic";
+  /** 분석 시점 플랫폼 (agent_version 인코딩). 매핑 부재 = null → "—" 표시. */
+  platform: string | null;
   overall: number;
   dimensionScores: { key: string; label: string; score: number }[];
   analyzedAtIso: string;
@@ -119,6 +122,7 @@ function deriveEpisodeRows(
         episodeNumber: e.episode_number,
         title: e.title,
         source,
+        platform: getAgentPlatformLabel(run.agent_version),
         overall,
         dimensionScores,
         analyzedAtIso: run.created_at,
@@ -180,9 +184,6 @@ export function IndividualTab({
             <h2 className="font-serif text-[20px] text-stone-100">
               개별 분석 누적 점수
             </h2>
-            <p className="mt-1 text-[12px] text-stone-500">
-              개별 분석된 회차의 6축 평균
-            </p>
           </div>
           {hasAnalyses && workAvgScore != null && (
             <div className="flex items-end gap-8">
@@ -231,9 +232,6 @@ export function IndividualTab({
               <h2 className="mt-0.5 font-serif text-[17px] text-stone-100">
                 회차별 분석 결과
               </h2>
-              <p className="mt-1 text-[11.5px] text-stone-500">
-                개별 분석 우선, 없으면 일괄 derive — 출처 배지로 구분
-              </p>
             </div>
             <div className="text-[11px] text-stone-500">
               <span className="tabular-nums">{episodeRows.length}</span>
@@ -253,6 +251,9 @@ export function IndividualTab({
                   </th>
                   <th className="py-3 pr-3 text-left font-mono text-[10px] uppercase tracking-widest text-stone-500">
                     출처
+                  </th>
+                  <th className="py-3 pr-3 text-left font-mono text-[10px] uppercase tracking-widest text-stone-500">
+                    플랫폼
                   </th>
                   <th className="py-3 pr-3 text-right font-mono text-[10px] uppercase tracking-widest text-stone-500">
                     평균
@@ -283,6 +284,13 @@ export function IndividualTab({
                     </td>
                     <td className="py-3 pr-3 align-middle">
                       <SourceBadge source={row.source} />
+                    </td>
+                    <td className="py-3 pr-3 align-middle">
+                      <span
+                        className={`text-[11.5px] ${row.platform ? "text-stone-300" : "text-stone-500"}`}
+                      >
+                        {row.platform ?? "—"}
+                      </span>
                     </td>
                     <td
                       className={`py-3 pr-3 text-right align-middle font-serif text-[16px] font-medium tabular-nums ${getAnalysisScoreColor(row.overall)}`}

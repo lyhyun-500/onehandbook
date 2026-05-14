@@ -1,4 +1,5 @@
 import { formatDimensionLabel } from "@/lib/analysis/dimensionLabel";
+import { getAgentPlatformLabel } from "@/lib/agentPlatform";
 import {
   averageOverallScore,
   latestAnalysisPerEpisode,
@@ -30,16 +31,9 @@ interface WorkAnalysisPageProps {
 
 function buildHolisticRunView(row: HolisticRunRow): HolisticRunView {
   const r = row.result_json;
-  // options_json 컬럼은 DB schema 본질이나 HolisticRunRow 타입에 부재 — runtime 안전 캐스트
-  const optsRaw = (row as unknown as { options_json?: unknown }).options_json;
-  const platformRaw =
-    optsRaw && typeof optsRaw === "object"
-      ? (optsRaw as { platform?: unknown }).platform
-      : null;
-  const platform =
-    typeof platformRaw === "string" && platformRaw.trim().length > 0
-      ? platformRaw
-      : "Novel Agent";
+  // 플랫폼 영역 = agent_version 컬럼 인코딩 (kakao-page / munpia / naver-series / generic).
+  // generic / 매핑 부재 = null → 표시처에서 "범용" fallback.
+  const platform = getAgentPlatformLabel(row.agent_version) ?? "범용";
 
   const episodeIds = row.episode_ids;
   const minEp = episodeIds.length > 0 ? Math.min(...episodeIds) : null;
