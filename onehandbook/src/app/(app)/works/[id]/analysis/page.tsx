@@ -3,7 +3,7 @@ import { requireAppUser } from "@/lib/supabase/appUser";
 import { listAgentVersionsWithAvailability } from "@/lib/ai";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { AppShellHeader } from "@/components/AppShellHeader";
+import { TopBar } from "@/components/shell/TopBar";
 import { WorkAnalysisHub } from "./WorkAnalysisHub";
 import type { AnalysisRunRow, HolisticRunRow } from "@/lib/analysisSummary";
 
@@ -62,28 +62,29 @@ export default async function WorkAnalysisPage({
   const natBalance = appUser.coin_balance ?? 0;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <AppShellHeader
-        email={appUser.email ?? ""}
+    <>
+      <TopBar
+        breadcrumb={["스튜디오", work.title]}
+        title="AI 분석 리포트"
         natBalance={natBalance}
       />
 
       <main className="mx-auto max-w-4xl px-6 py-12">
         <Link
           href={`/works/${id}`}
-          className="mb-6 inline-block text-sm text-zinc-400 hover:text-zinc-100"
+          className="mb-6 inline-block text-sm text-stone-400 hover:text-stone-100"
         >
           ← {work.title}으로 돌아가기
         </Link>
 
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-zinc-100">AI 분석</h1>
-            <p className="mt-1 text-zinc-400">{work.title}</p>
+            <h1 className="text-2xl font-bold text-stone-100">AI 분석</h1>
+            <p className="mt-1 text-stone-400">{work.title}</p>
           </div>
           <Link
             href={`/works/${id}/settings`}
-            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-cyan-500/35 bg-cyan-950/30 px-4 py-2.5 text-sm font-medium text-cyan-200 transition-colors hover:border-cyan-400/50 hover:bg-cyan-950/50"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-sky-500/35 bg-sky-950/30 px-4 py-2.5 text-sm font-medium text-sky-200 transition-colors hover:border-sky-400/50 hover:bg-sky-950/50"
           >
             세계관 설정
           </Link>
@@ -102,6 +103,6 @@ export default async function WorkAnalysisPage({
           phoneVerified={appUser.phone_verified}
         />
       </main>
-    </div>
+    </>
   );
 }

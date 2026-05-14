@@ -35,7 +35,7 @@ const MENU_ITEMS: MenuItem[] = [
   { icon: Headphones, label: "문의함", href: "/account/inquiries" },
   { icon: BookOpen, label: "스튜디오", href: "/studio" },
   { icon: Bell, label: "공지사항", href: "/notices" },
-  { icon: Coins, label: "NAT 충전", href: "/billing", badge: "+" },
+  { icon: Coins, label: "NAT 충전", href: "/pricing", badge: "+" },
   { icon: FileText, label: "이용약관", href: "/terms" },
 ];
 

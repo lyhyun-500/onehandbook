@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import Link from "next/link";
-import { AppShellHeader } from "@/components/AppShellHeader";
+import { TopBar } from "@/components/shell/TopBar";
 import { CopyWithBreaks } from "@/components/CopyWithBreaks";
 
 const ANNOUNCEMENTS: {
@@ -32,15 +32,15 @@ export default async function NoticesPage() {
   const natBalance = appUser.coin_balance ?? 0;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <AppShellHeader email={appUser.email} natBalance={natBalance} />
+    <>
+      <TopBar title="공지사항" natBalance={natBalance} />
 
       <main className="mx-auto max-w-2xl px-6 py-10 sm:py-12">
-        <p className="mb-1 text-xs font-medium uppercase tracking-widest text-cyan-400/90">
+        <p className="mb-1 text-xs font-medium uppercase tracking-widest text-sky-400/90">
           안내
         </p>
-        <h1 className="text-2xl font-bold text-zinc-100">공지사항</h1>
-        <p className="mt-2 text-sm text-zinc-400">
+        <h1 className="text-2xl font-bold text-stone-100">공지사항</h1>
+        <p className="mt-2 text-sm text-stone-400">
           운영 공지·업데이트 소식을 이 페이지에서 안내합니다.
         </p>
 
@@ -48,20 +48,20 @@ export default async function NoticesPage() {
           {ANNOUNCEMENTS.map((item) => (
             <li
               key={item.id}
-              className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 shadow-lg shadow-black/20"
+              className="rounded-xl border border-stone-800 bg-stone-900/40 p-5 shadow-lg shadow-black/20"
             >
               <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-lg font-semibold text-zinc-100">
+                <h2 className="text-lg font-semibold text-stone-100">
                   {item.title}
                 </h2>
                 <time
                   dateTime={item.date}
-                  className="text-xs tabular-nums text-zinc-500"
+                  className="text-xs tabular-nums text-stone-500"
                 >
                   {item.date}
                 </time>
               </div>
-              <p className="text-sm leading-relaxed text-zinc-400">
+              <p className="text-sm leading-relaxed text-stone-400">
                 <CopyWithBreaks as="span" className="block">
                   {item.body}
                 </CopyWithBreaks>
@@ -72,11 +72,11 @@ export default async function NoticesPage() {
 
         <Link
           href="/studio"
-          className="mt-10 inline-flex text-sm text-zinc-500 transition-colors hover:text-cyan-300"
+          className="mt-10 inline-flex text-sm text-stone-500 transition-colors hover:text-sky-300"
         >
           ← 스튜디오로
         </Link>
       </main>
-    </div>
+    </>
   );
 }

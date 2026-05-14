@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
     "@chroma-core/default-embed",
     "@huggingface/transformers",
   ],
+  async redirects() {
+    return [
+      { source: "/billing", destination: "/pricing", permanent: true },
+    ];
+  },
 };
 
 export default withSentryConfig(nextConfig, {

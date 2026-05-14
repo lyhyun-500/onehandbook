@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { AppShellHeader } from "@/components/AppShellHeader";
+import { TopBar } from "@/components/shell/TopBar";
 import { SidePanelWrapper } from "@/components/side-panel/SidePanelWrapper";
 import {
   parseCharacterSettings,
@@ -49,9 +49,10 @@ export default async function EpisodeEditPage({
   const characterSettings = parseCharacterSettings(work.character_settings);
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100">
-      <AppShellHeader
-        email={appUser.email ?? ""}
+    <>
+      <TopBar
+        breadcrumb={["스튜디오", work.title, "회차", `${episode.episode_number}화`]}
+        title="회차 편집"
         natBalance={natBalance}
       />
 
@@ -68,15 +69,15 @@ export default async function EpisodeEditPage({
           <div className="mx-auto max-w-4xl px-6 py-12">
             <Link
               href={`/works/${id}`}
-              className="mb-6 inline-block text-sm text-zinc-400 hover:text-zinc-100"
+              className="mb-6 inline-block text-sm text-stone-400 hover:text-stone-100"
             >
               ← {work.title}으로 돌아가기
             </Link>
 
-            <h1 className="mb-2 text-2xl font-bold text-zinc-100">
+            <h1 className="mb-2 text-2xl font-bold text-stone-100">
               회차 편집 ({episode.episode_number}화)
             </h1>
-            <p className="mb-8 text-zinc-400">{work.title}</p>
+            <p className="mb-8 text-stone-400">{work.title}</p>
 
             <EpisodeEditForm
               workId={work.id}
@@ -87,6 +88,6 @@ export default async function EpisodeEditPage({
           </div>
         </main>
       </div>
-    </div>
+    </>
   );
 }

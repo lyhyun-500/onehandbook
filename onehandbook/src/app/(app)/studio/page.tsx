@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import { CopyWithBreaks } from "@/components/CopyWithBreaks";
 import { StudioPhoneVerifySuccessModal } from "@/components/StudioPhoneVerifySuccessModal";
-import { AppShellHeader } from "@/components/AppShellHeader";
+import { TopBar } from "@/components/shell/TopBar";
 import {
   agentScoresByWorkFromRuns,
   recentScoresByWorkFromRuns,
@@ -38,7 +38,7 @@ function computeStats(works: StudioWorkData[]): StudioStats {
 
 export default async function StudioPage() {
   const supabase = await createClient();
-  const { id: userId, email: userEmail, coin_balance, phone_verified } =
+  const { id: userId, coin_balance, phone_verified } =
     await requireAppUser(supabase);
 
   // 로그인 콜백에서는 DB 조회를 기다리지 않고 /studio로 보내므로,
@@ -94,11 +94,11 @@ export default async function StudioPage() {
   const isEmpty = transformedWorks.length === 0;
 
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-100">
+    <>
+      <TopBar title="스튜디오" natBalance={natBalance} />
       <Suspense fallback={null}>
         <StudioPhoneVerifySuccessModal />
       </Suspense>
-      <AppShellHeader email={userEmail} natBalance={natBalance} />
 
       {!phone_verified && (
         <div className="mx-auto max-w-6xl px-6 pt-6 sm:px-8">
@@ -126,6 +126,6 @@ export default async function StudioPage() {
           stats={stats}
         />
       )}
-    </div>
+    </>
   );
 }

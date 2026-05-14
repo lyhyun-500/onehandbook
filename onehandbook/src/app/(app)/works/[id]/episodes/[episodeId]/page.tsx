@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { AppShellHeader } from "@/components/AppShellHeader";
+import { TopBar } from "@/components/shell/TopBar";
 
 export default async function EpisodeViewPage({
   params,
@@ -38,31 +38,40 @@ export default async function EpisodeViewPage({
   const natBalance = appUser.coin_balance ?? 0;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <AppShellHeader
-        email={appUser.email ?? ""}
+    <>
+      <TopBar
+        breadcrumb={["스튜디오", work.title, "회차"]}
+        title={`${episode.episode_number}화 · ${episode.title}`}
         natBalance={natBalance}
+        actions={
+          <Link
+            href={`/works/${id}/episodes/${episodeId}/edit`}
+            className="rounded-md px-2.5 py-1.5 text-[11px] text-stone-300 hover:bg-stone-100/[0.04] hover:text-stone-100"
+          >
+            회차 편집
+          </Link>
+        }
       />
 
       <main className="mx-auto max-w-3xl px-6 py-12">
         <Link
           href={`/works/${id}`}
-          className="mb-6 inline-block text-sm text-zinc-400 hover:text-zinc-100"
+          className="mb-6 inline-block text-sm text-stone-400 hover:text-stone-100"
         >
           ← {work.title}으로 돌아가기
         </Link>
 
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-zinc-100">
+          <h1 className="text-2xl font-bold text-stone-100">
             {episode.episode_number}화. {episode.title}
           </h1>
-          <p className="mt-2 text-sm text-zinc-500">
+          <p className="mt-2 text-sm text-stone-500">
             {new Date(episode.created_at).toLocaleDateString("ko-KR")}
           </p>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-8">
-          <pre className="whitespace-pre-wrap font-sans text-zinc-100 leading-relaxed">
+        <div className="rounded-xl border border-stone-800 bg-stone-900/50 p-8">
+          <pre className="whitespace-pre-wrap font-sans text-stone-100 leading-relaxed">
             {episode.content}
           </pre>
         </div>
@@ -70,7 +79,7 @@ export default async function EpisodeViewPage({
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
             href={`/works/${id}/episodes/${episodeId}/edit`}
-            className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition-colors hover:bg-zinc-800"
+            className="rounded-lg border border-stone-700 px-4 py-2 text-sm text-stone-300 transition-colors hover:bg-stone-800"
           >
             편집
           </Link>
@@ -88,6 +97,6 @@ export default async function EpisodeViewPage({
           </Link>
         </div>
       </main>
-    </div>
+    </>
   );
 }

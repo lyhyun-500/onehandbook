@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { AppShellHeader } from "@/components/AppShellHeader";
+import { TopBar } from "@/components/shell/TopBar";
 import { WorkSettingsForm } from "./WorkSettingsForm";
 import {
   normalizeCharacterSettings,
@@ -34,22 +34,23 @@ export default async function WorkSettingsPage({
   const natBalance = appUser.coin_balance ?? 0;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <AppShellHeader
-        email={appUser.email ?? ""}
+    <>
+      <TopBar
+        breadcrumb={["스튜디오", work.title]}
+        title="작품 설정"
         natBalance={natBalance}
       />
 
       <main className="mx-auto max-w-4xl px-6 py-12">
         <Link
           href={`/works/${id}`}
-          className="mb-6 inline-block text-sm text-zinc-400 hover:text-zinc-100"
+          className="mb-6 inline-block text-sm text-stone-400 hover:text-stone-100"
         >
           ← {work.title}으로 돌아가기
         </Link>
 
-        <h1 className="mb-2 text-2xl font-bold text-zinc-100">작품 설정</h1>
-        <p className="mb-8 text-zinc-400">{work.title}</p>
+        <h1 className="mb-2 text-2xl font-bold text-stone-100">작품 설정</h1>
+        <p className="mb-8 text-stone-400">{work.title}</p>
 
         <WorkSettingsForm
           workId={work.id}
@@ -65,6 +66,6 @@ export default async function WorkSettingsPage({
           initialCharacters={normalizeCharacterSettings(work.character_settings)}
         />
       </main>
-    </div>
+    </>
   );
 }

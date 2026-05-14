@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
-import { AppShellHeader } from "@/components/AppShellHeader";
+import { TopBar } from "@/components/shell/TopBar";
 import { inquiryCategoryLabel } from "@/lib/inquiry/categories";
 
 type InquiryRow = {
@@ -42,18 +42,19 @@ export default async function MyInquiriesPage() {
   const inquiries: InquiryRow[] = (rows ?? []) as InquiryRow[];
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <AppShellHeader
-        email={appUser.email ?? ""}
+    <>
+      <TopBar
+        breadcrumb={["계정"]}
+        title="문의함"
         natBalance={appUser.coin_balance ?? 0}
       />
 
       <main className="mx-auto max-w-3xl px-6 py-12">
-        <p className="mb-1 text-xs font-medium uppercase tracking-widest text-cyan-400/90">
+        <p className="mb-1 text-xs font-medium uppercase tracking-widest text-sky-400/90">
           1:1 문의
         </p>
-        <h1 className="text-2xl font-bold text-zinc-100">내 문의 내역</h1>
-        <p className="mt-2 text-sm text-zinc-400">
+        <h1 className="text-2xl font-bold text-stone-100">내 문의 내역</h1>
+        <p className="mt-2 text-sm text-stone-400">
           작성하신 문의와 답변을 확인하실 수 있습니다. 답변이 도착하면 헤더 알림으로
           알려드립니다.
         </p>
@@ -65,9 +66,9 @@ export default async function MyInquiriesPage() {
         )}
 
         {!error && inquiries.length === 0 && (
-          <div className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900/40 p-8 text-center">
-            <p className="text-sm text-zinc-400">아직 작성한 문의가 없습니다.</p>
-            <p className="mt-2 text-xs text-zinc-500">
+          <div className="mt-8 rounded-xl border border-stone-800 bg-stone-900/40 p-8 text-center">
+            <p className="text-sm text-stone-400">아직 작성한 문의가 없습니다.</p>
+            <p className="mt-2 text-xs text-stone-500">
               사이트 우측 하단 문의 버튼으로 문의를 보낼 수 있습니다.
             </p>
           </div>
@@ -79,15 +80,15 @@ export default async function MyInquiriesPage() {
             return (
               <li
                 key={inq.id}
-                className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5 shadow-sm shadow-black/20"
+                className="rounded-xl border border-stone-800 bg-stone-900/50 p-5 shadow-sm shadow-black/20"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-sm font-semibold text-zinc-100">
+                    <h2 className="truncate text-sm font-semibold text-stone-100">
                       {inq.title}
                     </h2>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                      <span className="rounded bg-zinc-800/80 px-2 py-0.5 text-[11px] text-zinc-300">
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-stone-500">
+                      <span className="rounded bg-stone-800/80 px-2 py-0.5 text-[11px] text-stone-300">
                         {inquiryCategoryLabel(inq.category ?? "general")}
                       </span>
                       <span>{formatDateTime(inq.created_at)}</span>
@@ -104,21 +105,21 @@ export default async function MyInquiriesPage() {
                   )}
                 </div>
 
-                <p className="mt-4 whitespace-pre-wrap text-sm text-zinc-300">
+                <p className="mt-4 whitespace-pre-wrap text-sm text-stone-300">
                   {inq.content}
                 </p>
 
                 {replied && (
-                  <div className="mt-5 rounded-lg border border-cyan-500/20 bg-cyan-500/[0.04] p-4">
+                  <div className="mt-5 rounded-lg border border-sky-500/20 bg-sky-500/[0.04] p-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-cyan-300">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-sky-300">
                         Novel Agent 답변
                       </span>
-                      <span className="text-xs text-zinc-500">
+                      <span className="text-xs text-stone-500">
                         {inq.replied_at ? formatDateTime(inq.replied_at) : ""}
                       </span>
                     </div>
-                    <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-200">
+                    <p className="mt-3 whitespace-pre-wrap text-sm text-stone-200">
                       {inq.reply_content}
                     </p>
                   </div>
@@ -130,11 +131,11 @@ export default async function MyInquiriesPage() {
 
         <Link
           href="/studio"
-          className="mt-10 inline-flex rounded-lg border border-zinc-600 px-4 py-2 text-sm text-zinc-200 hover:border-zinc-500 hover:bg-zinc-900/60"
+          className="mt-10 inline-flex rounded-lg border border-stone-600 px-4 py-2 text-sm text-stone-200 hover:border-stone-500 hover:bg-stone-900/60"
         >
           ← 스튜디오로
         </Link>
       </main>
-    </div>
+    </>
   );
 }

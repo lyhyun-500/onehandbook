@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { AppShellHeader } from "@/components/AppShellHeader";
+import { TopBar } from "@/components/shell/TopBar";
 import {
   averageOverallScore,
   latestAnalysisPerEpisode,
@@ -54,31 +54,40 @@ export default async function WorkDetailPage({
   const natBalance = appUser.coin_balance ?? 0;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <AppShellHeader
-        email={appUser.email ?? ""}
+    <>
+      <TopBar
+        breadcrumb={["스튜디오"]}
+        title={work.title}
         natBalance={natBalance}
+        actions={
+          <Link
+            href={`/works/${id}/settings`}
+            className="rounded-md px-2.5 py-1.5 text-[11px] text-stone-300 hover:bg-stone-100/[0.04] hover:text-stone-100"
+          >
+            작품 설정
+          </Link>
+        }
       />
 
       <main className="mx-auto max-w-4xl px-6 py-12">
         <Link
           href="/studio"
-          className="mb-6 inline-block text-sm text-zinc-400 hover:text-zinc-100"
+          className="mb-6 inline-block text-sm text-stone-400 hover:text-stone-100"
         >
           ← 스튜디오로 돌아가기
         </Link>
 
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-zinc-100">{work.title}</h1>
-            <p className="mt-1 text-zinc-400">
+            <h1 className="text-2xl font-bold text-stone-100">{work.title}</h1>
+            <p className="mt-1 text-stone-400">
               {work.genre} · {work.total_episodes}화
             </p>
           </div>
           <div className="flex items-center gap-3">
             <Link
               href={`/works/${id}/settings`}
-              className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+              className="rounded-lg border border-stone-700 px-4 py-2 text-sm text-stone-300 transition-colors hover:bg-stone-800 hover:text-stone-100"
             >
               작품 설정
             </Link>
@@ -100,7 +109,7 @@ export default async function WorkDetailPage({
         {/* 회차 목록 */}
         <section>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-zinc-100">회차 목록</h2>
+            <h2 className="text-lg font-semibold text-stone-100">회차 목록</h2>
             <Link
               href={`/works/${id}/episodes/new`}
               className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500"
@@ -109,8 +118,8 @@ export default async function WorkDetailPage({
             </Link>
           </div>
           {episodeList.length === 0 ? (
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-8 text-center">
-              <p className="mb-4 text-zinc-500">등록된 회차가 없습니다</p>
+            <div className="rounded-xl border border-stone-800 bg-stone-900/50 p-8 text-center">
+              <p className="mb-4 text-stone-500">등록된 회차가 없습니다</p>
               <Link
                 href={`/works/${id}/episodes/new`}
                 className="inline-block rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500"
@@ -123,13 +132,13 @@ export default async function WorkDetailPage({
               {episodeList.map((ep) => (
                 <div
                   key={ep.id}
-                  className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3"
+                  className="flex items-center justify-between rounded-lg border border-stone-800 bg-stone-900/50 px-4 py-3"
                 >
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                    <span className="text-sm text-zinc-500">
+                    <span className="text-sm text-stone-500">
                       {ep.episode_number}화
                     </span>
-                    <span className="text-zinc-100">{ep.title}</span>
+                    <span className="text-stone-100">{ep.title}</span>
                     <EpisodeRowAnalysisBadge
                       episodeId={ep.id}
                       serverLatestRunCreatedAt={
@@ -138,7 +147,7 @@ export default async function WorkDetailPage({
                     />
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-stone-500">
                       {new Date(ep.created_at).toLocaleDateString("ko-KR")}
                     </span>
                     <EpisodeActions workId={id} episodeId={ep.id} />
@@ -149,6 +158,6 @@ export default async function WorkDetailPage({
           )}
         </section>
       </main>
-    </div>
+    </>
   );
 }

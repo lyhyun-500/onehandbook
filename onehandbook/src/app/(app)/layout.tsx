@@ -25,11 +25,16 @@ type WorkRow = {
  * 부족하면 works.created_at DESC 보충. 최종 RECENT_WORKS_LIMIT 건.
  *
  * fallbackId = 최근 분석 작품 1번째. 분석 0 사용자는 가장 최근 생성 작품. 작품 0건이면 null.
+ * episodeFallback = 작품별 최근 analysis_run 의 episode_id. URL 부재 시 회차 분석 메뉴 진입 본질.
  */
 function computeLeftRailData(
   works: WorkRow[],
   runs: Array<AnalysisRunRow & { work_id: number }>,
-): { recent: LeftRailWork[]; fallbackId: number | null } {
+): {
+  recent: LeftRailWork[];
+  fallbackId: number | null;
+  episodeFallback: Record<number, number>;
+} {
   const worksById = new Map<number, WorkRow>();
   for (const w of works) worksById.set(w.id, w);
 
@@ -71,7 +76,19 @@ function computeLeftRailData(
   const fallbackId =
     orderedByAnalysis[0] ?? works[0]?.id ?? null;
 
-  return { recent, fallbackId };
+  // runs 는 이미 created_at DESC 정렬 — 작품별 최초 등장이 최신.
+  const episodeFallback: Record<number, number> = {};
+  for (const r of runs) {
+    if (episodeFallback[r.work_id] != null) continue;
+    if (!worksById.has(r.work_id)) continue;
+    const eid = Number(
+      (r as unknown as { episode_id?: unknown }).episode_id ?? Number.NaN,
+    );
+    if (!Number.isFinite(eid)) continue;
+    episodeFallback[r.work_id] = eid;
+  }
+
+  return { recent, fallbackId, episodeFallback };
 }
 
 /**
@@ -110,7 +127,10 @@ export default async function AppShellLayout({
     analysisRuns = (data ?? []) as Array<AnalysisRunRow & { work_id: number }>;
   }
 
-  const { recent, fallbackId } = computeLeftRailData(works, analysisRuns);
+  const { recent, fallbackId, episodeFallback } = computeLeftRailData(
+    works,
+    analysisRuns,
+  );
   const natBalance = appUser.coin_balance ?? 0;
 
   return (
@@ -120,6 +140,7 @@ export default async function AppShellLayout({
         natBalance={natBalance}
         recentWorks={recent}
         currentWorkFallbackId={fallbackId}
+        currentEpisodeFallbackByWorkId={episodeFallback}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   BookOpen,
   Pencil,
+  LineChart,
   Sparkles,
   Settings,
   type LucideIcon,
@@ -36,14 +37,23 @@ export interface LeftRailProps {
    * 옵션 C 정책: 최근 분석 작품 1건. 분석 0 사용자는 가장 최근 생성 작품. 작품 0건이면 null.
    */
   currentWorkFallbackId: number | null;
+  /**
+   * 회차 분석 메뉴 fallback episode id — workId 별 최근 analysis_run 의 episode_id.
+   * URL 이 `/works/[id]/episodes/[id]` 형식이면 그 id 우선, 아니면 본 fallback 사용.
+   * fallback 도 부재이면 회차 분석 메뉴 disabled.
+   */
+  currentEpisodeFallbackByWorkId: Record<number, number>;
 }
 
 interface NavItem {
   id: string;
   label: string;
   icon: LucideIcon;
-  /** URL resolver — currentWorkId 의존 항목은 null 반환 시 disabled 처리. */
-  resolveHref: (currentWorkId: number | null) => string | null;
+  /** URL resolver — currentWorkId/Episode 의존 항목은 null 반환 시 disabled 처리. */
+  resolveHref: (
+    currentWorkId: number | null,
+    currentEpisodeId: number | null,
+  ) => string | null;
   /** active 판정 — pathname 기반. */
   isActive: (pathname: string) => boolean;
 }
@@ -61,22 +71,40 @@ const NAV_ITEMS: NavItem[] = [
     label: "작품 상세",
     icon: Pencil,
     resolveHref: (id) => (id != null ? `/works/${id}` : null),
+    // /works/[id] exact match — settings 는 별도 active 영역 (현재 dedicated 메뉴 부재라 work 와 동시 active 유지)
     isActive: (p) =>
-      /^\/works\/\d+$/.test(p) ||
-      /^\/works\/\d+\/(?!analysis)/.test(p) ||
-      /^\/works\/\d+\/episodes(\/|$)/.test(p),
+      /^\/works\/\d+$/.test(p) || /^\/works\/\d+\/settings$/.test(p),
   },
   {
     id: "analysis",
-    label: "AI 분석",
-    icon: Sparkles,
+    label: "분석 리포트",
+    icon: LineChart,
     resolveHref: (id) => (id != null ? `/works/${id}/analysis` : null),
     isActive: (p) => /^\/works\/\d+\/analysis$/.test(p),
+  },
+  {
+    id: "episode",
+    label: "회차 분석",
+    icon: Sparkles,
+    resolveHref: (workId, episodeId) =>
+      workId != null && episodeId != null
+        ? `/works/${workId}/episodes/${episodeId}`
+        : null,
+    // /works/[id]/episodes/[id], /edit, /new 모두 회차 분석 영역
+    isActive: (p) => /^\/works\/\d+\/episodes(\/|$)/.test(p),
   },
 ];
 
 function resolveCurrentWorkIdFromPathname(pathname: string): number | null {
   const match = pathname.match(/^\/works\/(\d+)(?:\/|$)/);
+  if (!match) return null;
+  const id = Number.parseInt(match[1], 10);
+  return Number.isFinite(id) ? id : null;
+}
+
+function resolveCurrentEpisodeIdFromPathname(pathname: string): number | null {
+  // /works/[id]/episodes/[episodeId] + /edit 영역 매치. /new 는 정수 아니라 null.
+  const match = pathname.match(/^\/works\/\d+\/episodes\/(\d+)(?:\/|$)/);
   if (!match) return null;
   const id = Number.parseInt(match[1], 10);
   return Number.isFinite(id) ? id : null;
@@ -88,6 +116,7 @@ export function LeftRail({
   natBalance,
   recentWorks,
   currentWorkFallbackId,
+  currentEpisodeFallbackByWorkId,
 }: LeftRailProps) {
   const pathname = usePathname() ?? "";
   const [menuOpen, setMenuOpen] = useState(false);
@@ -97,6 +126,13 @@ export function LeftRail({
     if (fromUrl != null) return fromUrl;
     return currentWorkFallbackId;
   }, [pathname, currentWorkFallbackId]);
+
+  const currentEpisodeId = useMemo(() => {
+    const fromUrl = resolveCurrentEpisodeIdFromPathname(pathname);
+    if (fromUrl != null) return fromUrl;
+    if (currentWorkId == null) return null;
+    return currentEpisodeFallbackByWorkId[currentWorkId] ?? null;
+  }, [pathname, currentWorkId, currentEpisodeFallbackByWorkId]);
 
   const currentWork = useMemo(() => {
     if (currentWorkId == null) return null;
@@ -162,7 +198,7 @@ export function LeftRail({
         <div className="px-3 pb-2 text-[10px] text-stone-500">화면</div>
         <nav className="space-y-0.5">
           {NAV_ITEMS.map((item) => {
-            const href = item.resolveHref(currentWorkId);
+            const href = item.resolveHref(currentWorkId, currentEpisodeId);
             const disabled = href == null;
             const active = !disabled && item.isActive(pathname);
             const Icon = item.icon;
