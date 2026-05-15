@@ -4,14 +4,17 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { TopBar } from "@/components/shell/TopBar";
 import {
+  agentScoresByWorkFromRuns,
   averageOverallScore,
   latestAnalysisPerEpisode,
   type AnalysisRunRow,
 } from "@/lib/analysisSummary";
+import type { WorkOption } from "@/components/atoms/WorkSelector";
 import { EpisodeActions } from "./EpisodeActions";
 import { EpisodeRowAnalysisBadge } from "@/components/EpisodeRowAnalysisBadge";
 import { WorkAiOverview } from "./WorkAiOverview";
 import { DeleteWorkButton } from "./DeleteWorkButton";
+import { WorkDetailHeader } from "./WorkDetailHeader";
 
 export default async function WorkDetailPage({
   params,
@@ -53,6 +56,38 @@ export default async function WorkDetailPage({
   const workAverage = averageOverallScore(latestByEpisode);
   const natBalance = appUser.coin_balance ?? 0;
 
+  // 작품 전환 WorkSelector 영역 — 사용자 본인의 작품 목록 전체.
+  const { data: worksRaw } = await supabase
+    .from("works")
+    .select("id, title, genre, status, total_episodes")
+    .eq("author_id", appUser.id)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+  const workList = worksRaw ?? [];
+
+  const workIds = workList.map((w) => w.id as number);
+  let agentScores: Record<number, number | null> = {};
+  if (workIds.length > 0) {
+    const { data: allRuns } = await supabase
+      .from("analysis_runs")
+      .select("id, episode_id, work_id, agent_version, result_json, created_at")
+      .in("work_id", workIds)
+      .order("created_at", { ascending: false });
+    const rowsTyped = (allRuns ?? []) as Array<
+      AnalysisRunRow & { work_id: number }
+    >;
+    agentScores = agentScoresByWorkFromRuns(rowsTyped);
+  }
+
+  const workOptions: WorkOption[] = workList.map((w) => ({
+    id: String(w.id),
+    title: w.title as string,
+    genre: w.genre as string,
+    status: w.status as string,
+    totalEpisodes: w.total_episodes as number,
+    agentScore: agentScores[w.id as number] ?? null,
+  }));
+
   return (
     <>
       <TopBar
@@ -78,12 +113,12 @@ export default async function WorkDetailPage({
         </Link>
 
         <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-stone-100">{work.title}</h1>
-            <p className="mt-1 text-stone-400">
-              {work.genre} · {work.total_episodes}화
-            </p>
-          </div>
+          <WorkDetailHeader
+            workId={String(id)}
+            works={workOptions}
+            genre={work.genre as string}
+            totalEpisodes={work.total_episodes as number}
+          />
           <div className="flex items-center gap-3">
             <Link
               href={`/works/${id}/settings`}

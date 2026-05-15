@@ -1,8 +1,12 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { getAnalysisScoreColor } from "@/lib/analysisScoreColor";
+import { computeHolisticNatCost } from "@/lib/nat";
+import { BatchSpendConfirmModal } from "@/components/BatchSpendConfirmModal";
+import { EmptyState } from "@/components/atoms/EmptyState";
 import {
   EpisodeTrendChart,
   type EpisodeScorePoint,
@@ -12,6 +16,11 @@ import {
   type HolisticDimension,
 } from "./HolisticDimensionCard";
 import { RunSelector, type RunOption } from "./RunSelector";
+import {
+  HolisticRangeSelector,
+  type RangeSelectorEpisode,
+} from "./HolisticRangeSelector";
+import { HolisticSubmitBar } from "./HolisticSubmitBar";
 
 export interface HolisticRunView {
   id: string;
@@ -29,11 +38,22 @@ export interface HolisticRunView {
   improvements: string[];
 }
 
+export type HolisticTabMode = "report" | "select";
+
 interface HolisticTabProps {
   workId: string;
+  workTitle: string;
   runs: HolisticRunView[];
-  /** URL searchParams ?run=<id> 또는 첫 번째 run 본질. */
+  /** URL searchParams ?run=<id> 또는 첫 번째 run. */
   currentRunId: string | null;
+  /** URL searchParams ?mode= — select 모드 진입 영역. */
+  mode: HolisticTabMode;
+  /** RangeSelector / SubmitBar 영역에 사용. */
+  episodes: RangeSelectorEpisode[];
+  /** "missing" = 미분석 회차 자동 선택, "all" = 전체 자동 선택. */
+  preselect: "missing" | "all" | null;
+  /** 사용자 NAT 잔량 — BatchSpendConfirmModal 영역에 사용. */
+  natBalance: number;
 }
 
 function formatTimestamp(iso: string): string {
@@ -44,29 +64,113 @@ function formatTimestamp(iso: string): string {
 }
 
 /**
- * 시안 `design_novel/novel-agent/holistic-report.jsx` 정합 — 일괄 분석 view-only.
+ * 시안 `design_novel/novel-agent/holistic-report.jsx` 정합.
  *
- * LEE 결정 Z5 (a) — 분석 실행 진입점 부재 본질 (HolisticRangeSelector + HolisticSubmitBar 영역 외).
- * mode = "report" | "no-runs" 본질만.
+ * 3 mode:
+ * - `report`: 분석 결과 표시 (1+ run 영역)
+ * - `select`: RangeSelector + SubmitBar (BatchAnalyzeCTA 또는 "추가 분석" 진입)
+ * - (no-runs): runs.length === 0 본질 — empty state.
  */
-export function HolisticTab({ workId, runs, currentRunId }: HolisticTabProps) {
+export function HolisticTab({
+  workId,
+  workTitle,
+  runs,
+  currentRunId,
+  mode,
+  episodes,
+  preselect,
+  natBalance,
+}: HolisticTabProps) {
   const router = useRouter();
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  if (runs.length === 0) {
-    // mode = "no-runs"
+  // preselect 영역 자동 적용 — mode = select 진입 시점에만.
+  useEffect(() => {
+    if (mode !== "select") return;
+    if (preselect === "all") {
+      setSelectedIds(new Set(episodes.map((e) => e.id)));
+    } else if (preselect === "missing") {
+      setSelectedIds(new Set(episodes.filter((e) => !e.analyzed).map((e) => e.id)));
+    }
+  }, [mode, preselect, episodes]);
+
+  const exitSelect = () => {
+    const params = new URLSearchParams();
+    params.set("tab", "holistic");
+    router.push(`/works/${workId}/analysis?${params.toString()}`);
+  };
+
+  const selectedEpisodes = useMemo(
+    () => episodes.filter((e) => selectedIds.has(e.id)),
+    [episodes, selectedIds]
+  );
+
+  // mode = select — RangeSelector + SubmitBar
+  if (mode === "select") {
+    const natCost = computeHolisticNatCost(selectedIds.size, {
+      includeLore: true,
+      includePlatformOptimization: true,
+    });
     return (
-      <div className="rounded-xl border border-dashed border-stone-700 bg-stone-900/30 px-8 py-14 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-sky-400/[0.08] text-sky-300 ring-1 ring-inset ring-sky-400/20">
-          <Sparkles size={22} aria-hidden="true" />
+      <>
+        <div className="mb-5">
+          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-stone-500">
+            통합 분석 진입
+          </div>
+          <h2 className="mt-1 font-serif text-[20px] text-stone-100">
+            분석 회차 선택
+          </h2>
         </div>
-        <h3 className="font-serif text-[18px] text-stone-100">
-          아직 일괄 분석 이력이 없습니다
-        </h3>
-        <p className="mx-auto mt-2 max-w-md font-serif text-[13px] leading-relaxed text-stone-400">
-          여러 회차를 묶어 작품 흐름 기준의 통합 리포트를 받을 수 있습니다. 일괄
-          분석은 별도 진입점에서 시작합니다.
-        </p>
-      </div>
+
+        <HolisticRangeSelector
+          episodes={episodes}
+          selectedIds={selectedIds}
+          onChange={setSelectedIds}
+        />
+
+        <HolisticSubmitBar
+          selectedCount={selectedIds.size}
+          natCost={natCost}
+          onCancel={exitSelect}
+          onSubmit={() => setConfirmOpen(true)}
+        />
+
+        <BatchSpendConfirmModal
+          open={confirmOpen}
+          workId={workId}
+          workTitle={workTitle}
+          selected={selectedEpisodes.map((e) => ({
+            id: e.id,
+            episode_number: e.episode_number,
+            title: e.title,
+          }))}
+          balance={natBalance}
+          onClose={() => setConfirmOpen(false)}
+          onJobQueued={() => {
+            setConfirmOpen(false);
+            // job 큐 진입 후 report 모드 복귀 — 백그라운드 처리 본질 (알림 채널 갱신).
+            exitSelect();
+          }}
+        />
+      </>
+    );
+  }
+
+  // mode = report — 분석 결과 표시
+  if (runs.length === 0) {
+    return (
+      <EmptyState
+        variant="sky"
+        icon={<Sparkles size={22} aria-hidden="true" />}
+        title="아직 일괄 분석 이력이 없습니다"
+        body={
+          <>
+            <span className="block">여러 회차를 묶어 작품 흐름 기준의 통합 리포트를 받습니다.</span>
+            <span className="block mt-1">상단 일괄 분석 영역에서 시작하세요.</span>
+          </>
+        }
+      />
     );
   }
 
@@ -83,7 +187,6 @@ export function HolisticTab({ workId, runs, currentRunId }: HolisticTabProps) {
 
   return (
     <div>
-      {/* Run selector strip — 2+ run 시점에만 노출 */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-stone-500">
           현재 표시:{" "}
@@ -103,7 +206,6 @@ export function HolisticTab({ workId, runs, currentRunId }: HolisticTabProps) {
         )}
       </div>
 
-      {/* Hero */}
       <section>
         <header className="mb-5 flex flex-wrap items-end justify-between gap-6">
           <div className="min-w-0">
@@ -142,7 +244,6 @@ export function HolisticTab({ workId, runs, currentRunId }: HolisticTabProps) {
         </header>
       </section>
 
-      {/* Executive Summary — 서브타이틀 영역 일괄 삭제 (LEE 결정 정합), p text 영역만 보존 */}
       {current.executiveSummary && (
         <section className="mt-7 rounded-lg border border-stone-800/60 bg-stone-950/40 px-6 py-5">
           <p
@@ -154,7 +255,6 @@ export function HolisticTab({ workId, runs, currentRunId }: HolisticTabProps) {
         </section>
       )}
 
-      {/* Episode trend chart */}
       {current.episodeScores.length > 0 && (
         <section className="mt-7">
           <header className="mb-4">
@@ -168,7 +268,6 @@ export function HolisticTab({ workId, runs, currentRunId }: HolisticTabProps) {
         </section>
       )}
 
-      {/* Dimensions */}
       {current.dimensions.length > 0 && (
         <section className="mt-8">
           <header className="mb-4">
@@ -184,7 +283,6 @@ export function HolisticTab({ workId, runs, currentRunId }: HolisticTabProps) {
         </section>
       )}
 
-      {/* Strengths + Improvements */}
       {(current.strengths.length > 0 || current.improvements.length > 0) && (
         <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
           {current.strengths.length > 0 && (

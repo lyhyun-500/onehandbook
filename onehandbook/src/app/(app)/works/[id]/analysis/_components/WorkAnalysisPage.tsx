@@ -6,13 +6,24 @@ import {
   type AnalysisRunRow,
   type HolisticRunRow,
 } from "@/lib/analysisSummary";
+import { computeHolisticNatCost } from "@/lib/nat";
+import type { WorkOption } from "@/components/atoms/WorkSelector";
 import { TabSegment, type AnalysisTab } from "./TabSegment";
 import { WorkHeader } from "./WorkHeader";
 import {
   IndividualTab,
   type EpisodeRef,
 } from "./IndividualTab";
-import { HolisticTab, type HolisticRunView } from "./HolisticTab";
+import {
+  HolisticTab,
+  type HolisticRunView,
+  type HolisticTabMode,
+} from "./HolisticTab";
+import {
+  BatchAnalyzeCTA,
+  type BatchAnalyzeCTAState,
+} from "./BatchAnalyzeCTA";
+import type { RangeSelectorEpisode } from "./HolisticRangeSelector";
 
 interface WorkAnalysisPageProps {
   workId: string;
@@ -22,17 +33,19 @@ interface WorkAnalysisPageProps {
     status: string;
     total_episodes: number;
   };
+  workOptions: WorkOption[];
   episodes: EpisodeRef[];
   runs: AnalysisRunRow[];
   holisticRuns: HolisticRunRow[];
   activeTab: AnalysisTab;
   currentRunId: string | null;
+  holisticMode: HolisticTabMode;
+  preselect: "missing" | "all" | null;
+  natBalance: number;
 }
 
 function buildHolisticRunView(row: HolisticRunRow): HolisticRunView {
   const r = row.result_json;
-  // 플랫폼 영역 = agent_version 컬럼 인코딩 (kakao-page / munpia / naver-series / generic).
-  // generic / 매핑 부재 = null → 표시처에서 "범용" fallback.
   const platform = getAgentPlatformLabel(row.agent_version) ?? "범용";
 
   const episodeIds = row.episode_ids;
@@ -57,7 +70,6 @@ function buildHolisticRunView(row: HolisticRunRow): HolisticRunView {
     improvements?: string[];
   };
 
-  // dimensions 는 array 또는 record — array 우선
   let dimensions: HolisticRunView["dimensions"] = [];
   if (Array.isArray(rawResult.dimensions)) {
     dimensions = rawResult.dimensions.map((d) => ({
@@ -95,19 +107,33 @@ function buildHolisticRunView(row: HolisticRunRow): HolisticRunView {
   };
 }
 
+function deriveCTAState(
+  totalEpisodes: number,
+  analyzedEpisodes: number,
+): BatchAnalyzeCTAState | null {
+  if (totalEpisodes === 0) return null;
+  if (analyzedEpisodes === 0) return "none";
+  if (analyzedEpisodes >= totalEpisodes) return "all_analyzed";
+  return "partial";
+}
+
 /**
- * /works/[id]/analysis 의 메인 orchestrator — 시안 정합 tab shell.
+ * `/works/[id]/analysis` 의 메인 orchestrator — WorkHeader + BatchAnalyzeCTA + TabSegment + (Individual | Holistic).
  *
- * 분석 실행 영역 (BatchAnalyzeCTA + HolisticRangeSelector) 부재 — Phase 2-D-8-5 후보.
+ * BatchAnalyzeCTA 위치: WorkHeader 와 TabSegment 사이 (tab 무관, 작품 단위 전역 노출).
  */
 export function WorkAnalysisPage({
   workId,
   work,
+  workOptions,
   episodes,
   runs,
   holisticRuns,
   activeTab,
   currentRunId,
+  holisticMode,
+  preselect,
+  natBalance,
 }: WorkAnalysisPageProps) {
   const latest = latestAnalysisPerEpisode(runs);
   const analyzedEpisodes = latest.size;
@@ -117,10 +143,40 @@ export function WorkAnalysisPage({
 
   const holisticViews = holisticRuns.map(buildHolisticRunView);
 
+  const analyzedIdSet = new Set<number>(latest.keys());
+  // 통합 일괄 분석 본질 = 통합 run 에 포함된 회차도 "분석됨" 으로 표시.
+  for (const h of holisticRuns) {
+    for (const eid of h.episode_ids) analyzedIdSet.add(eid);
+  }
+
+  const rangeSelectorEpisodes: RangeSelectorEpisode[] = episodes.map((e) => ({
+    id: e.id,
+    episode_number: e.episode_number,
+    title: e.title,
+    analyzed: analyzedIdSet.has(e.id),
+  }));
+
+  const ctaState = deriveCTAState(work.total_episodes, analyzedEpisodes);
+
+  // CTA NAT 비용 — 옵션 기본 ON (lore + platform) 시점의 산식.
+  const totalNatCost = computeHolisticNatCost(work.total_episodes, {
+    includeLore: true,
+    includePlatformOptimization: true,
+  });
+  const unanalyzedCount = Math.max(
+    0,
+    work.total_episodes - analyzedEpisodes,
+  );
+  const partialNatCost = computeHolisticNatCost(unanalyzedCount, {
+    includeLore: true,
+    includePlatformOptimization: true,
+  });
+
   return (
     <>
       <WorkHeader
-        title={work.title}
+        workId={workId}
+        works={workOptions}
         genre={work.genre}
         status={work.status}
         totalEpisodes={work.total_episodes}
@@ -130,6 +186,19 @@ export function WorkAnalysisPage({
       />
 
       <div className="mx-auto max-w-6xl px-6 pb-8 pt-6">
+        {/* BatchAnalyzeCTA — select 모드 외 시점에만 노출 (선택 영역 진입 후엔 중복 회피) */}
+        {ctaState && !(activeTab === "holistic" && holisticMode === "select") && (
+          <BatchAnalyzeCTA
+            workId={workId}
+            state={ctaState}
+            totalEpisodes={work.total_episodes}
+            analyzedEpisodes={analyzedEpisodes}
+            partialNatCost={partialNatCost}
+            totalNatCost={totalNatCost}
+            lastAnalyzedAt={lastAnalyzedAt}
+          />
+        )}
+
         <TabSegment workId={workId} activeTab={activeTab} />
 
         {activeTab === "individual" ? (
@@ -143,8 +212,13 @@ export function WorkAnalysisPage({
         ) : (
           <HolisticTab
             workId={workId}
+            workTitle={work.title}
             runs={holisticViews}
             currentRunId={currentRunId}
+            mode={holisticMode}
+            episodes={rangeSelectorEpisodes}
+            preselect={preselect}
+            natBalance={natBalance}
           />
         )}
       </div>

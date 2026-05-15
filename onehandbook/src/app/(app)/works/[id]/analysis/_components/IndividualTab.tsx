@@ -8,6 +8,7 @@ import { formatDimensionLabel } from "@/lib/analysis/dimensionLabel";
 import { getAgentPlatformLabel } from "@/lib/agentPlatform";
 import { getAnalysisScoreColor } from "@/lib/analysisScoreColor";
 import { DimensionLocked } from "@/components/atoms/DimensionLocked";
+import { EmptyState } from "@/components/atoms/EmptyState";
 import { ScoreRangeLegend } from "@/components/atoms/ScoreRangeLegend";
 import { SourceBadge } from "@/components/atoms/SourceBadge";
 import { DimensionCard, type DimensionSummary } from "./DimensionCard";
@@ -155,24 +156,22 @@ export function IndividualTab({
 
   if (episodes.length === 0) {
     return (
-      <div className="mx-auto max-w-2xl rounded-xl border border-dashed border-stone-700/70 bg-stone-900/30 px-8 py-14 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-stone-800/60 text-stone-400">
-          <FileText size={20} aria-hidden="true" />
-        </div>
-        <h3 className="font-serif text-[18px] text-stone-100">
-          아직 회차가 없습니다
-        </h3>
-        <p className="mx-auto mt-2 max-w-md font-serif text-[13px] leading-relaxed text-stone-400">
-          <span className="text-stone-200">{workTitle}</span>에 회차를 한 건이라도
-          추가하시면 6축 통합 분석을 시작할 수 있어요.
-        </p>
-        <Link
-          href={`/works/${workId}/episodes/new`}
-          className="mt-6 inline-flex items-center gap-1.5 rounded-md bg-sky-400 px-4 py-2 text-[12.5px] font-medium text-stone-950 hover:bg-sky-300"
-        >
-          첫 회차 추가
-        </Link>
-      </div>
+      <EmptyState
+        variant="stone"
+        icon={<FileText size={20} aria-hidden="true" />}
+        title="아직 회차가 없습니다"
+        body={
+          <>
+            <span className="text-stone-200">{workTitle}</span>에 회차를 한
+            건이라도 추가하시면 6축 통합 분석을 시작할 수 있어요.
+          </>
+        }
+        cta={{
+          label: "첫 회차 추가",
+          href: `/works/${workId}/episodes/new`,
+          variant: "primary",
+        }}
+      />
     );
   }
 
