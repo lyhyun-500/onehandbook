@@ -34,7 +34,11 @@ import { PHONE_SIGNUP_REWARD_COINS } from "@/config/phoneSignupReward";
 import { formatDimensionLabel } from "@/lib/analysis/dimensionLabel";
 import type { PreviousAnalysisResultPayload } from "@/lib/analysisResultCache";
 import type { AnalysisJobListItem } from "@/app/api/analyze/jobs/route";
-import { AnalysisJobInlineProgress } from "@/components/AnalysisJobInlineProgress";
+import { AnalysisCTA } from "@/components/atoms/AnalysisCTA";
+import { AnalysisProcessing } from "@/components/atoms/AnalysisProcessing";
+import { AnalysisFailed } from "@/components/atoms/AnalysisFailed";
+import { OverallSummaryCard } from "@/components/atoms/OverallSummaryCard";
+import { DimensionResultCard } from "@/components/atoms/DimensionResultCard";
 
 export type VersionOption = {
   id: string;
@@ -71,26 +75,6 @@ function analysisRowFromApi(raw: {
 function AnalysisResultDetailBody({ latest }: { latest: AnalysisRow }) {
   return (
     <>
-      <div className="space-y-2">
-        <h3 className="text-sm font-medium text-zinc-300">항목별</h3>
-        <ul className="space-y-2 text-sm">
-          {Object.entries(latest.result_json.dimensions).map(([name, d]) => (
-            <li
-              key={name}
-              className="rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2"
-            >
-              <span className="text-zinc-400">
-                {formatDimensionLabel(name)}
-              </span>{" "}
-              <span className="text-zinc-100">{d.score}점</span>
-              <p className="mt-1 text-zinc-500">
-                <CopyWithBreaks as="span">{d.comment}</CopyWithBreaks>
-              </p>
-            </li>
-          ))}
-        </ul>
-      </div>
-
       <div>
         <h3 className="mb-2 text-sm font-medium text-zinc-300">개선 포인트</h3>
         <ul className="list-inside list-disc space-y-1 text-sm text-zinc-400">
@@ -773,67 +757,6 @@ export function AnalyzePanel({
         </p>
       )}
 
-      <div className="mb-4 space-y-3 rounded-lg border border-zinc-800/80 bg-zinc-950/40 px-4 py-3">
-        <label className="flex cursor-pointer items-start gap-3 text-sm">
-          <input
-            type="checkbox"
-            checked={includeLore}
-            onChange={(e) => setIncludeLore(e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-cyan-600"
-          />
-          <span className="text-zinc-300">
-            작품 설정의 세계관·인물을 반영{" "}
-            <span className="text-cyan-400/80">(+1 NAT)</span>
-          </span>
-        </label>
-        <label className="flex cursor-pointer items-start gap-3 text-sm">
-          <input
-            type="checkbox"
-            checked={includePlatformOptimization}
-            onChange={(e) =>
-              setIncludePlatformOptimization(e.target.checked)
-            }
-            className="mt-0.5 h-4 w-4 rounded border-zinc-600 bg-zinc-800 text-cyan-600"
-          />
-          <span className="text-zinc-300">
-            플랫폼 맞춤 분석{" "}
-            <span className="text-cyan-400/80">(+1 NAT)</span>
-            <span className="mt-0.5 block text-xs text-zinc-500">
-              <CopyWithBreaks as="span" className="block">
-                끄면 카카오·문피아·네이버 시리즈 등 구분 없이 일반 점검으로 진행합니다. (같은 AI 모델)
-              </CopyWithBreaks>
-            </span>
-          </span>
-        </label>
-      </div>
-
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div>
-          <label className="mb-1 block text-xs text-zinc-500">분석 플랫폼</label>
-          <select
-            value={agentVersion}
-            onChange={(e) => setAgentVersion(e.target.value)}
-            disabled={!includePlatformOptimization}
-            className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {versions.map((v) => (
-              <option key={v.id} value={v.id} disabled={!v.available}>
-                {v.label}
-                {!v.available ? " (설정 필요)" : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="button"
-          onClick={onClickAnalyze}
-          disabled={analyzeDisabled}
-          className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-zinc-950 shadow-md shadow-cyan-500/15 transition-colors hover:bg-cyan-400 disabled:opacity-50"
-        >
-          분석 실행
-        </button>
-      </div>
-
       {!effectiveAvailable && (
         <p className="mb-4 text-sm text-amber-200/90">
           <CopyWithBreaks as="span" className="block">
@@ -842,15 +765,26 @@ export function AnalyzePanel({
         </p>
       )}
 
-      {singleInlineProgress.show && (
-        <div className="mb-4">
-          <AnalysisJobInlineProgress
-            job={singleInlineProgress.job}
-            bootstrapping={singleInlineProgress.bootstrapping}
-            title="AI 분석 진행 중"
+      {singleInlineProgress.show && <AnalysisProcessing />}
+
+      {!singleInlineProgress.show &&
+        !jobFailedBanner &&
+        analyses.length === 0 && (
+          <AnalysisCTA
+            totalNat={natTotal}
+            costHint={
+              !charCountKnown
+                ? "글자수 계산 중"
+                : charCount > 10000
+                  ? "10,000자 초과 회차"
+                  : charCount > 6000
+                    ? "~10,000자 회차"
+                    : "6,000자 이하 회차"
+            }
+            onAnalyze={onClickAnalyze}
+            disabled={analyzeDisabled}
           />
-        </div>
-      )}
+        )}
 
       {cacheNotice && (
         <p className="mb-4 rounded-lg border border-emerald-500/25 bg-emerald-950/25 px-3 py-2 text-sm text-emerald-100/95">
@@ -859,23 +793,19 @@ export function AnalyzePanel({
       )}
 
       {jobFailedBanner && (
-        <div className="mb-4 rounded-lg border border-amber-500/35 bg-amber-950/30 px-3 py-3 text-sm text-amber-100/95">
-          <CopyWithBreaks as="span" className="block">
-            {jobFailedBanner.message}
-          </CopyWithBreaks>
-          {jobFailedBanner.retryable && (
-            <button
-              type="button"
-              onClick={() => {
-                setJobFailedBanner(null);
-                void requestAnalyze();
-              }}
-              className="mt-3 rounded-lg bg-amber-500/90 px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-amber-400"
-            >
-              다시 시도
-            </button>
-          )}
-        </div>
+        <AnalysisFailed
+          message={jobFailedBanner.message}
+          retryNat={natTotal}
+          onRetry={
+            jobFailedBanner.retryable
+              ? () => {
+                  setJobFailedBanner(null);
+                  void requestAnalyze();
+                }
+              : () => setJobFailedBanner(null)
+          }
+          errorCode={jobFailedBanner.code}
+        />
       )}
 
       {error && (
@@ -902,13 +832,22 @@ export function AnalyzePanel({
 
       <NatSpendConfirmModal
         open={confirmOpen}
-        title="분석 비용 확인"
-        description="아래 NAT가 차감된 뒤 분석이 시작됩니다."
-        lines={natLines}
-        totalNat={natTotal}
+        episode={{
+          episode_number: episodeNumber ?? 0,
+          title: episodeTitle ?? null,
+        }}
+        workTitle={workTitle ?? ""}
+        charCount={charCount}
+        includeLore={includeLore}
+        onIncludeLoreChange={setIncludeLore}
+        includePlatformOptimization={includePlatformOptimization}
+        onIncludePlatformOptimizationChange={setIncludePlatformOptimization}
+        agentVersion={agentVersion}
+        onAgentVersionChange={setAgentVersion}
+        natLines={natLines}
+        natTotal={natTotal}
         balance={natBalance}
-        confirmLabel="계속"
-        loading={false}
+        loading={analyzing}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {
           setConfirmOpen(false);
@@ -1022,23 +961,42 @@ export function AnalyzePanel({
             </div>
           )}
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <div>
-              <p
-                className={
-                  viewingLatest
-                    ? "text-sm text-zinc-500"
-                    : "text-sm text-amber-200/90"
-                }
-              >
-                {viewingLatest ? "최신 분석" : "이전 결과 보기"} ·{" "}
-                {getProfileLabel(displayedAnalysis.agent_version)} ·{" "}
-                {formatKoreanDateTime(displayedAnalysis.created_at)}
-              </p>
-            </div>
-            <p className="text-3xl font-bold text-cyan-400">
-              {displayedAnalysis.result_json.overall_score}
-              <span className="text-lg font-normal text-zinc-500">/100</span>
+            <p
+              className={
+                viewingLatest
+                  ? "text-sm text-zinc-500"
+                  : "text-sm text-amber-200/90"
+              }
+            >
+              {viewingLatest ? "최신 분석" : "이전 결과 보기"} ·{" "}
+              {getProfileLabel(displayedAnalysis.agent_version)} ·{" "}
+              {formatKoreanDateTime(displayedAnalysis.created_at)}
             </p>
+          </div>
+
+          <OverallSummaryCard
+            score={displayedAnalysis.result_json.overall_score}
+            title={viewingLatest ? "분석 완료" : "이전 결과"}
+            body={
+              displayedAnalysis.result_json.comparable_note ||
+              displayedAnalysis.result_json.improvement_points[0] ||
+              "6축 점수와 회차별 코멘트가 자동으로 정리됐습니다."
+            }
+            onRerun={onClickAnalyze}
+            rerunDisabled={analyzeDisabled || analyzing}
+          />
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {Object.entries(displayedAnalysis.result_json.dimensions).map(
+              ([name, d]) => (
+                <DimensionResultCard
+                  key={name}
+                  label={formatDimensionLabel(name)}
+                  score={d.score}
+                  comment={d.comment}
+                />
+              ),
+            )}
           </div>
 
           {displayedAnalysis.holistic_derived ? (

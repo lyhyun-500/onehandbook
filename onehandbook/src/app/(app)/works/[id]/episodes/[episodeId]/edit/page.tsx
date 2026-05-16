@@ -8,6 +8,7 @@ import {
   parseCharacterSettings,
   parseWorldSetting,
 } from "@/components/side-panel/parseWorkJson";
+import { formatEpisodeLabel } from "@/lib/episodeLabel";
 import { EpisodeEditForm } from "./EpisodeEditForm";
 
 export default async function EpisodeEditPage({
@@ -51,7 +52,15 @@ export default async function EpisodeEditPage({
   return (
     <>
       <TopBar
-        breadcrumb={["스튜디오", work.title, "회차", `${episode.episode_number}화`]}
+        breadcrumb={[
+          "스튜디오",
+          work.title,
+          "회차",
+          formatEpisodeLabel(
+            { episode_number: episode.episode_number, title: null },
+            { withTitle: false },
+          ),
+        ]}
         title="회차 편집"
         natBalance={natBalance}
       />
@@ -75,7 +84,12 @@ export default async function EpisodeEditPage({
             </Link>
 
             <h1 className="mb-2 text-2xl font-bold text-stone-100">
-              회차 편집 ({episode.episode_number}화)
+              회차 편집 (
+              {formatEpisodeLabel(
+                { episode_number: episode.episode_number, title: null },
+                { withTitle: false },
+              )}
+              )
             </h1>
             <p className="mb-8 text-stone-400">{work.title}</p>
 

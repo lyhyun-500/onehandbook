@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { getAnalysisScoreColor } from "@/lib/analysisScoreColor";
 import { computeHolisticNatCost } from "@/lib/nat";
+import { formatEpisodeLabel } from "@/lib/episodeLabel";
 import { BatchSpendConfirmModal } from "@/components/BatchSpendConfirmModal";
 import { EmptyState } from "@/components/atoms/EmptyState";
 import {
@@ -337,7 +338,14 @@ export function HolisticTab({
       <footer className="mt-8 border-t border-stone-800/60 pt-4">
         <div className="font-mono text-[10px] uppercase tracking-widest text-stone-500">
           대상 회차 ·{" "}
-          {current.episodeScores.map((e) => `${e.episode_number}화`).join(" · ")}
+          {current.episodeScores
+            .map((e) =>
+              formatEpisodeLabel(
+                { episode_number: e.episode_number, title: null },
+                { withTitle: false },
+              ),
+            )
+            .join(" · ")}
         </div>
       </footer>
     </div>

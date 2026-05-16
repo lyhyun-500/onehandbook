@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
+import { formatEpisodeLabel } from "@/lib/episodeLabel";
 import { ReaderTracker } from "./ReaderTracker";
 
 export default async function ExploreEpisodeReadPage({
@@ -58,7 +59,10 @@ export default async function ExploreEpisodeReadPage({
           회차 읽기
         </p>
         <h1 className="text-2xl font-bold text-zinc-100">
-          {episode.episode_number}화. {episode.title}
+          {formatEpisodeLabel({
+            episode_number: episode.episode_number as number,
+            title: episode.title as string,
+          })}
         </h1>
         <p className="mt-2 text-sm text-zinc-500">
           {new Date(episode.created_at).toLocaleDateString("ko-KR")}

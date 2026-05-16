@@ -24,6 +24,7 @@ import {
   isContentUnchangedFailure,
   isUserCancelledFailure,
 } from "@/lib/analysis/analysisJobFailureHeuristics";
+import { formatEpisodeLabel } from "@/lib/episodeLabel";
 
 export type JobStatus = AnalysisJobListItem["status"];
 
@@ -68,7 +69,7 @@ function analysisHref(j: AnalysisJobListItem): string {
   if (j.job_kind === "holistic_batch") {
     return `/works/${j.work_id}/analysis`;
   }
-  return `/works/${j.work_id}/analysis?focus=${j.episode_id}`;
+  return `/works/${j.work_id}/episodes/${j.episode_id}`;
 }
 
 function analysisJobRowToListItem(
@@ -1222,7 +1223,10 @@ function jobCardTitle(j: AnalysisJobListItem): string {
   }
   const num = j.episode_number;
   if (typeof num === "number" && !Number.isNaN(num)) {
-    return `${wt} · ${num}화`;
+    return `${wt} · ${formatEpisodeLabel(
+      { episode_number: num, title: null },
+      { withTitle: false },
+    )}`;
   }
   return `${wt} · 개별 분석`;
 }

@@ -1,7 +1,8 @@
 import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
-import { Bell, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HeaderAnalysisBell } from "@/contexts/AnalysisJobsContext";
 import { Divider } from "./Divider";
 
 export interface TopBarProps {
@@ -59,14 +60,7 @@ export function TopBar({ breadcrumb, title, actions, natBalance }: TopBarProps) 
           <span className="tabular-nums">{natBalance.toLocaleString("ko-KR")}</span>
           <span className="opacity-60">NAT</span>
         </Link>
-        <Link
-          href="/notices"
-          className="relative flex h-8 w-8 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100/[0.04] hover:text-stone-200"
-          aria-label="공지사항"
-          title="공지사항"
-        >
-          <Bell size={15} aria-hidden="true" />
-        </Link>
+        <HeaderAnalysisBell />
       </div>
     </div>
   );

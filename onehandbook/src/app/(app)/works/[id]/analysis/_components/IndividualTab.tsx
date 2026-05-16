@@ -5,6 +5,7 @@ import {
   type AnalysisRunRow,
 } from "@/lib/analysisSummary";
 import { formatDimensionLabel } from "@/lib/analysis/dimensionLabel";
+import { formatEpisodeLabel } from "@/lib/episodeLabel";
 import { getAgentPlatformLabel } from "@/lib/agentPlatform";
 import { getAnalysisScoreColor } from "@/lib/analysisScoreColor";
 import { DimensionLocked } from "@/components/atoms/DimensionLocked";
@@ -270,7 +271,10 @@ export function IndividualTab({
                   >
                     <td className="py-3 pl-5 pr-3 align-middle">
                       <div className="font-mono text-[12px] tabular-nums text-stone-400">
-                        {String(row.episodeNumber).padStart(2, "0")}화
+                        {formatEpisodeLabel(
+                          { episode_number: row.episodeNumber, title: null },
+                          { withTitle: false },
+                        )}
                       </div>
                     </td>
                     <td className="py-3 pr-3 align-middle">

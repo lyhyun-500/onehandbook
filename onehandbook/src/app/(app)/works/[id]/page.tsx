@@ -10,6 +10,7 @@ import {
   type AnalysisRunRow,
 } from "@/lib/analysisSummary";
 import type { WorkOption } from "@/components/atoms/WorkSelector";
+import { formatEpisodeLabel } from "@/lib/episodeLabel";
 import { EpisodeActions } from "./EpisodeActions";
 import { EpisodeRowAnalysisBadge } from "@/components/EpisodeRowAnalysisBadge";
 import { WorkAiOverview } from "./WorkAiOverview";
@@ -171,8 +172,9 @@ export default async function WorkDetailPage({
                 >
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                     <span className="text-sm text-stone-500">
-                      {ep.episode_number}화
+                      {formatEpisodeLabel(ep, { withTitle: false })}
                     </span>
+                    <span className="text-stone-600">·</span>
                     <span className="text-stone-100">{ep.title}</span>
                     <EpisodeRowAnalysisBadge
                       episodeId={ep.id}

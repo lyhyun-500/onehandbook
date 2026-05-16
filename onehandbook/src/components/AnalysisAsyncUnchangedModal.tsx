@@ -76,7 +76,7 @@ export function AnalysisAsyncUnchangedModal({
 
   const href =
     typeof focusEpisodeId === "number" && !Number.isNaN(focusEpisodeId)
-      ? `/works/${workId}/analysis?focus=${focusEpisodeId}`
+      ? `/works/${workId}/episodes/${focusEpisodeId}`
       : `/works/${workId}/analysis`;
 
   const onForceAnalyze = async () => {

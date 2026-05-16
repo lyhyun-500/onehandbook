@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatEpisodeLabel } from "@/lib/episodeLabel";
 
 export interface RangeSelectorEpisode {
   id: number;
@@ -205,8 +206,11 @@ export function HolisticRangeSelector({
                 onChange={() => toggle(e.id)}
                 className="h-4 w-4 cursor-pointer accent-sky-400"
               />
-              <span className="w-14 shrink-0 font-mono text-[11.5px] tabular-nums text-stone-500">
-                {String(e.episode_number).padStart(2, "0")}화
+              <span className="w-16 shrink-0 font-mono text-[11.5px] tabular-nums text-stone-500">
+                {formatEpisodeLabel(
+                  { episode_number: e.episode_number, title: null },
+                  { withTitle: false },
+                )}
               </span>
               <span
                 className={`line-clamp-1 flex-1 font-serif text-[13px] ${

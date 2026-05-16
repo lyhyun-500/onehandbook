@@ -9,6 +9,7 @@ import {
   type AnalysisProfileConfig,
 } from "@/config/analysis-profiles";
 import { computeHolisticNatCost } from "@/lib/nat";
+import { formatEpisodeLabel } from "@/lib/episodeLabel";
 
 interface SelectedEpisodeSummary {
   id: number;
@@ -131,7 +132,12 @@ export function BatchSpendConfirmModal({
   const summaryTitle =
     selected.length <= 4
       ? selected
-          .map((s) => `${s.episode_number}화`)
+          .map((s) =>
+            formatEpisodeLabel(
+              { episode_number: s.episode_number, title: null },
+              { withTitle: false },
+            ),
+          )
           .join(", ")
       : `${selected[0].episode_number}화 ~ ${
           selected[selected.length - 1].episode_number

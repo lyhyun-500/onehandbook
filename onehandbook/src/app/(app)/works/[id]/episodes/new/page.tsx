@@ -3,6 +3,7 @@ import { requireAppUser } from "@/lib/supabase/appUser";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { TopBar } from "@/components/shell/TopBar";
+import { formatEpisodeLabel } from "@/lib/episodeLabel";
 import { EpisodeEditor } from "./EpisodeEditor";
 
 export default async function NewEpisodePage({
@@ -51,7 +52,12 @@ export default async function NewEpisodePage({
         </Link>
 
         <h1 className="mb-2 text-2xl font-bold text-stone-100">
-          회차 등록 ({nextEpisodeNumber}화)
+          회차 등록 (
+          {formatEpisodeLabel(
+            { episode_number: nextEpisodeNumber, title: null },
+            { withTitle: false },
+          )}
+          )
         </h1>
         <p className="mb-8 text-stone-400">{work.title}</p>
 
