@@ -43,9 +43,10 @@ export default async function StudioPage() {
 
   // 로그인 콜백에서는 DB 조회를 기다리지 않고 /studio로 보내므로,
   // 최초 진입 시 여기서 약관 동의 여부를 확인해 /auth/welcome로 이동시킵니다.
+  // 함께: 신규 작가 풀스크린 온보딩(05A) 분기를 위한 onboarding_seen_at 도 동시 조회.
   const { data: consentRow } = await supabase
     .from("users")
-    .select("terms_agreed_at")
+    .select("terms_agreed_at, onboarding_seen_at")
     .eq("id", userId)
     .maybeSingle();
   if (!consentRow?.terms_agreed_at) {
@@ -92,6 +93,11 @@ export default async function StudioPage() {
   const stats = computeStats(transformedWorks);
   const natBalance = coin_balance ?? 0;
   const isEmpty = transformedWorks.length === 0;
+
+  // 신규 작가 풀스크린 온보딩(05A) 분기 — 작품 0건 + 미본 사용자.
+  if (isEmpty && !consentRow.onboarding_seen_at) {
+    redirect("/onboarding");
+  }
 
   return (
     <>

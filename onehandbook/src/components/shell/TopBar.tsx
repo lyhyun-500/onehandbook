@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HeaderAnalysisBell } from "@/contexts/AnalysisJobsContext";
+import { HelpPopover } from "@/components/onboarding/HelpPopover";
 import { Divider } from "./Divider";
 
 export interface TopBarProps {
@@ -50,6 +51,7 @@ export function TopBar({ breadcrumb, title, actions, natBalance }: TopBarProps) 
       </div>
       <div className="flex items-center gap-2">
         {actions}
+        <HelpPopover />
         <Divider className="mx-2 h-6 w-px" />
         <Link
           href="/billing"

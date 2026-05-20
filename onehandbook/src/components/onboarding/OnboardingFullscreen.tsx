@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Plus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { LoginSpinner, type LoginStage } from "@/components/auth/LoginSpinner";
 import { NatChip } from "@/components/atoms/NatChip";
 import { SampleAnalysisReport } from "@/components/onboarding/SampleAnalysisReport";
 
@@ -11,6 +13,12 @@ interface OnboardingFullscreenProps {
   /** supabase auth_id (RLS user lookup). */
   authId: string;
 }
+
+const STAGE_SEQUENCE: { stage: LoginStage; ms: number }[] = [
+  { stage: "auth", ms: 1500 },
+  { stage: "profile", ms: 1500 },
+  { stage: "workspace", ms: 1500 },
+];
 
 /**
  * 신규 작가 온보딩 (05A) 풀스크린.
@@ -29,6 +37,33 @@ export function OnboardingFullscreen({ authId }: OnboardingFullscreenProps) {
   const router = useRouter();
   const supabase = createClient();
 
+  // 3-stage 시뮬 시퀀스 — onboarding_seen_at IS NULL 사용자만 진입하는 라우트라
+  // 본문 노출 전 LoginSpinner 3단계 (auth → profile → workspace, 각 1.5초) 진행.
+  // 재방문(onboarding_seen_at NOT NULL)은 /studio redirect 라 시뮬 미노출.
+  const [spinnerStage, setSpinnerStage] = useState<LoginStage | null>("auth");
+
+  useEffect(() => {
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const advance = (idx: number) => {
+      if (cancelled) return;
+      if (idx >= STAGE_SEQUENCE.length) {
+        setSpinnerStage(null);
+        return;
+      }
+      const { stage, ms } = STAGE_SEQUENCE[idx]!;
+      setSpinnerStage(stage);
+      timeoutId = setTimeout(() => advance(idx + 1), ms);
+    };
+
+    advance(0);
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, []);
+
   const handleClose = async () => {
     try {
       await supabase
@@ -41,6 +76,10 @@ export function OnboardingFullscreen({ authId }: OnboardingFullscreenProps) {
     }
     router.push("/studio");
   };
+
+  if (spinnerStage !== null) {
+    return <LoginSpinner stage={spinnerStage} />;
+  }
 
   return (
     <div className="relative min-h-screen w-full bg-stone-950 text-stone-200">
