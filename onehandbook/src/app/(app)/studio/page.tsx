@@ -118,7 +118,7 @@ export default async function StudioPage() {
       )}
 
       {isEmpty ? (
-        <StudioEmptyState />
+        <StudioEmptyState userId={userId} />
       ) : (
         <StudioPageClient
           userId={userId}

@@ -9,9 +9,29 @@ import { GENRES } from "@/lib/constants/genres";
 const STATUSES = ["연재중", "완결", "휴재"] as const;
 const CONTRACT_STATUSES = ["미계약", "계약"] as const;
 
-export function AddWorkButton({ userId }: { userId: number }) {
+export interface AddWorkButtonProps {
+  userId: number;
+  /** Controlled open state — 외부에서 open 제어 (예: EmptyStudio 의 import CTA 트리거). */
+  open?: boolean;
+  onOpenChange?: (next: boolean) => void;
+  /** 자체 trigger button 숨김 (외부 trigger 사용 시 true). */
+  hideTrigger?: boolean;
+}
+
+export function AddWorkButton({
+  userId,
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger,
+}: AddWorkButtonProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (next: boolean) => {
+    if (isControlled) onOpenChange?.(next);
+    else setInternalOpen(next);
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -68,13 +88,15 @@ export function AddWorkButton({ userId }: { userId: number }) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="rounded-lg bg-sky-500 px-5 py-2.5 text-sm font-semibold text-stone-950 shadow-lg shadow-sky-500/20 transition-colors hover:bg-sky-400"
-      >
-        작품 등록
-      </button>
+      {!hideTrigger && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="rounded-lg bg-sky-500 px-5 py-2.5 text-sm font-semibold text-stone-950 shadow-lg shadow-sky-500/20 transition-colors hover:bg-sky-400"
+        >
+          작품 등록
+        </button>
+      )}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]">
