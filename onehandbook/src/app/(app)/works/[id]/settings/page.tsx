@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { TopBar } from "@/components/shell/TopBar";
 import { WorkSettingsForm } from "./WorkSettingsForm";
 import {
@@ -21,7 +20,7 @@ export default async function WorkSettingsPage({
   const { data: work } = await supabase
     .from("works")
     .select(
-      "id, title, genre, status, tags, author_id, world_setting, character_settings, contract_status, management_offer_opt_in, deleted_at"
+      "id, title, genre, status, synopsis, tags, author_id, world_setting, character_settings, contract_status, management_offer_opt_in, deleted_at"
     )
     .eq("id", id)
     .is("deleted_at", null)
@@ -41,31 +40,21 @@ export default async function WorkSettingsPage({
         natBalance={natBalance}
       />
 
-      <main className="mx-auto max-w-4xl px-6 py-12">
-        <Link
-          href={`/works/${id}`}
-          className="mb-6 inline-block text-sm text-stone-400 hover:text-stone-100"
-        >
-          ← {work.title}으로 돌아가기
-        </Link>
-
-        <h1 className="mb-2 text-2xl font-bold text-stone-100">작품 설정</h1>
-        <p className="mb-8 text-stone-400">{work.title}</p>
-
-        <WorkSettingsForm
-          workId={work.id}
-          initialTitle={work.title}
-          initialGenre={work.genre}
-          initialStatus={work.status}
-          initialContractStatus={
-            work.contract_status === "계약" ? "계약" : "미계약"
-          }
-          initialManagementOfferOptIn={Boolean(work.management_offer_opt_in)}
-          initialTags={Array.isArray(work.tags) ? work.tags : []}
-          initialWorld={normalizeWorldSetting(work.world_setting)}
-          initialCharacters={normalizeCharacterSettings(work.character_settings)}
-        />
-      </main>
+      <WorkSettingsForm
+        workId={work.id}
+        workTitle={work.title}
+        initialTitle={work.title}
+        initialGenre={work.genre}
+        initialStatus={work.status}
+        initialSynopsis={typeof work.synopsis === "string" ? work.synopsis : ""}
+        initialContractStatus={
+          work.contract_status === "계약" ? "계약" : "미계약"
+        }
+        initialManagementOfferOptIn={Boolean(work.management_offer_opt_in)}
+        initialTags={Array.isArray(work.tags) ? work.tags : []}
+        initialWorld={normalizeWorldSetting(work.world_setting)}
+        initialCharacters={normalizeCharacterSettings(work.character_settings)}
+      />
     </>
   );
 }

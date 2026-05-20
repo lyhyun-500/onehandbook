@@ -1,9 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { TopBar } from "@/components/shell/TopBar";
-import { SidePanelWrapper } from "@/components/side-panel/SidePanelWrapper";
 import {
   parseCharacterSettings,
   parseWorldSetting,
@@ -23,7 +21,7 @@ export default async function EpisodeEditPage({
   const { data: work } = await supabase
     .from("works")
     .select(
-      "id, title, author_id, deleted_at, world_setting, character_settings"
+      "id, title, author_id, deleted_at, world_setting, character_settings",
     )
     .eq("id", id)
     .is("deleted_at", null)
@@ -45,7 +43,6 @@ export default async function EpisodeEditPage({
   }
 
   const natBalance = appUser.coin_balance ?? 0;
-
   const worldSetting = parseWorldSetting(work.world_setting);
   const characterSettings = parseCharacterSettings(work.character_settings);
 
@@ -54,7 +51,7 @@ export default async function EpisodeEditPage({
       <TopBar
         breadcrumb={[
           "스튜디오",
-          work.title,
+          work.title as string,
           "회차",
           formatEpisodeLabel(
             { episode_number: episode.episode_number, title: null },
@@ -65,43 +62,16 @@ export default async function EpisodeEditPage({
         natBalance={natBalance}
       />
 
-      <div className="flex min-h-0 flex-1">
-        <SidePanelWrapper
-          workId={work.id}
-          episodeId={episode.id}
-          episodeNumber={episode.episode_number}
-          worldSetting={worldSetting}
-          characterSettings={characterSettings}
-        />
-
-        <main className="min-h-0 flex-1 overflow-auto">
-          <div className="mx-auto max-w-4xl px-6 py-12">
-            <Link
-              href={`/works/${id}`}
-              className="mb-6 inline-block text-sm text-stone-400 hover:text-stone-100"
-            >
-              ← {work.title}으로 돌아가기
-            </Link>
-
-            <h1 className="mb-2 text-2xl font-bold text-stone-100">
-              회차 편집 (
-              {formatEpisodeLabel(
-                { episode_number: episode.episode_number, title: null },
-                { withTitle: false },
-              )}
-              )
-            </h1>
-            <p className="mb-8 text-stone-400">{work.title}</p>
-
-            <EpisodeEditForm
-              workId={work.id}
-              episodeId={episode.id}
-              initialTitle={episode.title}
-              initialContent={episode.content}
-            />
-          </div>
-        </main>
-      </div>
+      <EpisodeEditForm
+        workId={work.id as number}
+        workTitle={work.title as string}
+        episodeId={episode.id as number}
+        episodeNumber={episode.episode_number as number}
+        initialTitle={episode.title as string}
+        initialContent={episode.content as string}
+        initialWorld={worldSetting}
+        initialCharacters={characterSettings}
+      />
     </>
   );
 }

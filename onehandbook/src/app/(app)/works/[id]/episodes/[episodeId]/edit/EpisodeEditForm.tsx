@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Check, ChevronRight, PanelRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   EPISODE_CONTENT_MAX_CHARS,
@@ -11,25 +13,55 @@ import {
   isEpisodeContentWithinLimit,
 } from "@/lib/episodeContentLimit";
 import { md5Hex } from "@/lib/contentHash";
+import { SettingsDrawer } from "@/components/episode-edit/SettingsDrawer";
+import type {
+  CharacterSettings,
+  WorldSetting,
+} from "@/components/side-panel/types";
 
-export function EpisodeEditForm({
-  workId,
-  episodeId,
-  initialTitle,
-  initialContent,
-}: {
+interface EpisodeEditFormProps {
   workId: number;
+  workTitle: string;
   episodeId: number;
+  episodeNumber: number;
   initialTitle: string;
   initialContent: string;
-}) {
+  initialWorld: WorldSetting;
+  initialCharacters: CharacterSettings;
+}
+
+/**
+ * 회차 편집 client — 시안 episode-edit.jsx EpisodeEditScreen 정합.
+ *
+ * 풀폭 에디터(max-w-1100) + floating `설정` 버튼(panelRight) → SettingsDrawer 호출.
+ * 통합 저장은 SettingsDrawer 가 책임 (D-16). 본 form 은 회차 본문 저장만.
+ */
+export function EpisodeEditForm({
+  workId,
+  workTitle,
+  episodeId,
+  episodeNumber,
+  initialTitle,
+  initialContent,
+  initialWorld,
+  initialCharacters,
+}: EpisodeEditFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerUnsaved, setDrawerUnsaved] = useState(false);
 
   const supabase = createClient();
+
+  const charCount = countEpisodeContentChars(content);
+  const overLimit = !isEpisodeContentWithinLimit(content);
+  const nearLimit =
+    !overLimit && charCount >= EPISODE_CONTENT_MAX_CHARS * 0.9;
+  const bodyDirty = title !== initialTitle || content !== initialContent;
+  const totalUnsaved = bodyDirty || drawerUnsaved;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,19 +70,19 @@ export function EpisodeEditForm({
 
     if (!isEpisodeContentWithinLimit(content)) {
       setError(
-        `본문은 회차당 ${EPISODE_CONTENT_MAX_LABEL}(${EPISODE_CONTENT_MAX_CHARS.toLocaleString()}자)까지 등록할 수 있습니다.`
+        `본문은 회차당 ${EPISODE_CONTENT_MAX_LABEL}(${EPISODE_CONTENT_MAX_CHARS.toLocaleString()}자)까지 등록할 수 있습니다.`,
       );
       setLoading(false);
       return;
     }
 
     try {
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from("episodes")
         .update({ title, content, content_hash: md5Hex(content) })
         .eq("id", episodeId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
 
       router.push(`/works/${workId}`);
     } catch (err: unknown) {
@@ -65,13 +97,57 @@ export function EpisodeEditForm({
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6"
-    >
-      <div className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-zinc-300">
+    <>
+      <form
+        onSubmit={handleSubmit}
+        className="relative mx-auto flex max-w-[1100px] flex-col gap-6 px-8 py-8"
+      >
+        <header className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="font-mono text-[10.5px] uppercase tracking-[0.3em] text-sky-300/70">
+              회차 편집
+            </div>
+            <div className="mt-1.5 flex items-center gap-2 text-[12.5px] text-stone-400">
+              <Link
+                href={`/works/${workId}`}
+                className="text-stone-300 hover:text-sky-200"
+              >
+                {workTitle}
+              </Link>
+              <ChevronRight
+                size={10}
+                aria-hidden="true"
+                className="text-stone-600"
+              />
+              <span className="font-mono tabular-nums">{episodeNumber}화</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className="group relative flex items-center gap-2 rounded-md border border-stone-700 bg-stone-900/70 px-3 py-2 text-[12px] text-stone-200 backdrop-blur transition-colors hover:border-sky-400/40 hover:bg-sky-400/[0.08] hover:text-sky-200"
+            aria-label="설정 패널 열기"
+          >
+            <PanelRight
+              size={13}
+              aria-hidden="true"
+              className="text-stone-400 group-hover:text-sky-300"
+            />
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-stone-500 group-hover:text-sky-300/80">
+              설정
+            </span>
+            <span className="font-serif text-[12.5px]">세계관·인물·메모</span>
+            {drawerUnsaved && (
+              <span className="absolute right-2.5 top-2 flex h-1.5 w-1.5">
+                <span className="absolute inset-0 animate-ping rounded-full bg-amber-400/60" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-400" />
+              </span>
+            )}
+          </button>
+        </header>
+
+        <div className="flex flex-col gap-2">
+          <label className="font-mono text-[10.5px] uppercase tracking-[0.25em] text-stone-500">
             회차 제목
           </label>
           <input
@@ -81,36 +157,51 @@ export function EpisodeEditForm({
             required
             maxLength={200}
             placeholder="회차 제목을 입력하세요"
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 placeholder-zinc-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            className="w-full rounded-md border border-stone-800/80 bg-stone-900/40 px-4 py-3 font-serif text-[18px] text-stone-100 placeholder:text-stone-600 focus:border-sky-400/40 focus:outline-none"
           />
         </div>
 
-        <div>
-          <div className="mb-1.5 flex items-center justify-between gap-2">
-            <label className="block text-sm font-medium text-zinc-300">
-              본문
-            </label>
-            <span
-              className={
-                !isEpisodeContentWithinLimit(content)
-                  ? "text-sm text-red-400"
-                  : countEpisodeContentChars(content) >=
-                      EPISODE_CONTENT_MAX_CHARS * 0.9
-                    ? "text-sm text-amber-400/90"
-                    : "text-sm text-zinc-500"
-              }
+        <div className="flex flex-col gap-2">
+          <div className="flex items-end justify-between">
+            <div>
+              <label className="font-mono text-[10.5px] uppercase tracking-[0.25em] text-stone-500">
+                본문
+              </label>
+              <p className="mt-1 text-[11px] text-stone-500">
+                회차당 {EPISODE_CONTENT_MAX_LABEL} 제한입니다.
+              </p>
+            </div>
+            <div
+              className={`font-mono text-[12px] tabular-nums ${
+                overLimit
+                  ? "text-rose-300"
+                  : nearLimit
+                    ? "text-amber-300"
+                    : "text-stone-400"
+              }`}
             >
-              {countEpisodeContentChars(content).toLocaleString()} /{" "}
-              {EPISODE_CONTENT_MAX_CHARS.toLocaleString()}자
-            </span>
+              <span
+                className={
+                  overLimit
+                    ? "text-rose-300"
+                    : nearLimit
+                      ? "text-amber-300"
+                      : "text-stone-200"
+                }
+              >
+                {charCount.toLocaleString("ko-KR")}
+              </span>
+              <span className="mx-1 text-stone-600">/</span>
+              <span>
+                {EPISODE_CONTENT_MAX_CHARS.toLocaleString("ko-KR")}자
+              </span>
+            </div>
           </div>
-          <p className="mb-2 text-xs text-zinc-500">
-            회차당 {EPISODE_CONTENT_MAX_LABEL} 제한입니다.
-          </p>
-          {!isEpisodeContentWithinLimit(content) && (
-            <p className="mb-2 rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          {overLimit && (
+            <p className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
               본문이 {EPISODE_CONTENT_MAX_LABEL}를 초과했습니다. 저장하려면{" "}
-              {EPISODE_CONTENT_MAX_CHARS.toLocaleString()}자 이하로 줄여 주세요.
+              {EPISODE_CONTENT_MAX_CHARS.toLocaleString("ko-KR")}자 이하로 줄여
+              주세요.
             </p>
           )}
           <textarea
@@ -119,35 +210,61 @@ export function EpisodeEditForm({
               setContent((prev) => applyEpisodeContentChange(prev, e.target.value))
             }
             required
-            placeholder="본문 내용을 입력하세요"
-            rows={16}
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 placeholder-zinc-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 resize-y"
+            placeholder="이번 회차의 본문을 작성하세요…"
+            rows={24}
+            className="w-full resize-y rounded-md border border-stone-800/80 bg-stone-900/40 px-6 py-5 font-serif text-[15px] leading-[1.95] text-stone-200 placeholder:text-stone-600 focus:border-sky-400/40 focus:outline-none"
+            style={{ textWrap: "pretty", minHeight: 520 }}
           />
         </div>
 
         {error && (
-          <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
+          <p className="rounded-md border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
             {error}
           </p>
         )}
 
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="rounded-lg border border-zinc-700 px-6 py-2.5 text-zinc-300 transition-colors hover:bg-zinc-800"
-          >
-            취소
-          </button>
-          <button
-            type="submit"
-            disabled={loading || !isEpisodeContentWithinLimit(content)}
-            className="rounded-lg bg-amber-600 px-6 py-2.5 font-medium text-white transition-colors hover:bg-amber-500 disabled:opacity-50"
-          >
-            {loading ? "저장 중..." : "저장"}
-          </button>
-        </div>
-      </div>
-    </form>
+        <footer className="mt-2 flex items-center justify-between gap-3 border-t border-stone-800/60 pt-5">
+          <div className="font-mono text-[10.5px] tracking-wide">
+            {totalUnsaved ? (
+              <span className="text-amber-300/85">· 미저장 변경 있음</span>
+            ) : (
+              <span className="text-stone-600">· 모든 변경 사항 저장됨</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="rounded-md border border-stone-800/80 bg-stone-900/40 px-4 py-2 text-[12.5px] text-stone-300 hover:border-stone-700 hover:text-stone-100"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={loading || overLimit}
+              className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-5 py-2 text-[13px] font-medium text-stone-950 hover:bg-amber-400 disabled:opacity-50"
+              style={{
+                boxShadow:
+                  "0 0 0 1px oklch(0.66 0.16 60 / 0.4), 0 8px 24px -12px oklch(0.78 0.16 60 / 0.5)",
+              }}
+            >
+              <Check size={12} aria-hidden="true" />
+              {loading ? "저장 중..." : "저장"}
+            </button>
+          </div>
+        </footer>
+      </form>
+
+      <SettingsDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        workId={workId}
+        episodeId={episodeId}
+        episodeNumber={episodeNumber}
+        initialWorld={initialWorld}
+        initialCharacters={initialCharacters}
+        onUnsavedChange={setDrawerUnsaved}
+      />
+    </>
   );
 }

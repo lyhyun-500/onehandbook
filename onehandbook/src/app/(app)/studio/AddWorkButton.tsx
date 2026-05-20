@@ -4,18 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TagInput } from "@/components/TagInput";
-
-const GENRES = [
-  "로맨스",
-  "판타지",
-  "현대",
-  "무협",
-  "스포츠",
-  "미스터리",
-  "SF",
-  "일상",
-  "기타",
-];
+import { GENRES } from "@/lib/constants/genres";
 
 const STATUSES = ["연재중", "완결", "휴재"] as const;
 const CONTRACT_STATUSES = ["미계약", "계약"] as const;
@@ -26,7 +15,7 @@ export function AddWorkButton({ userId }: { userId: number }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const [genre, setGenre] = useState("로맨스");
+  const [genre, setGenre] = useState("현대");
   const [status, setStatus] = useState<"연재중" | "완결" | "휴재">("연재중");
   const [tags, setTags] = useState<string[]>([]);
   const [contractStatus, setContractStatus] = useState<"미계약" | "계약">("미계약");
@@ -62,7 +51,7 @@ export function AddWorkButton({ userId }: { userId: number }) {
       if (error) throw error;
       setOpen(false);
       setTitle("");
-      setGenre("로맨스");
+      setGenre("현대");
       setStatus("연재중");
       setTags([]);
       setContractStatus("미계약");

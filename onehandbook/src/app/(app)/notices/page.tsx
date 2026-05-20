@@ -2,29 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import Link from "next/link";
 import { TopBar } from "@/components/shell/TopBar";
-import { CopyWithBreaks } from "@/components/CopyWithBreaks";
-
-const ANNOUNCEMENTS: {
-  id: string;
-  title: string;
-  date: string;
-  body: string;
-}[] = [
-  {
-    id: "1",
-    title: "Novel Agent 스튜디오 안내",
-    date: "2026-03-31",
-    body:
-      "작가 스튜디오에서 작품·회차를 등록하고 AI 흥행 분석을 이용할 수 있습니다. NAT 잔액은 상단에서 항상 확인할 수 있으며, 충전은 NAT 충전 페이지에서 안내를 참고해 주세요.",
-  },
-  {
-    id: "2",
-    title: "서비스 이용 및 문의",
-    date: "2026-03-31",
-    body:
-      "이용약관·개인정보 처리에 대한 내용은 하단 푸터의 이용약관 링크에서 확인할 수 있습니다. 서비스 관련 문의는 이용약관의 문의 안내를 참고해 주세요.",
-  },
-];
+import { NOTICES } from "@/lib/notices";
+import { NoticesAccordion } from "./NoticesAccordion";
 
 export default async function NoticesPage() {
   const supabase = await createClient();
@@ -35,47 +14,29 @@ export default async function NoticesPage() {
     <>
       <TopBar title="공지사항" natBalance={natBalance} />
 
-      <main className="mx-auto max-w-2xl px-6 py-10 sm:py-12">
-        <p className="mb-1 text-xs font-medium uppercase tracking-widest text-sky-400/90">
-          안내
-        </p>
-        <h1 className="text-2xl font-bold text-stone-100">공지사항</h1>
-        <p className="mt-2 text-sm text-stone-400">
-          운영 공지·업데이트 소식을 이 페이지에서 안내합니다.
-        </p>
+      <main className="mx-auto max-w-3xl px-8 py-10">
+        <header className="mb-8">
+          <div className="font-mono text-[10.5px] uppercase tracking-[0.3em] text-sky-300/75">
+            안내
+          </div>
+          <h1 className="mt-2 font-serif text-[34px] font-medium leading-tight tracking-tight text-stone-100">
+            공지사항
+          </h1>
+          <p className="mt-3 max-w-xl font-serif text-[13.5px] leading-relaxed text-stone-400">
+            운영 공지·업데이트 소식을 이 페이지에서 안내합니다. 새 공지는 최상단에 추가됩니다.
+          </p>
+        </header>
 
-        <ul className="mt-10 space-y-6">
-          {ANNOUNCEMENTS.map((item) => (
-            <li
-              key={item.id}
-              className="rounded-xl border border-stone-800 bg-stone-900/40 p-5 shadow-lg shadow-black/20"
-            >
-              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-lg font-semibold text-stone-100">
-                  {item.title}
-                </h2>
-                <time
-                  dateTime={item.date}
-                  className="text-xs tabular-nums text-stone-500"
-                >
-                  {item.date}
-                </time>
-              </div>
-              <p className="text-sm leading-relaxed text-stone-400">
-                <CopyWithBreaks as="span" className="block">
-                  {item.body}
-                </CopyWithBreaks>
-              </p>
-            </li>
-          ))}
-        </ul>
+        <NoticesAccordion notices={NOTICES} />
 
-        <Link
-          href="/studio"
-          className="mt-10 inline-flex text-sm text-stone-500 transition-colors hover:text-sky-300"
-        >
-          ← 스튜디오로
-        </Link>
+        <div className="mt-10 border-t border-stone-800/60 pt-6">
+          <Link
+            href="/studio"
+            className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest text-stone-400 hover:text-sky-200"
+          >
+            ← 스튜디오로
+          </Link>
+        </div>
       </main>
     </>
   );

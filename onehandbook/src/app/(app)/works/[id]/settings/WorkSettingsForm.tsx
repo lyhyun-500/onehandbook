@@ -1,110 +1,121 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { Check, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TagInput } from "@/components/TagInput";
+import { Checkbox, Field, SelectInput, Textarea, TextInput } from "@/components/forms";
+import { GENRES, isKnownGenre } from "@/lib/constants/genres";
+import { EmptyState } from "@/components/atoms/EmptyState";
 import {
-  CHARACTER_ROLES,
   emptyCharacter,
   type CharacterSetting,
   type WorldSetting,
 } from "@/lib/works/loreTypes";
-import {
-  SIDEPANEL_CHARACTER_ROLES,
-  normalizeRoleForSidePanel,
-} from "@/components/side-panel/types";
-
-const GENRES = [
-  "로맨스",
-  "판타지",
-  "현대",
-  "무협",
-  "스포츠",
-  "미스터리",
-  "SF",
-  "일상",
-  "기타",
-];
 
 const STATUSES = ["연재중", "완결", "휴재"] as const;
+const CONTRACT_STATUSES = ["미계약", "계약"] as const;
+/** 시안 ROLE_OPTIONS — D-12 결정: 4개 + "기타" fallback (기존 "기타" 인물 편집 시 disabled option 노출). */
+const ROLE_OPTIONS = ["주인공", "조연", "악역", "단역"] as const;
 
-type CardStatus = "clean" | "dirty" | "invalid";
-
-function getCardStatus(
-  current: CharacterSetting,
-  initial: CharacterSetting | undefined
-): CardStatus {
-  if (!current.name.trim()) return "invalid";
-  if (initial === undefined) return "dirty";
-
-  const changed =
-    current.name !== initial.name ||
-    current.role !== initial.role ||
-    current.personality !== initial.personality ||
-    current.abilities !== initial.abilities ||
-    current.goals !== initial.goals ||
-    current.relationships !== initial.relationships;
-
-  return changed ? "dirty" : "clean";
-}
-
-function cardBorderClass(status: CardStatus): string {
-  if (status === "dirty") return "border-blue-500";
-  if (status === "invalid") return "border-yellow-500";
-  return "border-zinc-800";
-}
-
-export function WorkSettingsForm({
-  workId,
-  initialTitle,
-  initialGenre,
-  initialStatus,
-  initialContractStatus,
-  initialManagementOfferOptIn,
-  initialTags,
-  initialWorld,
-  initialCharacters,
+function SettingsSection({
+  title,
+  description,
+  action,
+  children,
 }: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-stone-800/70 bg-stone-900/30 px-7 py-6">
+      <header className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-serif text-[18px] font-medium text-stone-100">
+            {title}
+          </h2>
+          {description && (
+            <p className="mt-1 font-serif text-[12px] leading-relaxed text-stone-500">
+              {description}
+            </p>
+          )}
+        </div>
+        {action}
+      </header>
+      <div className="flex flex-col gap-5">{children}</div>
+    </section>
+  );
+}
+
+interface WorkSettingsFormProps {
   workId: number;
+  workTitle: string;
   initialTitle: string;
   initialGenre: string;
   initialStatus: string;
+  initialSynopsis: string;
   initialContractStatus: "미계약" | "계약";
   initialManagementOfferOptIn: boolean;
   initialTags: string[];
   initialWorld: WorldSetting;
   initialCharacters: CharacterSetting[];
-}) {
+}
+
+type StatusValue = (typeof STATUSES)[number];
+type ContractValue = (typeof CONTRACT_STATUSES)[number];
+
+export function WorkSettingsForm({
+  workId,
+  workTitle,
+  initialTitle,
+  initialGenre,
+  initialStatus,
+  initialSynopsis,
+  initialContractStatus,
+  initialManagementOfferOptIn,
+  initialTags,
+  initialWorld,
+  initialCharacters,
+}: WorkSettingsFormProps) {
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
+
   const [title, setTitle] = useState(initialTitle);
   const [genre, setGenre] = useState(initialGenre);
-  const [status, setStatus] = useState<"연재중" | "완결" | "휴재">(
-    initialStatus as "연재중" | "완결" | "휴재"
-  );
-  const [contractStatus, setContractStatus] = useState<"미계약" | "계약">(
-    initialContractStatus
-  );
-  const [managementOfferOptIn, setManagementOfferOptIn] = useState<boolean>(
-    Boolean(initialManagementOfferOptIn)
+  const [status, setStatus] = useState<StatusValue>(initialStatus as StatusValue);
+  const [synopsis, setSynopsis] = useState(initialSynopsis);
+  const [contractStatus, setContractStatus] =
+    useState<ContractValue>(initialContractStatus);
+  const [managementOfferOptIn, setManagementOfferOptIn] = useState(
+    Boolean(initialManagementOfferOptIn),
   );
   const [tags, setTags] = useState<string[]>(
-    Array.isArray(initialTags) ? initialTags.filter((t) => typeof t === "string") : []
+    Array.isArray(initialTags) ? initialTags.filter((t) => typeof t === "string") : [],
   );
-  const [worldBackground, setWorldBackground] = useState(
-    initialWorld.background
-  );
+  const [worldBackground, setWorldBackground] = useState(initialWorld.background);
   const [worldEra, setWorldEra] = useState(initialWorld.era);
   const [worldRules, setWorldRules] = useState(initialWorld.rules);
   const [characters, setCharacters] = useState<CharacterSetting[]>(
-    initialCharacters.length > 0 ? initialCharacters : []
+    initialCharacters.length > 0 ? initialCharacters : [],
   );
-  const initialCharactersRef = useRef<CharacterSetting[]>(initialCharacters);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = createClient();
+  const initialSnapshot = useRef({
+    title: initialTitle,
+    genre: initialGenre,
+    status: initialStatus,
+    synopsis: initialSynopsis,
+    contractStatus: initialContractStatus,
+    managementOfferOptIn: Boolean(initialManagementOfferOptIn),
+    tags: [...(initialTags ?? [])],
+    world: { ...initialWorld },
+    characters: initialCharacters.map((c) => ({ ...c })),
+  });
 
   const tagsNormalized = useMemo(() => {
     const uniq = new Map<string, string>();
@@ -119,11 +130,44 @@ export function WorkSettingsForm({
     return [...uniq.values()].slice(0, 20);
   }, [tags]);
 
-  const addCharacter = () => {
-    setCharacters((prev) => [...prev, emptyCharacter()]);
-    setExpandedIndex(characters.length);
-  };
+  const isDirty = useMemo(() => {
+    const s = initialSnapshot.current;
+    if (title !== s.title) return true;
+    if (genre !== s.genre) return true;
+    if (status !== s.status) return true;
+    if (synopsis !== s.synopsis) return true;
+    if (contractStatus !== s.contractStatus) return true;
+    if (managementOfferOptIn !== s.managementOfferOptIn) return true;
+    if (JSON.stringify(tagsNormalized) !== JSON.stringify(s.tags)) return true;
+    if (
+      worldBackground !== s.world.background ||
+      worldEra !== s.world.era ||
+      worldRules !== s.world.rules
+    )
+      return true;
+    if (JSON.stringify(characters) !== JSON.stringify(s.characters)) return true;
+    return false;
+  }, [
+    title,
+    genre,
+    status,
+    synopsis,
+    contractStatus,
+    managementOfferOptIn,
+    tagsNormalized,
+    worldBackground,
+    worldEra,
+    worldRules,
+    characters,
+  ]);
 
+  const addCharacter = () => {
+    setCharacters((prev) => {
+      const next = [...prev, emptyCharacter()];
+      setExpandedIndex(next.length - 1);
+      return next;
+    });
+  };
   const removeCharacter = (index: number) => {
     setCharacters((prev) => prev.filter((_, i) => i !== index));
     setExpandedIndex((prev) => {
@@ -132,18 +176,10 @@ export function WorkSettingsForm({
       return prev > index ? prev - 1 : prev;
     });
   };
-
-  const updateCharacter = (
-    index: number,
-    patch: Partial<CharacterSetting>
-  ) => {
+  const updateCharacter = (index: number, patch: Partial<CharacterSetting>) => {
     setCharacters((prev) =>
-      prev.map((c, i) => (i === index ? { ...c, ...patch } : c))
+      prev.map((c, i) => (i === index ? { ...c, ...patch } : c)),
     );
-  };
-
-  const toggleExpand = (index: number) => {
-    setExpandedIndex((prev) => (prev === index ? null : index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -169,12 +205,13 @@ export function WorkSettingsForm({
       }));
 
     try {
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from("works")
         .update({
           title,
           genre,
           status,
+          synopsis: synopsis.trim() || null,
           contract_status: contractStatus,
           management_offer_opt_in: managementOfferOptIn,
           tags: tagsNormalized,
@@ -183,7 +220,7 @@ export function WorkSettingsForm({
         })
         .eq("id", workId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
 
       router.push(`/works/${workId}`);
       router.refresh();
@@ -201,342 +238,325 @@ export function WorkSettingsForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6"
+      className="mx-auto flex max-w-4xl flex-col gap-6 px-8 py-9"
     >
-      <div className="space-y-10">
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-zinc-100">기본 정보</h2>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-              제목
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              maxLength={200}
-              placeholder="작품 제목"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 placeholder-zinc-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-            />
-          </div>
+      <header className="mb-1">
+        <button
+          type="button"
+          onClick={() => router.push(`/works/${workId}`)}
+          className="inline-flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-widest text-stone-400 hover:text-sky-200"
+        >
+          ← 작품 상세로
+        </button>
+        <h1 className="mt-3 font-serif text-[34px] font-medium leading-tight tracking-tight text-stone-100">
+          작품 설정
+        </h1>
+        <p className="mt-1.5 font-serif text-[13.5px] leading-relaxed text-stone-400">
+          {workTitle}
+        </p>
+      </header>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-              장르
-            </label>
-            <select
-              value={genre}
-              onChange={(e) => setGenre(e.target.value)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-            >
+      <SettingsSection
+        title="기본 정보"
+        description="작품 식별과 분류에 사용되는 메타 정보입니다."
+      >
+        <Field label="제목">
+          <TextInput
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            maxLength={200}
+            placeholder="작품 제목"
+          />
+        </Field>
+
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          <Field label="장르">
+            <SelectInput value={genre} onChange={setGenre}>
               {GENRES.map((g) => (
-                <option key={g} value={g}>
+                <option key={g} value={g} className="bg-stone-900">
                   {g}
                 </option>
               ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-              연재 상태
-            </label>
-            <select
+              {/* D-6 fallback: 새 GENRES 외 값(예: 미스터리/SF/일상) 가진 작품 편집 시 disabled option 노출. */}
+              {!isKnownGenre(genre) && (
+                <option value={genre} disabled className="bg-stone-900 text-stone-500">
+                  {genre} (사용 중단)
+                </option>
+              )}
+            </SelectInput>
+          </Field>
+          <Field label="연재 상태">
+            <SelectInput
               value={status}
-              onChange={(e) =>
-                setStatus(e.target.value as "연재중" | "완결" | "휴재")
-              }
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              onChange={(v) => setStatus(v as StatusValue)}
             >
               {STATUSES.map((s) => (
-                <option key={s} value={s}>
+                <option key={s} value={s} className="bg-stone-900">
                   {s}
                 </option>
               ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-              계약 여부
-            </label>
-            <select
+            </SelectInput>
+          </Field>
+          <Field label="계약 여부">
+            <SelectInput
               value={contractStatus}
-              onChange={(e) => setContractStatus(e.target.value as "미계약" | "계약")}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              onChange={(v) => setContractStatus(v as ContractValue)}
             >
-              <option value="미계약">미계약</option>
-              <option value="계약">계약</option>
-            </select>
-          </div>
-
-          <div className="rounded-lg border border-zinc-800 bg-zinc-950/30 px-4 py-3">
-            <label
-              className="flex cursor-pointer items-start gap-3 text-sm text-zinc-400"
-              aria-disabled="true"
-            >
-              <input
-                type="checkbox"
-                checked={managementOfferOptIn}
-                onChange={(e) => setManagementOfferOptIn(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-zinc-700 bg-zinc-800 text-amber-600 opacity-80"
-              />
-              <span className="leading-snug">
-                매니지먼트 계약 제의를 받겠습니다 (현재 서비스 개발 중)
-              </span>
-            </label>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-              태그
-            </label>
-            <p className="mb-2 text-sm text-zinc-500">
-              엔터로 추가하고, 칩의 ×로 삭제합니다. 예: #회귀물 #먼치킨 #전문직
-            </p>
-            <TagInput value={tags} onChange={setTags} />
-          </div>
-        </div>
-
-        <div className="space-y-4 border-t border-zinc-800 pt-8">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-100">
-              세계관 설정
-            </h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              AI 분석 시 원고와 함께 전달됩니다. 배경·시대·규칙을 자유롭게
-              적어 주세요.
-            </p>
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-              배경
-            </label>
-            <textarea
-              value={worldBackground}
-              onChange={(e) => setWorldBackground(e.target.value)}
-              rows={3}
-              placeholder="지역, 무대, 세계의 큰 그림 등"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 placeholder-zinc-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-              시대
-            </label>
-            <textarea
-              value={worldEra}
-              onChange={(e) => setWorldEra(e.target.value)}
-              rows={2}
-              placeholder="현대, 조선, 다른 차원의 연도 체계 등"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 placeholder-zinc-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-zinc-300">
-              세계관 규칙
-            </label>
-            <textarea
-              value={worldRules}
-              onChange={(e) => setWorldRules(e.target.value)}
-              rows={4}
-              placeholder="마법, 시스템, 금지 사항, 사회 구조 등"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-zinc-100 placeholder-zinc-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4 border-t border-zinc-800 pt-8">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-zinc-100">
-                인물 설정
-              </h2>
-              <p className="mt-1 text-sm text-zinc-500">
-                이름이 있는 행만 저장됩니다. 분석 시 캐릭터 일관성·관계 활용도에
-                반영됩니다.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={addCharacter}
-              className="rounded-lg border border-zinc-600 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
-            >
-              인물 추가
-            </button>
-          </div>
-
-          {characters.length === 0 ? (
-            <p className="text-sm text-zinc-500">
-              등록된 인물이 없습니다. 「인물 추가」로 입력해 주세요.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {characters.map((c, index) => (
-                <CharacterAccordionCard
-                  key={index}
-                  index={index}
-                  character={c}
-                  initial={initialCharactersRef.current[index]}
-                  open={expandedIndex === index}
-                  onToggle={() => toggleExpand(index)}
-                  onRemove={() => removeCharacter(index)}
-                  onPatch={(patch) => updateCharacter(index, patch)}
-                />
+              {CONTRACT_STATUSES.map((c) => (
+                <option key={c} value={c} className="bg-stone-900">
+                  {c}
+                </option>
               ))}
-            </ul>
+            </SelectInput>
+          </Field>
+        </div>
+
+        {/*
+          contract_status='미계약' AND management_offer_opt_in=true 조합이
+          향후 B2B(매니지먼트·플랫폼) 노출 판정 기준 — 단일 플래그 아님.
+          작가 통제권·커뮤니티 신뢰 우선 이중 게이트. 노출 로직 자체는 다음 페이즈.
+        */}
+        <div className="rounded-md border border-stone-800/70 bg-stone-900/40 px-4 py-3">
+          <Checkbox
+            checked={managementOfferOptIn}
+            onChange={setManagementOfferOptIn}
+            label="매니지먼트 계약 제의를 받겠습니다"
+            hint="현재 서비스 개발 중"
+          />
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        title="태그"
+        description="엔터로 추가하고, 칩의 × 로 삭제합니다. 예: #회귀물 #먼치킨 #전문직"
+      >
+        <TagInput value={tags} onChange={setTags} />
+      </SettingsSection>
+
+      <SettingsSection
+        title="시놉시스"
+        description="작품 상세 페이지에 노출되는 소개입니다. AI 분석에는 사용되지 않으며, 독자·외부에 보여줄 한 줄~한 단락 요약입니다."
+      >
+        <Field label="시놉시스 본문">
+          <Textarea
+            rows={4}
+            value={synopsis}
+            onChange={(e) => setSynopsis(e.target.value)}
+            placeholder="작품을 한 단락 안에 소개해 주세요."
+          />
+        </Field>
+      </SettingsSection>
+
+      <SettingsSection
+        title="세계관 설정"
+        description="AI 분석 시 원고와 함께 전달됩니다. 배경·시대·규칙을 자유롭게 적어 주세요."
+      >
+        <Field label="배경">
+          <Textarea
+            rows={3}
+            value={worldBackground}
+            onChange={(e) => setWorldBackground(e.target.value)}
+            placeholder="지역, 무대, 세계의 큰 그림 등"
+          />
+        </Field>
+        <Field label="시대">
+          <Textarea
+            rows={2}
+            value={worldEra}
+            onChange={(e) => setWorldEra(e.target.value)}
+            placeholder="현대, 조선, 다른 차원의 연도 체계 등"
+          />
+        </Field>
+        <Field label="세계관 규칙">
+          <Textarea
+            rows={4}
+            value={worldRules}
+            onChange={(e) => setWorldRules(e.target.value)}
+            placeholder="마법, 시스템, 금지 사항, 사회 구조 등"
+          />
+        </Field>
+      </SettingsSection>
+
+      <SettingsSection
+        title="인물 설정"
+        description="이름이 있는 행만 저장됩니다. 분석 시 캐릭터 일관성·관계 활용도에 반영됩니다."
+        action={
+          <button
+            type="button"
+            onClick={addCharacter}
+            className="flex items-center gap-1.5 rounded-md border border-stone-700 bg-stone-900/60 px-3.5 py-2 font-serif text-[13px] text-stone-200 hover:border-sky-400/40 hover:text-sky-200"
+          >
+            <Plus size={12} aria-hidden="true" />
+            인물 추가
+          </button>
+        }
+      >
+        {characters.length === 0 ? (
+          <EmptyState
+            variant="sky"
+            icon={<Plus size={18} aria-hidden="true" />}
+            title="아직 등록된 인물이 없습니다"
+            body="주요 인물의 이름·역할·배경을 추가하면 분석 정확도가 올라갑니다."
+            cta={{
+              label: "첫 인물 추가",
+              onClick: addCharacter,
+              variant: "primary",
+            }}
+          />
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {characters.map((ch, index) => (
+              <CharacterEditCard
+                key={index}
+                index={index}
+                ch={ch}
+                expanded={expandedIndex === index}
+                onToggle={() =>
+                  setExpandedIndex((prev) => (prev === index ? null : index))
+                }
+                onChange={(patch) => updateCharacter(index, patch)}
+                onDelete={() => removeCharacter(index)}
+              />
+            ))}
+          </div>
+        )}
+      </SettingsSection>
+
+      {error && (
+        <p className="rounded-md border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+          {error}
+        </p>
+      )}
+
+      <footer className="mt-2 flex items-center justify-between gap-3 border-t border-stone-800/60 pt-6">
+        <div className="font-mono text-[10.5px] tracking-wide">
+          {isDirty ? (
+            <span className="text-amber-300/85">· 미저장 변경 있음</span>
+          ) : (
+            <span className="text-stone-600">· 모든 변경 사항 저장됨</span>
           )}
         </div>
-
-        {error && (
-          <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
-            {error}
-          </p>
-        )}
-
-        <div className="flex gap-3 border-t border-zinc-800 pt-6">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => router.back()}
-            className="rounded-lg border border-zinc-700 px-6 py-2.5 text-zinc-300 transition-colors hover:bg-zinc-800"
+            className="rounded-md border border-stone-800/80 bg-stone-900/40 px-5 py-2.5 font-serif text-[13px] text-stone-300 hover:border-stone-700 hover:text-stone-100"
           >
             취소
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="rounded-lg bg-amber-600 px-6 py-2.5 font-medium text-white transition-colors hover:bg-amber-500 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-6 py-2.5 font-serif text-[13.5px] font-medium text-stone-950 hover:bg-amber-400 disabled:opacity-50"
+            style={{
+              boxShadow:
+                "0 0 0 1px oklch(0.66 0.16 60 / 0.4), 0 8px 24px -12px oklch(0.78 0.16 60 / 0.5)",
+            }}
           >
+            <Check size={12} aria-hidden="true" />
             {loading ? "저장 중..." : "저장"}
           </button>
         </div>
-      </div>
+      </footer>
     </form>
   );
 }
 
-function CharacterAccordionCard({
+function CharacterEditCard({
   index,
-  character,
-  initial,
-  open,
+  ch,
+  expanded,
   onToggle,
-  onRemove,
-  onPatch,
+  onChange,
+  onDelete,
 }: {
   index: number;
-  character: CharacterSetting;
-  initial: CharacterSetting | undefined;
-  open: boolean;
+  ch: CharacterSetting;
+  expanded: boolean;
   onToggle: () => void;
-  onRemove: () => void;
-  onPatch: (patch: Partial<CharacterSetting>) => void;
+  onChange: (patch: Partial<CharacterSetting>) => void;
+  onDelete: () => void;
 }) {
-  const status = getCardStatus(character, initial);
-  const border = cardBorderClass(status);
-  const label = character.name.trim() || `인물 ${index + 1}`;
-  const sub = character.role ? ` · ${character.role}` : "";
-
+  const isKnownRole = ROLE_OPTIONS.some((r) => r === ch.role);
   return (
-    <li className={`overflow-hidden rounded-lg border bg-zinc-950/40 ${border}`}>
-      <div className="flex items-center gap-2 px-3 py-2">
+    <article className="rounded-lg border border-stone-800/70 bg-stone-900/40 transition-colors hover:border-stone-700/80">
+      <header className="flex items-center gap-3 px-4 py-3">
         <button
           type="button"
           onClick={onToggle}
-          className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left text-sm text-zinc-200"
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-stone-500 transition-colors hover:bg-stone-800/60 hover:text-stone-200 ${expanded ? "rotate-90 text-sky-300" : ""}`}
+          aria-label={expanded ? "접기" : "펼치기"}
         >
-          <span className="min-w-0 truncate">
-            <span className="text-zinc-500">{open ? "▼" : "▶"}</span>{" "}
-            <span className="font-medium">{label}</span>
-            <span className="text-zinc-500">{sub}</span>
-          </span>
-          <span className="flex shrink-0 flex-col items-end gap-0.5">
-            {status === "dirty" ? (
-              <span className="text-xs text-blue-400">수정됨</span>
-            ) : null}
-            {status === "invalid" ? (
-              <span className="text-xs text-yellow-400">이름 필요</span>
-            ) : null}
-          </span>
+          <ChevronRight size={11} aria-hidden="true" />
         </button>
+        <input
+          type="text"
+          value={ch.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+          placeholder={`인물 ${index + 1} 이름`}
+          className="flex-1 bg-transparent font-serif text-[14.5px] text-stone-100 placeholder:text-stone-600 focus:outline-none"
+        />
+        <span className="font-mono text-[10px] text-stone-600">·</span>
+        <select
+          value={ch.role}
+          onChange={(e) => onChange({ role: e.target.value })}
+          className="appearance-none rounded-sm bg-transparent font-mono text-[10.5px] uppercase tracking-widest text-stone-400 focus:outline-none"
+        >
+          {ROLE_OPTIONS.map((r) => (
+            <option key={r} value={r} className="bg-stone-900">
+              {r}
+            </option>
+          ))}
+          {/* D-12 fallback: 운영 데이터에 "기타" 등 ROLE_OPTIONS 외 값이 들어있는 경우 disabled option 으로 노출. */}
+          {!isKnownRole && ch.role && (
+            <option value={ch.role} disabled className="bg-stone-900 text-stone-500">
+              {ch.role} (사용 중단)
+            </option>
+          )}
+        </select>
         <button
           type="button"
-          onClick={onRemove}
-          className="shrink-0 rounded border border-red-500/30 px-2 py-1 text-xs text-red-300 hover:bg-red-950/40"
+          onClick={onDelete}
+          className="ml-2 inline-flex items-center gap-1 rounded border border-rose-400/30 bg-rose-400/[0.06] px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-rose-300/90 hover:bg-rose-400/[0.14] hover:text-rose-200"
         >
-          🗑 삭제
+          <Trash2 size={10} aria-hidden="true" />
+          삭제
         </button>
-      </div>
-
-      {open ? (
-        <div className="space-y-3 border-t border-zinc-800/80 px-3 py-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs text-zinc-500">이름</label>
-              <input
-                type="text"
-                value={character.name}
-                onChange={(e) => onPatch({ name: e.target.value })}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
-              />
-            </div>
-            <div className="sm:col-span-1">
-              <label className="mb-1 block text-xs text-zinc-500">역할</label>
-              <select
-                value={normalizeRoleForSidePanel(character.role)}
-                onChange={(e) => onPatch({ role: e.target.value })}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
-              >
-                {SIDEPANEL_CHARACTER_ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs text-zinc-500">성격</label>
-              <textarea
-                value={character.personality}
-                onChange={(e) => onPatch({ personality: e.target.value })}
-                rows={2}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs text-zinc-500">능력</label>
-              <textarea
-                value={character.abilities}
-                onChange={(e) => onPatch({ abilities: e.target.value })}
-                rows={2}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs text-zinc-500">목표</label>
-              <textarea
-                value={character.goals}
-                onChange={(e) => onPatch({ goals: e.target.value })}
-                rows={2}
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs text-zinc-500">
-                인물 간 관계
-              </label>
-              <textarea
-                value={character.relationships}
-                onChange={(e) => onPatch({ relationships: e.target.value })}
-                rows={2}
-                placeholder="타 인물과의 관계, 갈등 구조 등"
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600"
-              />
-            </div>
-          </div>
+      </header>
+      {expanded && (
+        <div className="space-y-3 border-t border-stone-800/60 px-4 py-3">
+          <Field label="성격">
+            <Textarea
+              rows={2}
+              value={ch.personality}
+              onChange={(e) => onChange({ personality: e.target.value })}
+            />
+          </Field>
+          <Field label="능력">
+            <Textarea
+              rows={2}
+              value={ch.abilities}
+              onChange={(e) => onChange({ abilities: e.target.value })}
+            />
+          </Field>
+          <Field label="목표">
+            <Textarea
+              rows={2}
+              value={ch.goals}
+              onChange={(e) => onChange({ goals: e.target.value })}
+            />
+          </Field>
+          <Field label="인물 간 관계">
+            <Textarea
+              rows={2}
+              value={ch.relationships}
+              onChange={(e) => onChange({ relationships: e.target.value })}
+              placeholder="타 인물과의 관계, 갈등 구조 등"
+            />
+          </Field>
         </div>
-      ) : null}
-    </li>
+      )}
+    </article>
   );
 }

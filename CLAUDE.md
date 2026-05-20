@@ -49,10 +49,10 @@
 이 프로젝트는 **두 개의 작업 도메인** 으로 나뉘어 있음:
 
 ### 도메인 A: 소비자 사이트 (사용자 작가 대상)
-- **담당 도구**: Cursor + 웹 Claude (대화)
+- **담당 도구**: **Claude Code** (코드 작업) + 웹 Claude (PM/설계 자문)
 - **경로**: `onehandbook/src/app/(main)/*`, `onehandbook/src/app/studio/*` 등
-- **현재 작업**: 사이드 패널 UI 리디자인 스프린트 (Phase 2)
-- **참고 문서**: 이 파일의 서비스 개요 + `docs/adr/`
+- **현재 작업**: 디자인 시안 적용 스프린트 (Phase 2-D)
+- **참고 문서**: 이 파일의 서비스 개요 + `docs/adr/` + `design_novel/novel-agent/`
 
 ### 도메인 B: 어드민 페이지 (LEE 운영 전용)
 - **담당 도구**: **Claude Code** (자율 에이전트)
@@ -60,7 +60,7 @@
 - **현재 작업**: MVP 구축 (유저 관리, NAT 충전, 문의 답장, 탈퇴 로그)
 - **참고 문서**: **`docs/admin-handoff/` 폴더 전체**
 
-> **Claude Code 는 도메인 B 작업 시 `docs/admin-handoff/README.md` 를 먼저 읽고 시작할 것.**
+> **Claude Code 는 도메인 A/B 모든 코드 작업을 단독 담당.** 도메인 B 작업 시 `docs/admin-handoff/README.md` 를 먼저 읽고 시작할 것.
 
 ---
 
@@ -160,8 +160,8 @@
 이 섹션은 Claude Code (터미널 에이전트) 가 주로 참고.
 
 ### 작업 원칙
-1. **어드민 페이지 작업만 담당**. 소비자 사이트 코드 (`onehandbook/src/app/(main)`, `/studio`, `/pricing` 등) 는 **수정 금지**.
-2. **파일 수정 전 `git status` 확인**. 다른 도구 (Cursor) 가 작업 중인 파일 건드리지 말 것.
+1. **user 사이트 + admin 페이지 전 코드 작업 담당** (도메인 A/B 단독). 명시 보호 영역(아래 "건드리면 안 되는 곳")만 예외.
+2. **파일 수정 전 `git status` 확인**. 미커밋 변경/타 브랜치 작업 흔적은 본 채널에 먼저 보고.
 3. **큰 변경 전 계획 제시**. 5개 이상 파일 신규/수정 시 먼저 계획 보고 후 승인 대기.
 4. **테스트/빌드 확인 필수**. 작업 단위 완료 시 `npm run build` 로 회귀 없는지 검증.
 5. **보고 습관**. 각 작업 단위 끝에 "무엇을 했고, 다음에 뭘 할지" 요약.
@@ -176,9 +176,7 @@
 7. `docs/adr/ADR-0003-admin-route.md` ← 어드민 위치 결정
 
 ### 건드리면 안 되는 곳 (중요)
-- `onehandbook/src/app/(main)/**` — 소비자 랜딩/스튜디오
-- `onehandbook/src/app/api/analyze/**` — 분석 파이프라인
-- `onehandbook/src/components/side-panel/**` — Cursor 가 작업 중 (Phase 2)
+- `onehandbook/src/app/api/analyze/**` — 분석 파이프라인 (운영 중, 신중)
 - `supabase/migrations/*` 기존 파일 — 새 마이그레이션은 **추가만** (기존 수정 금지)
 - `.env`, `.env.local` — 환경변수 직접 수정 금지 (LEE 가 수동 관리)
 

@@ -71,9 +71,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "작품 상세",
     icon: Pencil,
     resolveHref: (id) => (id != null ? `/works/${id}` : null),
-    // /works/[id] exact match — settings 는 별도 active 영역 (현재 dedicated 메뉴 부재라 work 와 동시 active 유지)
-    isActive: (p) =>
-      /^\/works\/\d+$/.test(p) || /^\/works\/\d+\/settings$/.test(p),
+    isActive: (p) => /^\/works\/\d+$/.test(p),
   },
   {
     id: "analysis",
@@ -90,8 +88,7 @@ const NAV_ITEMS: NavItem[] = [
       workId != null && episodeId != null
         ? `/works/${workId}/episodes/${episodeId}`
         : null,
-    // /works/[id]/episodes/[id], /edit, /new 모두 회차 분석 영역
-    isActive: (p) => /^\/works\/\d+\/episodes(\/|$)/.test(p),
+    isActive: (p) => /^\/works\/\d+\/episodes\/\d+$/.test(p),
   },
 ];
 
