@@ -6,7 +6,6 @@ import {
   type AnalysisRunRow,
   type HolisticRunRow,
 } from "@/lib/analysisSummary";
-import { computeHolisticNatCost } from "@/lib/nat";
 import type { WorkOption } from "@/components/atoms/WorkSelector";
 import { TabSegment, type AnalysisTab } from "./TabSegment";
 import { WorkHeader } from "./WorkHeader";
@@ -19,11 +18,6 @@ import {
   type HolisticRunView,
   type HolisticTabMode,
 } from "./HolisticTab";
-import {
-  BatchAnalyzeCTA,
-  type BatchAnalyzeCTAState,
-} from "./BatchAnalyzeCTA";
-import type { RangeSelectorEpisode } from "./HolisticRangeSelector";
 
 interface WorkAnalysisPageProps {
   workId: string;
@@ -107,20 +101,11 @@ function buildHolisticRunView(row: HolisticRunRow): HolisticRunView {
   };
 }
 
-function deriveCTAState(
-  totalEpisodes: number,
-  analyzedEpisodes: number,
-): BatchAnalyzeCTAState | null {
-  if (totalEpisodes === 0) return null;
-  if (analyzedEpisodes === 0) return "none";
-  if (analyzedEpisodes >= totalEpisodes) return "all_analyzed";
-  return "partial";
-}
-
 /**
- * `/works/[id]/analysis` 의 메인 orchestrator — WorkHeader + BatchAnalyzeCTA + TabSegment + (Individual | Holistic).
+ * `/works/[id]/analysis` — 리포트 보관함 (조회 전용).
  *
- * BatchAnalyzeCTA 위치: WorkHeader 와 TabSegment 사이 (tab 무관, 작품 단위 전역 노출).
+ * IA 재정비 (B-2): 분석 실행 UI 제거 (BatchAnalyzeCTA / 일괄 select 영역).
+ * 분석 실행 진입점은 **작품 상세 BatchAnalyzeModal** 단일. 본 페이지는 누적 조회 전용.
  */
 export function WorkAnalysisPage({
   workId,
@@ -132,45 +117,13 @@ export function WorkAnalysisPage({
   activeTab,
   currentRunId,
   holisticMode,
-  preselect,
-  natBalance,
 }: WorkAnalysisPageProps) {
   const latest = latestAnalysisPerEpisode(runs);
   const analyzedEpisodes = latest.size;
   const workAvgScore = averageOverallScore(latest);
-  const lastAnalyzedAt =
-    runs.length > 0 ? runs[0].created_at : null;
+  const lastAnalyzedAt = runs.length > 0 ? runs[0].created_at : null;
 
   const holisticViews = holisticRuns.map(buildHolisticRunView);
-
-  const analyzedIdSet = new Set<number>(latest.keys());
-  // 통합 일괄 분석 본질 = 통합 run 에 포함된 회차도 "분석됨" 으로 표시.
-  for (const h of holisticRuns) {
-    for (const eid of h.episode_ids) analyzedIdSet.add(eid);
-  }
-
-  const rangeSelectorEpisodes: RangeSelectorEpisode[] = episodes.map((e) => ({
-    id: e.id,
-    episode_number: e.episode_number,
-    title: e.title,
-    analyzed: analyzedIdSet.has(e.id),
-  }));
-
-  const ctaState = deriveCTAState(work.total_episodes, analyzedEpisodes);
-
-  // CTA NAT 비용 — 옵션 기본 ON (lore + platform) 시점의 산식.
-  const totalNatCost = computeHolisticNatCost(work.total_episodes, {
-    includeLore: true,
-    includePlatformOptimization: true,
-  });
-  const unanalyzedCount = Math.max(
-    0,
-    work.total_episodes - analyzedEpisodes,
-  );
-  const partialNatCost = computeHolisticNatCost(unanalyzedCount, {
-    includeLore: true,
-    includePlatformOptimization: true,
-  });
 
   return (
     <>
@@ -186,19 +139,6 @@ export function WorkAnalysisPage({
       />
 
       <div className="mx-auto max-w-6xl px-6 pb-8 pt-6">
-        {/* BatchAnalyzeCTA — select 모드 외 시점에만 노출 (선택 영역 진입 후엔 중복 회피) */}
-        {ctaState && !(activeTab === "holistic" && holisticMode === "select") && (
-          <BatchAnalyzeCTA
-            workId={workId}
-            state={ctaState}
-            totalEpisodes={work.total_episodes}
-            analyzedEpisodes={analyzedEpisodes}
-            partialNatCost={partialNatCost}
-            totalNatCost={totalNatCost}
-            lastAnalyzedAt={lastAnalyzedAt}
-          />
-        )}
-
         <TabSegment workId={workId} activeTab={activeTab} />
 
         {activeTab === "individual" ? (
@@ -212,13 +152,9 @@ export function WorkAnalysisPage({
         ) : (
           <HolisticTab
             workId={workId}
-            workTitle={work.title}
             runs={holisticViews}
             currentRunId={currentRunId}
             mode={holisticMode}
-            episodes={rangeSelectorEpisodes}
-            preselect={preselect}
-            natBalance={natBalance}
           />
         )}
       </div>

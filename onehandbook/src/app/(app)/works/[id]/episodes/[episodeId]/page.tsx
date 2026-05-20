@@ -17,6 +17,7 @@ import type {
   AnalysisRow,
   VersionOption,
 } from "@/components/AnalyzePanel";
+import type { HolisticLink } from "@/components/work/HolisticLinkBanner";
 import { formatEpisodeLabel } from "@/lib/episodeLabel";
 import { EpisodeDetailClient } from "./_components/EpisodeDetailClient";
 
@@ -166,6 +167,43 @@ export default async function EpisodeViewPage({
     (episode.content as string | null) ?? "",
   );
 
+  // HolisticLinkBanner: 본 회차가 속한 가장 최신 일괄 분석 1건 (LEE 결정 — N개 소속 시 최신 1건).
+  const { data: holisticRunRow } = await supabase
+    .from("holistic_analysis_runs")
+    .select("id, episode_ids, result_json, created_at")
+    .eq("work_id", id)
+    .contains("episode_ids", [Number(episode.id)])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let holisticLink: HolisticLink | null = null;
+  if (holisticRunRow) {
+    const epIds = (holisticRunRow.episode_ids as number[]) ?? [];
+    const epNums = epIds
+      .map((eid) => allEpisodes.find((e) => e.id === eid)?.episode_number as number | undefined)
+      .filter((n): n is number => typeof n === "number")
+      .sort((a, b) => a - b);
+    const rangeLabel =
+      epNums.length === 0
+        ? `${epIds.length}회차`
+        : epNums.length === 1
+          ? `${epNums[0]}화`
+          : `${epNums[0]}~${epNums[epNums.length - 1]}화`;
+    const overall = (holisticRunRow.result_json as { overall_score?: unknown })?.overall_score;
+    const runScore = typeof overall === "number" ? overall : null;
+    const created = new Date(holisticRunRow.created_at as string);
+    const runDate = `${created.getFullYear()}.${String(created.getMonth() + 1).padStart(2, "0")}.${String(created.getDate()).padStart(2, "0")}`;
+    holisticLink = {
+      runId: String(holisticRunRow.id),
+      workId: Number(id),
+      episodeCount: epIds.length,
+      rangeLabel,
+      runScore,
+      runDate,
+    };
+  }
+
   return (
     <>
       <TopBar
@@ -191,6 +229,7 @@ export default async function EpisodeViewPage({
         initialAnalyses={initialAnalyses}
         natBalance={natBalance}
         phoneVerified={phoneVerified}
+        holisticLink={holisticLink}
       />
     </>
   );

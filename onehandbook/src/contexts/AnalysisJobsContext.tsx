@@ -5,10 +5,12 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type {
@@ -1158,7 +1160,7 @@ function ToastStack({
   if (toasts.length === 0) return null;
   return (
     <div
-      className="pointer-events-none fixed bottom-6 right-6 z-[80] flex w-[min(calc(100vw-3rem),22rem)] flex-col gap-2"
+      className="pointer-events-none fixed bottom-6 right-6 z-[100] flex w-[min(calc(100vw-3rem),22rem)] flex-col gap-2"
       aria-live="polite"
     >
       {toasts.map((t) => (
@@ -1355,6 +1357,12 @@ function AnalysisBell({
   const [outcomesLoadingMore, setOutcomesLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  // K-A 정정 (LEE 라운드5): Portal 적용 — dropdownRef + outside click 둘 다 체크 + fixed 좌표.
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{
+    top: number;
+    right: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -1387,6 +1395,10 @@ function AnalysisBell({
         onIngestReadOutcomes(jobs);
         setOutcomesCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
         setOutcomesHasMore(jobs.length >= NOTIFICATION_OUTCOMES_PAGE_SIZE);
+      } catch (e) {
+        // J-I 정정 (LEE 라운드4): silent failure 방어. console.warn 만, UI 에러 화면 노출 차단.
+        // 근본 원인 진단은 별도 트랙 (production 모니터링 + 로그 보강).
+        console.warn("[AnalysisBell] loadFirst outcomes fetch failed", e);
       } finally {
         if (!cancelled) setOutcomesLoadingInitial(false);
       }
@@ -1457,15 +1469,32 @@ function AnalysisBell({
     onIngestReadOutcomes,
   ]);
 
+  // K-A 정정: Portal 적용 후 dropdown 이 부모 DOM 트리 밖이라
+  // wrapRef.contains 만 체크하면 dropdown 안 클릭도 outside 처리됨. dropdownRef 추가 체크.
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (wrapRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  // K-A 정정: open 시 wrapRef 좌표 측정 → fixed dropdown 위치 계산.
+  // useLayoutEffect 로 paint 전 측정 — 첫 frame 깜빡임 방지.
+  useLayoutEffect(() => {
+    if (!open || !wrapRef.current) {
+      setDropdownPos(null);
+      return;
+    }
+    const rect = wrapRef.current.getBoundingClientRect();
+    setDropdownPos({
+      top: rect.bottom + 8,
+      right: window.innerWidth - rect.right,
+    });
   }, [open]);
 
   const activeJobs = panelJobs.filter(
@@ -1489,8 +1518,15 @@ function AnalysisBell({
           </span>
         )}
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-[60] mt-2 w-[min(calc(100vw-2rem),22rem)] overflow-hidden rounded-2xl border border-stone-800 bg-stone-950 shadow-2xl shadow-black/50">
+      {open && dropdownPos && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{
+            position: "fixed",
+            top: dropdownPos.top,
+            right: dropdownPos.right,
+          }}
+          className="z-[100] w-[min(calc(100vw-2rem),22rem)] overflow-hidden rounded-2xl border border-stone-800 bg-stone-950 shadow-2xl shadow-black/50">
           <div className="border-b border-stone-800 bg-stone-900/90 px-3 py-2.5">
             <div className="flex items-center justify-between gap-2">
               <div>
@@ -1742,7 +1778,8 @@ function AnalysisBell({
             )}
 
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

@@ -41,7 +41,7 @@ export function WorkHeader({
         <div className="flex items-start justify-between gap-8">
           <div className="min-w-0 flex-1">
             <div className="font-mono text-[10.5px] uppercase tracking-[0.3em] text-sky-300/70">
-              분석 리포트
+              리포트 보관함
             </div>
             <div className="mt-2">
               <WorkSelector

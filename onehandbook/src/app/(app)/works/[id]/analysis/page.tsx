@@ -134,7 +134,7 @@ export default async function WorkAnalysisRoutePage({
     <>
       <TopBar
         breadcrumb={["스튜디오", work.title]}
-        title="AI 분석 리포트"
+        title="리포트 보관함"
         natBalance={natBalance}
       />
 

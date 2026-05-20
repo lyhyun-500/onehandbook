@@ -12,6 +12,10 @@ import {
   type EpisodeOption,
 } from "@/components/atoms/EpisodeSelector";
 import { WorkSelector, type WorkOption } from "@/components/atoms/WorkSelector";
+import {
+  HolisticLinkBanner,
+  type HolisticLink,
+} from "@/components/work/HolisticLinkBanner";
 import { formatEpisodeLabel } from "@/lib/episodeLabel";
 
 interface EpisodeDetailClientProps {
@@ -28,6 +32,8 @@ interface EpisodeDetailClientProps {
   initialAnalyses: AnalysisRow[];
   natBalance: number;
   phoneVerified: boolean;
+  /** 본 회차가 속한 가장 최신 일괄 분석 link (B-3). null = 단독 분석. */
+  holisticLink: HolisticLink | null;
 }
 
 export function EpisodeDetailClient({
@@ -44,6 +50,7 @@ export function EpisodeDetailClient({
   initialAnalyses,
   natBalance,
   phoneVerified,
+  holisticLink,
 }: EpisodeDetailClientProps) {
   const router = useRouter();
 
@@ -64,6 +71,8 @@ export function EpisodeDetailClient({
             size="md"
           />
         </div>
+
+        {holisticLink && <HolisticLinkBanner link={holisticLink} />}
 
         <AnalyzePanel
           workId={workId}

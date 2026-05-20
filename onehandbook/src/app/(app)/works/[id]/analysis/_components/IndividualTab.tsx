@@ -8,7 +8,6 @@ import { formatDimensionLabel } from "@/lib/analysis/dimensionLabel";
 import { formatEpisodeLabel } from "@/lib/episodeLabel";
 import { getAgentPlatformLabel } from "@/lib/agentPlatform";
 import { getAnalysisScoreColor } from "@/lib/analysisScoreColor";
-import { DimensionLocked } from "@/components/atoms/DimensionLocked";
 import { EmptyState } from "@/components/atoms/EmptyState";
 import { ScoreRangeLegend } from "@/components/atoms/ScoreRangeLegend";
 import { SourceBadge } from "@/components/atoms/SourceBadge";
@@ -176,6 +175,31 @@ export function IndividualTab({
     );
   }
 
+  if (!hasAnalyses) {
+    return (
+      <EmptyState
+        variant="sky"
+        icon={<FileText size={20} aria-hidden="true" />}
+        title="아직 분석 이력이 없습니다"
+        body={
+          <>
+            <span className="block">
+              이 화면은 결과를 보는 곳입니다. 분석은 작품 상세에서 시작합니다.
+            </span>
+            <span className="mt-1 block">
+              회차 행의 「분석」 버튼이나 「일괄 통합 분석」 으로 진입하세요.
+            </span>
+          </>
+        }
+        cta={{
+          label: "분석하러 가기 →",
+          href: `/works/${workId}`,
+          variant: "primary",
+        }}
+      />
+    );
+  }
+
   return (
     <>
       <section>
@@ -207,19 +231,11 @@ export function IndividualTab({
           )}
         </header>
 
-        {!hasAnalyses ? (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {TOP_DIMENSION_KEYS_FALLBACK.map((key) => (
-              <DimensionLocked key={key} label={formatDimensionLabel(key)} />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {dimensions.map((d) => (
-              <DimensionCard key={d.key} dim={d} />
-            ))}
-          </div>
-        )}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {dimensions.map((d) => (
+            <DimensionCard key={d.key} dim={d} />
+          ))}
+        </div>
       </section>
 
       {hasAnalyses && (

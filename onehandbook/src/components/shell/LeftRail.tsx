@@ -75,7 +75,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     id: "analysis",
-    label: "분석 리포트",
+    label: "리포트 보관함",
     icon: LineChart,
     resolveHref: (id) => (id != null ? `/works/${id}/analysis` : null),
     isActive: (p) => /^\/works\/\d+\/analysis$/.test(p),

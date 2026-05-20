@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { getAnalysisScoreColor } from "@/lib/analysisScoreColor";
-import { computeHolisticNatCost } from "@/lib/nat";
 import { formatEpisodeLabel } from "@/lib/episodeLabel";
-import { BatchSpendConfirmModal } from "@/components/BatchSpendConfirmModal";
 import { EmptyState } from "@/components/atoms/EmptyState";
 import {
   EpisodeTrendChart,
@@ -17,11 +14,6 @@ import {
   type HolisticDimension,
 } from "./HolisticDimensionCard";
 import { RunSelector, type RunOption } from "./RunSelector";
-import {
-  HolisticRangeSelector,
-  type RangeSelectorEpisode,
-} from "./HolisticRangeSelector";
-import { HolisticSubmitBar } from "./HolisticSubmitBar";
 
 export interface HolisticRunView {
   id: string;
@@ -39,22 +31,14 @@ export interface HolisticRunView {
   improvements: string[];
 }
 
+/** mode 파라미터는 보존 (deep-link 안전), 단 select 본문은 폐기 — 실행은 작품 상세 모달. */
 export type HolisticTabMode = "report" | "select";
 
 interface HolisticTabProps {
   workId: string;
-  workTitle: string;
   runs: HolisticRunView[];
-  /** URL searchParams ?run=<id> 또는 첫 번째 run. */
   currentRunId: string | null;
-  /** URL searchParams ?mode= — select 모드 진입 영역. */
   mode: HolisticTabMode;
-  /** RangeSelector / SubmitBar 영역에 사용. */
-  episodes: RangeSelectorEpisode[];
-  /** "missing" = 미분석 회차 자동 선택, "all" = 전체 자동 선택. */
-  preselect: "missing" | "all" | null;
-  /** 사용자 NAT 잔량 — BatchSpendConfirmModal 영역에 사용. */
-  natBalance: number;
 }
 
 function formatTimestamp(iso: string): string {
@@ -65,101 +49,22 @@ function formatTimestamp(iso: string): string {
 }
 
 /**
- * 시안 `design_novel/novel-agent/holistic-report.jsx` 정합.
+ * 일괄 분석 누적 조회 — `리포트 보관함` 일괄 탭.
  *
- * 3 mode:
- * - `report`: 분석 결과 표시 (1+ run 영역)
- * - `select`: RangeSelector + SubmitBar (BatchAnalyzeCTA 또는 "추가 분석" 진입)
- * - (no-runs): runs.length === 0 본질 — empty state.
+ * IA 재정비 (B-2): 실행 UI 제거. 분석 실행은 **작품 상세 BatchAnalyzeModal** 단일 진입점.
+ * 본 탭은 조회 전용 — RangeSelector / SubmitBar / BatchSpendConfirmModal 호출 0.
+ * select 모드 deep-link 진입 시에도 빈 상태 CTA 만 노출.
  */
 export function HolisticTab({
   workId,
-  workTitle,
   runs,
   currentRunId,
   mode,
-  episodes,
-  preselect,
-  natBalance,
 }: HolisticTabProps) {
   const router = useRouter();
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // preselect 영역 자동 적용 — mode = select 진입 시점에만.
-  useEffect(() => {
-    if (mode !== "select") return;
-    if (preselect === "all") {
-      setSelectedIds(new Set(episodes.map((e) => e.id)));
-    } else if (preselect === "missing") {
-      setSelectedIds(new Set(episodes.filter((e) => !e.analyzed).map((e) => e.id)));
-    }
-  }, [mode, preselect, episodes]);
-
-  const exitSelect = () => {
-    const params = new URLSearchParams();
-    params.set("tab", "holistic");
-    router.push(`/works/${workId}/analysis?${params.toString()}`);
-  };
-
-  const selectedEpisodes = useMemo(
-    () => episodes.filter((e) => selectedIds.has(e.id)),
-    [episodes, selectedIds]
-  );
-
-  // mode = select — RangeSelector + SubmitBar
-  if (mode === "select") {
-    const natCost = computeHolisticNatCost(selectedIds.size, {
-      includeLore: true,
-      includePlatformOptimization: true,
-    });
-    return (
-      <>
-        <div className="mb-5">
-          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-stone-500">
-            통합 분석 진입
-          </div>
-          <h2 className="mt-1 font-serif text-[20px] text-stone-100">
-            분석 회차 선택
-          </h2>
-        </div>
-
-        <HolisticRangeSelector
-          episodes={episodes}
-          selectedIds={selectedIds}
-          onChange={setSelectedIds}
-        />
-
-        <HolisticSubmitBar
-          selectedCount={selectedIds.size}
-          natCost={natCost}
-          onCancel={exitSelect}
-          onSubmit={() => setConfirmOpen(true)}
-        />
-
-        <BatchSpendConfirmModal
-          open={confirmOpen}
-          workId={workId}
-          workTitle={workTitle}
-          selected={selectedEpisodes.map((e) => ({
-            id: e.id,
-            episode_number: e.episode_number,
-            title: e.title,
-          }))}
-          balance={natBalance}
-          onClose={() => setConfirmOpen(false)}
-          onJobQueued={() => {
-            setConfirmOpen(false);
-            // job 큐 진입 후 report 모드 복귀 — 백그라운드 처리 본질 (알림 채널 갱신).
-            exitSelect();
-          }}
-        />
-      </>
-    );
-  }
-
-  // mode = report — 분석 결과 표시
-  if (runs.length === 0) {
+  // mode='select' deep-link 진입 시에도 실행 UI 없이 작품 상세 유도
+  if (mode === "select" || runs.length === 0) {
     return (
       <EmptyState
         variant="sky"
@@ -167,10 +72,19 @@ export function HolisticTab({
         title="아직 일괄 분석 이력이 없습니다"
         body={
           <>
-            <span className="block">여러 회차를 묶어 작품 흐름 기준의 통합 리포트를 받습니다.</span>
-            <span className="block mt-1">상단 일괄 분석 영역에서 시작하세요.</span>
+            <span className="block">
+              여러 회차를 묶어 작품 흐름 기준의 통합 리포트를 받습니다.
+            </span>
+            <span className="mt-1 block">
+              분석 실행은 작품 상세의 「일괄 통합 분석」 버튼에서 시작합니다.
+            </span>
           </>
         }
+        cta={{
+          label: "작품 상세로 이동",
+          href: `/works/${workId}`,
+          variant: "primary",
+        }}
       />
     );
   }
