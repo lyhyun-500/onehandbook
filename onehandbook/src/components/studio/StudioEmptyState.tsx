@@ -11,7 +11,7 @@ import { NatChip } from "@/components/atoms/NatChip";
  *
  * 시안 design_novel/novel-agent/portfolio-canvas.jsx EmptyStudioFrame 정합.
  * - 좌측 import CTA 2개 (LEE P-2-6 (a) — 둘 다 AddWorkButton 모달 트리거, 파일 업로드는 "준비 중" 안내)
- * - 우측 sub-CTA = 샘플 분석 다시 보기 (랜딩 /#sample) + 가치 제안
+ * - 우측 sub-CTA = 샘플 분석 다시 보기 (/onboarding?from=help) + 가치 제안
  * - NAT 카피 = 20 NAT (운영 정합, 시안 30 폐기)
  */
 export function StudioEmptyState({ userId }: { userId: number }) {
