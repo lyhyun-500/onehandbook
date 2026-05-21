@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Plus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { LoginSpinner, type LoginStage } from "@/components/auth/LoginSpinner";
 import { NatChip } from "@/components/atoms/NatChip";
 import { SampleAnalysisReport } from "@/components/onboarding/SampleAnalysisReport";
 
@@ -14,17 +12,14 @@ interface OnboardingFullscreenProps {
   authId: string;
   /**
    * HelpPopover 「샘플 분석 둘러보기」 진입 여부 (?from=help).
-   * - true (작품 보유/이미 본 사용자): 시뮬 생략 + onClose 시 UPDATE 생략 (NULL 유지)
-   * - false (신규 사용자, default): 시뮬 4.5초 + onClose 시 onboarding_seen_at UPDATE
+   * - true: onClose 시 onboarding_seen_at UPDATE 생략 (NULL 유지)
+   * - false (default): onClose 시 onboarding_seen_at = now() UPDATE
+   *
+   * 시뮬 3단계는 /auth/spinner transient page 로 이전됨 (발견 7). 본 컴포넌트는
+   * 시뮬 없이 즉시 본문 노출 — fromHelp 는 UPDATE 분기에만 사용.
    */
   fromHelp?: boolean;
 }
-
-const STAGE_SEQUENCE: { stage: LoginStage; ms: number }[] = [
-  { stage: "auth", ms: 1500 },
-  { stage: "profile", ms: 1500 },
-  { stage: "workspace", ms: 1500 },
-];
 
 /**
  * 신규 작가 온보딩 (05A) 풀스크린.
@@ -37,7 +32,9 @@ const STAGE_SEQUENCE: { stage: LoginStage; ms: number }[] = [
  *   3. 「내 작품으로 시작하기」 (Hero CTA primary)
  *   4. 「둘러보고 결정할게요」 (Hero CTA secondary)
  *
- * onClose → users.onboarding_seen_at = now() UPDATE + /studio router.push.
+ * onClose:
+ *   - fromHelp=false (신규 사용자): users.onboarding_seen_at = now() UPDATE + /studio
+ *   - fromHelp=true (help 진입): UPDATE 생략 (NULL 유지 — 정식 온보딩 path 보존) + /studio
  */
 export function OnboardingFullscreen({
   authId,
@@ -46,41 +43,7 @@ export function OnboardingFullscreen({
   const router = useRouter();
   const supabase = createClient();
 
-  // 3-stage 시뮬 시퀀스 — 신규 사용자(onboarding_seen_at IS NULL)에만 노출.
-  // fromHelp=true (작품 보유/이미 본 사용자가 헤더 ? 통해 둘러보기 진입) 시 시뮬 생략.
-  // 사유: 시뮬은 OAuth 로그인 진행 컨텍스트("인증→프로필→작업실")의 빌드업 — help 진입 사용자는
-  //      이미 로그인+분석 익숙 + 명시적 "둘러보기" 의도. 빠른 본문 노출이 의도 정합.
-  const [spinnerStage, setSpinnerStage] = useState<LoginStage | null>(
-    fromHelp ? null : "auth",
-  );
-
-  useEffect(() => {
-    if (fromHelp) return; // help 진입은 시뮬 생략
-
-    let cancelled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
-    const advance = (idx: number) => {
-      if (cancelled) return;
-      if (idx >= STAGE_SEQUENCE.length) {
-        setSpinnerStage(null);
-        return;
-      }
-      const { stage, ms } = STAGE_SEQUENCE[idx]!;
-      setSpinnerStage(stage);
-      timeoutId = setTimeout(() => advance(idx + 1), ms);
-    };
-
-    advance(0);
-    return () => {
-      cancelled = true;
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [fromHelp]);
-
   const handleClose = async () => {
-    // help 진입은 onboarding_seen_at UPDATE 생략 — NULL 유지로 정식 온보딩 path 보존.
-    // (작품 보유 사용자는 NOT NULL 이미 — UPDATE 무관, 신규 사용자는 NULL 유지가 의도)
     if (!fromHelp) {
       try {
         await supabase
@@ -94,10 +57,6 @@ export function OnboardingFullscreen({
     }
     router.push("/studio");
   };
-
-  if (spinnerStage !== null) {
-    return <LoginSpinner stage={spinnerStage} />;
-  }
 
   return (
     <div className="relative min-h-screen w-full bg-stone-950 text-stone-200">
