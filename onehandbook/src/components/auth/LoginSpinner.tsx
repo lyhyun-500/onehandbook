@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { Book } from "lucide-react";
 
 export type LoginStage = "auth" | "profile" | "workspace";
 
@@ -38,14 +38,11 @@ export function LoginSpinner({ stage = "auth" }: LoginSpinnerProps) {
   return (
     <main className="flex h-full min-h-screen w-full items-center justify-center bg-stone-950 text-stone-200">
       <div className="text-center">
-        <div className="mx-auto mb-7 flex justify-center">
-          <Image
-            src="/logo.svg"
-            alt="Novel Agent"
-            width={68}
-            height={48}
-            priority
-          />
+        <div
+          className="mx-auto mb-7 flex h-12 w-12 items-center justify-center rounded-md bg-gradient-to-br from-sky-300/90 to-sky-500/80 text-stone-950"
+          aria-label="Novel Agent"
+        >
+          <Book size={22} aria-hidden="true" />
         </div>
 
         <div
