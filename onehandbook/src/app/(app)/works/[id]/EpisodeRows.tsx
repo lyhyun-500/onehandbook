@@ -61,7 +61,7 @@ export function EpisodeRows({
                 goAnalysis();
               }
             }}
-            className="group grid cursor-pointer grid-cols-[80px_1fr_90px_80px_70px_70px_40px] items-center gap-4 border-b border-stone-800/40 px-4 py-3.5 text-[13px] transition-colors last:border-b-0 hover:bg-stone-100/[0.02] focus:outline-none focus:ring-1 focus:ring-inset focus:ring-sky-400/40"
+            className="grid cursor-pointer grid-cols-[80px_1fr_90px_80px_70px_70px_40px] items-center gap-4 border-b border-stone-800/40 px-4 py-3.5 text-[13px] last:border-b-0 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-sky-400/40"
           >
             <div className="font-mono text-[12px] tabular-nums text-stone-500">
               {epLabel}
@@ -109,7 +109,7 @@ export function EpisodeRows({
                 {analyzed ? "재분석" : "분석"}
               </button>
             </div>
-            <div className="flex justify-end text-stone-600 group-hover:text-sky-300">
+            <div className="flex justify-end text-stone-600">
               <ChevronRight size={13} aria-hidden="true" />
             </div>
           </div>
