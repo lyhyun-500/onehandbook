@@ -24,7 +24,7 @@ const ITEMS: HelpMenuItem[] = [
     icon: <BookOpen size={13} aria-hidden="true" />,
     title: "사용 가이드",
     sub: "분석 축 6개 · NAT 사용법",
-    href: "/notices",
+    href: "/guide",
   },
   {
     icon: <HelpCircle size={13} aria-hidden="true" />,
