@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { BookOpen, ChevronRight, HelpCircle, Play, Sparkles } from "lucide-react";
+import { BookOpen, ChevronRight, HelpCircle, Sparkles } from "lucide-react";
 
 interface HelpMenuItem {
   icon: ReactNode;
@@ -27,12 +27,6 @@ const ITEMS: HelpMenuItem[] = [
     href: "/notices",
   },
   {
-    icon: <Play size={13} aria-hidden="true" />,
-    title: "2분 영상 투어",
-    sub: "주요 화면 흐름",
-    href: "/notices",
-  },
-  {
     icon: <HelpCircle size={13} aria-hidden="true" />,
     title: "1:1 문의",
     sub: "보통 1영업일 내 답변",
@@ -41,7 +35,7 @@ const ITEMS: HelpMenuItem[] = [
 ];
 
 /**
- * 도움말 popover (05C) — TopBar 우측 ? 버튼 + Cmd/Ctrl+/ 단축키.
+ * 도움말 popover (05C) — TopBar 우측 ? 버튼.
  *
  * (app) 모든 페이지 영구 진입점.
  * 시안 design_novel/novel-agent/portfolio-canvas.jsx HelpMenuFrame 정합.
@@ -71,24 +65,12 @@ export function HelpPopover() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  // Cmd/Ctrl + / 단축키 토글
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
-        e.preventDefault();
-        setOpen((o) => !o);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
   return (
     <div ref={wrapRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label="도움말 (⌘ + /)"
+        aria-label="도움말"
         aria-expanded={open}
         className="flex h-7 w-7 items-center justify-center rounded-full border border-sky-400/40 bg-sky-400/[0.10] text-sky-200 ring-2 ring-sky-400/20 transition-colors hover:bg-sky-400/[0.16]"
       >
@@ -139,12 +121,6 @@ export function HelpPopover() {
                 />
               </Link>
             ))}
-          </div>
-          <div className="border-t border-stone-800/60 px-4 py-2.5 text-[10.5px] text-stone-500">
-            <kbd className="font-mono">⌘</kbd>{" "}
-            <span className="text-stone-600">+</span>{" "}
-            <kbd className="font-mono">/</kbd>{" "}
-            단축키로도 열 수 있어요
           </div>
         </div>
       )}
