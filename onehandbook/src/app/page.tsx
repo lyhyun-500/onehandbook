@@ -87,7 +87,7 @@ export default function HomePage() {
                   가입하고 20 NAT 받기
                 </button>
                 <a
-                  href="#sample"
+                  href="/sample"
                   className="rounded-md border border-stone-800 bg-stone-900/40 px-5 py-2.5 text-[13.5px] text-stone-200 hover:border-stone-700"
                 >
                   분석 샘플 보기 →
@@ -102,7 +102,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div id="sample">
+            <div>
               <LiveScoreCard />
             </div>
           </div>

@@ -37,9 +37,9 @@ export function SiteHeader() {
           <a href="#features" className="hover:text-stone-100">
             기능
           </a>
-          <a href="#sample" className="hover:text-stone-100">
+          <Link href="/sample" className="hover:text-stone-100">
             분석 샘플
-          </a>
+          </Link>
           <Link href="/pricing" className="hover:text-stone-100">
             요금
           </Link>
