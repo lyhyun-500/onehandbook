@@ -82,7 +82,7 @@ export function StudioEmptyState({ userId }: { userId: number }) {
               에이전트가 어떤 점수와 코멘트를 내놓는지 예시로 확인할 수 있습니다.
             </p>
             <Link
-              href="/#sample"
+              href="/onboarding?from=help"
               className="mt-5 inline-flex items-center gap-1.5 text-[12px] text-sky-300/90 hover:text-sky-200"
             >
               <Sparkles size={12} aria-hidden="true" />

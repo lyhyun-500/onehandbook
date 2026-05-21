@@ -144,12 +144,14 @@ export function OnboardingFullscreen({
           샘플 분석 — 황실의 그림자 46화
         </div>
         <h1 className="mt-2 max-w-[820px] font-serif text-[34px] leading-[1.2] tracking-tight text-stone-100">
-          에이전트가 한 회차를 어떻게 읽는지,{" "}
+          에이전트가 한 회차를 어떻게 읽는지,
+          <br />
           <span className="italic text-stone-400">먼저 보여드릴게요.</span>
         </h1>
         <p className="mt-3 max-w-[640px] text-[13.5px] leading-relaxed text-stone-400">
-          아래는 다른 작가의 회차로 돌려본 실제 분석 결과입니다. 6개 축 점수, 개선
-          포인트, 유사작 비교를 둘러본 뒤 내 작품으로 시작하세요.
+          아래는 실제 작품이 아닌 임시로 생성된 작품입니다.
+          <br />
+          6개 축 점수, 개선 포인트, 유사작 비교를 둘러본 뒤 내 작품으로 시작하세요.
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <button
