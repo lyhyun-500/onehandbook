@@ -17,7 +17,7 @@ const ITEMS: HelpMenuItem[] = [
     icon: <Sparkles size={13} aria-hidden="true" />,
     title: "샘플 분석 둘러보기",
     sub: "예시 회차로 점수·코멘트 보기",
-    href: "/#sample",
+    href: "/onboarding?from=help",
     accent: true,
   },
   {

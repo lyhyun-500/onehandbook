@@ -12,6 +12,12 @@ import { SampleAnalysisReport } from "@/components/onboarding/SampleAnalysisRepo
 interface OnboardingFullscreenProps {
   /** supabase auth_id (RLS user lookup). */
   authId: string;
+  /**
+   * HelpPopover 「샘플 분석 둘러보기」 진입 여부 (?from=help).
+   * - true (작품 보유/이미 본 사용자): 시뮬 생략 + onClose 시 UPDATE 생략 (NULL 유지)
+   * - false (신규 사용자, default): 시뮬 4.5초 + onClose 시 onboarding_seen_at UPDATE
+   */
+  fromHelp?: boolean;
 }
 
 const STAGE_SEQUENCE: { stage: LoginStage; ms: number }[] = [
@@ -33,16 +39,24 @@ const STAGE_SEQUENCE: { stage: LoginStage; ms: number }[] = [
  *
  * onClose → users.onboarding_seen_at = now() UPDATE + /studio router.push.
  */
-export function OnboardingFullscreen({ authId }: OnboardingFullscreenProps) {
+export function OnboardingFullscreen({
+  authId,
+  fromHelp = false,
+}: OnboardingFullscreenProps) {
   const router = useRouter();
   const supabase = createClient();
 
-  // 3-stage 시뮬 시퀀스 — onboarding_seen_at IS NULL 사용자만 진입하는 라우트라
-  // 본문 노출 전 LoginSpinner 3단계 (auth → profile → workspace, 각 1.5초) 진행.
-  // 재방문(onboarding_seen_at NOT NULL)은 /studio redirect 라 시뮬 미노출.
-  const [spinnerStage, setSpinnerStage] = useState<LoginStage | null>("auth");
+  // 3-stage 시뮬 시퀀스 — 신규 사용자(onboarding_seen_at IS NULL)에만 노출.
+  // fromHelp=true (작품 보유/이미 본 사용자가 헤더 ? 통해 둘러보기 진입) 시 시뮬 생략.
+  // 사유: 시뮬은 OAuth 로그인 진행 컨텍스트("인증→프로필→작업실")의 빌드업 — help 진입 사용자는
+  //      이미 로그인+분석 익숙 + 명시적 "둘러보기" 의도. 빠른 본문 노출이 의도 정합.
+  const [spinnerStage, setSpinnerStage] = useState<LoginStage | null>(
+    fromHelp ? null : "auth",
+  );
 
   useEffect(() => {
+    if (fromHelp) return; // help 진입은 시뮬 생략
+
     let cancelled = false;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -62,17 +76,21 @@ export function OnboardingFullscreen({ authId }: OnboardingFullscreenProps) {
       cancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, []);
+  }, [fromHelp]);
 
   const handleClose = async () => {
-    try {
-      await supabase
-        .from("users")
-        .update({ onboarding_seen_at: new Date().toISOString() })
-        .eq("auth_id", authId);
-    } catch (e) {
-      // silent fail — 갱신 실패해도 사용자 진입은 막지 않음
-      console.warn("[Onboarding] mark seen failed", e);
+    // help 진입은 onboarding_seen_at UPDATE 생략 — NULL 유지로 정식 온보딩 path 보존.
+    // (작품 보유 사용자는 NOT NULL 이미 — UPDATE 무관, 신규 사용자는 NULL 유지가 의도)
+    if (!fromHelp) {
+      try {
+        await supabase
+          .from("users")
+          .update({ onboarding_seen_at: new Date().toISOString() })
+          .eq("auth_id", authId);
+      } catch (e) {
+        // silent fail — 갱신 실패해도 사용자 진입은 막지 않음
+        console.warn("[Onboarding] mark seen failed", e);
+      }
     }
     router.push("/studio");
   };

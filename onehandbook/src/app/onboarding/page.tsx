@@ -6,15 +6,24 @@ import { OnboardingFullscreen } from "@/components/onboarding/OnboardingFullscre
 /**
  * /onboarding — 신규 작가 풀스크린 온보딩 (05A).
  *
- * 가드 (server-side):
- *   - requireAppUser (비로그인 → /login)
- *   - terms_agreed_at NULL → /auth/welcome
- *   - onboarding_seen_at NOT NULL → /studio (이미 본 사용자)
- *   - works.length > 0 → /studio (작품 있는 사용자)
+ * 진입 경로 2종 (searchParams.from):
+ *   - 기본 (신규 사용자): 가드 4종 (requireAppUser + terms + onboarding_seen_at NULL + works 0)
+ *   - from=help (HelpPopover 「샘플 분석 둘러보기」): 가드 2종만 (requireAppUser + terms).
+ *                works.length·onboarding_seen_at 검증 우회 — 작품 보유/이미 본 사용자도 진입 가능.
  *
- * 통과 시 OnboardingFullscreen client 렌더 (4 닫기 트리거 → onboarding_seen_at UPDATE).
+ * 통과 시 OnboardingFullscreen client 렌더.
+ * onClose 동작은 from 에 따라 분기 (OnboardingFullscreen 안):
+ *   - 기본: onboarding_seen_at = now() UPDATE + /studio router.push
+ *   - from=help: UPDATE 생략 (NULL 유지 — 정식 온보딩 path 보존) + /studio router.push
  */
-export default async function OnboardingPage() {
+export default async function OnboardingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string }>;
+}) {
+  const { from } = await searchParams;
+  const isHelpEntry = from === "help";
+
   const supabase = await createClient();
   const appUser = await requireAppUser(supabase);
 
@@ -32,19 +41,21 @@ export default async function OnboardingPage() {
   if (!userRow?.terms_agreed_at) {
     redirect("/auth/welcome");
   }
-  if (userRow.onboarding_seen_at) {
-    redirect("/studio");
+
+  // help 진입은 작품 보유/이미 본 사용자도 통과. 기본 진입만 추가 가드 4종.
+  if (!isHelpEntry) {
+    if (userRow.onboarding_seen_at) {
+      redirect("/studio");
+    }
+    const { data: works } = await supabase
+      .from("works")
+      .select("id")
+      .eq("author_id", appUser.id)
+      .is("deleted_at", null);
+    if ((works ?? []).length > 0) {
+      redirect("/studio");
+    }
   }
 
-  const { data: works } = await supabase
-    .from("works")
-    .select("id")
-    .eq("author_id", appUser.id)
-    .is("deleted_at", null);
-
-  if ((works ?? []).length > 0) {
-    redirect("/studio");
-  }
-
-  return <OnboardingFullscreen authId={user.id} />;
+  return <OnboardingFullscreen authId={user.id} fromHelp={isHelpEntry} />;
 }
