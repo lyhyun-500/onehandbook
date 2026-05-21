@@ -253,10 +253,13 @@ export function GuideClient() {
                   세계관·인물 옵션 +1 / 플랫폼 옵션 +1 (통합 1회)
                 </li>
                 <li>
-                  10화 초과 시 청크 분할 — 2 청크+ 시 merge{" "}
+                  11화 이상 선택 시 회차 묶음 단위로 나눠 분석 — 2 묶음 이상이면 결과
+                  합치기{" "}
                   <span className="font-mono tabular-nums text-sky-300/85">+2 NAT</span>
                 </li>
-                <li className="text-stone-500">(최대 50화 — Vercel 타임아웃 정합)</li>
+                <li className="text-stone-500">
+                  (최대 50화 — 한 번에 처리 가능한 분량)
+                </li>
               </ul>
             </div>
 
