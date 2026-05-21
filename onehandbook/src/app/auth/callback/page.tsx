@@ -4,11 +4,23 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { LoginSpinner } from "@/components/auth/LoginSpinner";
+import { LoginSpinner, type LoginStage } from "@/components/auth/LoginSpinner";
 
+const STAGE_SEQUENCE: LoginStage[] = ["auth", "profile", "workspace"];
+const STAGE_DURATION_MS = 1500;
+
+/**
+ * OAuth callback — Google / Naver 콜백 진입점.
+ *
+ * 발견 11 정정 (fixup 8a): 3단계 시뮬을 본 페이지에 직접 통합.
+ * 이전엔 /auth/spinner transient page 로 분기했으나, 신규/재로그인 사용자
+ * 동등 노출 위해 callback page 안 시뮬 → 완료 시 oauth-complete 진입.
+ * 즉 시뮬 4.5초는 pure 시각 노출이며, oauth-complete PKCE 교환은 시뮬 종료 후 동기 처리.
+ */
 function AuthCallbackLoadingPage() {
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const [stage, setStage] = useState<LoginStage>("auth");
 
   const code = searchParams.get("code");
   const provider = searchParams.get("provider");
@@ -21,8 +33,20 @@ function AuthCallbackLoadingPage() {
     }
     const q = new URLSearchParams({ code });
     if (provider) q.set("provider", provider);
-    // PKCE 쿠키가 fetch POST 에서 누락되는 경우가 있어, 동일 origin GET 으로 서버에서 교환
-    window.location.replace(`/api/auth/oauth-complete?${q.toString()}`);
+    const oauthCompleteUrl = `/api/auth/oauth-complete?${q.toString()}`;
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    timers.push(setTimeout(() => setStage("profile"), STAGE_DURATION_MS));
+    timers.push(setTimeout(() => setStage("workspace"), STAGE_DURATION_MS * 2));
+    timers.push(
+      setTimeout(() => {
+        // PKCE 쿠키가 fetch POST 에서 누락되는 경우가 있어, 동일 origin GET 으로 서버에서 교환
+        window.location.replace(oauthCompleteUrl);
+      }, STAGE_DURATION_MS * STAGE_SEQUENCE.length),
+    );
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+    };
   }, [code, provider]);
 
   if (error) {
@@ -51,7 +75,7 @@ function AuthCallbackLoadingPage() {
     );
   }
 
-  return <LoginSpinner stage="auth" />;
+  return <LoginSpinner stage={stage} />;
 }
 
 export default function AuthCallbackPage() {

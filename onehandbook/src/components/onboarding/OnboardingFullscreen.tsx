@@ -15,8 +15,8 @@ interface OnboardingFullscreenProps {
    * - true: onClose 시 onboarding_seen_at UPDATE 생략 (NULL 유지)
    * - false (default): onClose 시 onboarding_seen_at = now() UPDATE
    *
-   * 시뮬 3단계는 /auth/spinner transient page 로 이전됨 (발견 7). 본 컴포넌트는
-   * 시뮬 없이 즉시 본문 노출 — fromHelp 는 UPDATE 분기에만 사용.
+   * 시뮬 3단계는 /auth/callback page 에서 직접 노출됨 (발견 11 정정 — fixup 8a).
+   * 본 컴포넌트는 시뮬 없이 즉시 본문 노출 — fromHelp 는 UPDATE 분기에만 사용.
    */
   fromHelp?: boolean;
 }
