@@ -38,10 +38,6 @@ function formatLastActivity(q: InquiryRowBase): string {
   return `${y}-${m}-${day}`;
 }
 
-function shortenId(id: string): string {
-  return id.slice(0, 8);
-}
-
 export function InquiryListItem({ q, active, onClick }: InquiryListItemProps) {
   const status = deriveInquiryStatus(q);
   return (
@@ -65,8 +61,7 @@ export function InquiryListItem({ q, active, onClick }: InquiryListItemProps) {
       >
         {q.title}
       </div>
-      <div className="mt-1.5 flex items-center justify-between text-[10.5px] text-stone-500">
-        <span className="font-mono tabular-nums">#{shortenId(q.id)}</span>
+      <div className="mt-1.5 flex items-center justify-end text-[10.5px] text-stone-500">
         <span className="font-mono tabular-nums">{formatLastActivity(q)}</span>
       </div>
     </button>

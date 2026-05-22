@@ -60,6 +60,15 @@ export function InquiryComposer({
     };
   }, []);
 
+  // ESC 키 close (LEE 결정 영속화 — 중앙 모달 close 동작)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
   const canSubmit =
     consent && title.trim().length > 0 && content.trim().length > 0;
 
@@ -120,10 +129,22 @@ export function InquiryComposer({
   }
 
   return (
-    <div className="flex h-full min-w-0 flex-1 flex-col bg-stone-950/60">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="inquiry-composer-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/80 px-4 py-8 backdrop-blur-sm"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+    >
+      <div className="flex max-h-[90vh] w-[640px] min-w-0 flex-col overflow-hidden rounded-xl border border-stone-800/80 bg-stone-950 shadow-2xl">
       <header className="flex items-start justify-between gap-3 border-b border-stone-800/60 px-7 py-5">
         <div>
-          <h2 className="font-serif text-[22px] font-medium tracking-tight text-stone-100">
+          <h2
+            id="inquiry-composer-title"
+            className="font-serif text-[22px] font-medium tracking-tight text-stone-100"
+          >
             1:1 문의
           </h2>
           <div className="mt-1 font-mono text-[11px] uppercase tracking-[0.25em] text-sky-300/85">
@@ -299,6 +320,7 @@ export function InquiryComposer({
           </button>
         </footer>
       </form>
+      </div>
     </div>
   );
 }

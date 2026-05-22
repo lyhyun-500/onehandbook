@@ -80,11 +80,16 @@ export function InquiriesClient({ initialInquiries }: InquiriesClientProps) {
     [inquiries, selectedId],
   );
 
-  const panelOpen = composing || selected != null;
+  // LEE 결정 영속화 — composer 중앙 모달 + thread 2-pane 공존.
+  // panelOpen = thread panel 만 기준 (composing 분리 → 모달 별도 렌더).
+  const panelOpen = selected != null;
 
   function closePanel() {
-    setComposing(false);
     setSelectedId(null);
+  }
+
+  function closeComposer() {
+    setComposing(false);
     setAskingFromCategory(undefined);
   }
 
@@ -94,22 +99,20 @@ export function InquiriesClient({ initialInquiries }: InquiriesClientProps) {
   }
 
   function openComposerFresh() {
+    // LEE 결정 영속화 — 모달 + thread panel 공존, selectedId 유지.
     setComposing(true);
-    setSelectedId(null);
     setAskingFromCategory(undefined);
   }
 
   function openComposerFromThread(q: InquiryRowFull) {
+    // LEE 결정 영속화 — 「추가 질문」 = 현 thread category prefill + thread panel 유지.
     const cat = isInquiryCategory(q.category) ? q.category : undefined;
     setComposing(true);
-    setSelectedId(null);
     setAskingFromCategory(cat);
   }
 
   function selectInquiry(id: string) {
     setSelectedId(id);
-    setComposing(false);
-    setAskingFromCategory(undefined);
   }
 
   async function handleCloseInquiry(q: InquiryRowFull) {
@@ -149,7 +152,7 @@ export function InquiriesClient({ initialInquiries }: InquiriesClientProps) {
   }
 
   function handleComposerSubmitted() {
-    closePanel();
+    closeComposer();
     // 신규 inquiry = server fetch 통과 후 표시. 본 client 는 토스트만, 목록 갱신은
     // 새로고침/재방문 시 server fetch 가 새 row 반영. (Phase 분리 - realtime 미적용)
   }
@@ -303,27 +306,27 @@ export function InquiriesClient({ initialInquiries }: InquiriesClientProps) {
           </div>
         </div>
 
-        {panelOpen && (
+        {panelOpen && selected && (
           <aside className="flex min-h-0 w-[640px] shrink-0 flex-col bg-stone-950/60">
-            {composing ? (
-              <InquiryComposer
-                initialCategory={askingFromCategory}
-                onCancel={closePanel}
-                onSubmitted={handleComposerSubmitted}
-                onToast={pushToast}
-              />
-            ) : selected ? (
-              <InquiryThread
-                q={selected}
-                onBackToList={closePanel}
-                onClose={() => handleCloseInquiry(selected)}
-                onAskAgain={() => openComposerFromThread(selected)}
-                closing={closing}
-              />
-            ) : null}
+            <InquiryThread
+              q={selected}
+              onBackToList={closePanel}
+              onClose={() => handleCloseInquiry(selected)}
+              onAskAgain={() => openComposerFromThread(selected)}
+              closing={closing}
+            />
           </aside>
         )}
       </div>
+
+      {composing && (
+        <InquiryComposer
+          initialCategory={askingFromCategory}
+          onCancel={closeComposer}
+          onSubmitted={handleComposerSubmitted}
+          onToast={pushToast}
+        />
+      )}
     </div>
   );
 }

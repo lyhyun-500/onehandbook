@@ -46,10 +46,6 @@ function formatDateTime(iso: string): string {
   return `${y}-${m}-${day} ${hh}:${mm}`;
 }
 
-function shortenId(id: string): string {
-  return id.slice(0, 8);
-}
-
 export function InquiryThread({
   q,
   onBackToList,
@@ -96,8 +92,6 @@ export function InquiryThread({
                 </span>
               </>
             )}
-            <span className="text-stone-700">·</span>
-            <span className="font-mono tabular-nums">#{shortenId(q.id)}</span>
           </div>
         </header>
 
