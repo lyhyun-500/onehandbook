@@ -35,7 +35,7 @@ export default async function MyInquiriesPage() {
         title="문의함"
         natBalance={appUser.coin_balance ?? 0}
       />
-      <main className="h-[calc(100vh-3rem)] min-h-0">
+      <main className="h-[calc(100vh-3.5rem)] min-h-0">
         <InquiriesClient initialInquiries={inquiries} />
       </main>
     </>

@@ -244,7 +244,7 @@ export function InquiriesClient({ initialInquiries }: InquiriesClientProps) {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
+      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1">
         <div
           className={`min-h-0 flex-1 overflow-y-auto ${
             panelOpen ? "border-r border-stone-800/60" : ""
