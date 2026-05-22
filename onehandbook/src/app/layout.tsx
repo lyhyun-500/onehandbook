@@ -5,7 +5,6 @@ import {
   SITE_DESCRIPTION,
   SITE_NAME,
 } from "@/config/site";
-import { FloatingInquiryButton } from "@/components/FloatingInquiryButton";
 import { SiteFooter } from "@/components/SiteFooter";
 import { AnalysisJobsProvider } from "@/contexts/AnalysisJobsContext";
 import { getInternalSiteBaseUrl } from "@/lib/siteBaseUrl";
@@ -71,7 +70,6 @@ export default function RootLayout({
         <AnalysisJobsProvider>
           <div className="flex-1">{children}</div>
           <SiteFooter />
-          <FloatingInquiryButton />
         </AnalysisJobsProvider>
       </body>
     </html>
