@@ -17,7 +17,7 @@ type ToastState = { kind: "ok" | "err"; message: string };
 
 export function FloatingInquiryButton() {
   const [open, setOpen] = useState(false);
-  const [category, setCategory] = useState<InquiryCategory>("general");
+  const [category, setCategory] = useState<InquiryCategory>("etc");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [consent, setConsent] = useState(false);
@@ -117,7 +117,7 @@ export function FloatingInquiryButton() {
       setContent("");
       setReplyEmail("");
       setConsent(false);
-      setCategory("general");
+      setCategory("etc");
       setToast({
         kind: "ok",
         message: "문의가 접수됐습니다. 답변은 사이트 알림으로 안내드립니다.",

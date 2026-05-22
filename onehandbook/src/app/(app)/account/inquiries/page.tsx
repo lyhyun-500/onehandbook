@@ -1,45 +1,32 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import { TopBar } from "@/components/shell/TopBar";
-import { inquiryCategoryLabel } from "@/lib/inquiry/categories";
-
-type InquiryRow = {
-  id: string;
-  category: string | null;
-  title: string;
-  content: string;
-  reply_email: string | null;
-  reply_content: string | null;
-  replied_at: string | null;
-  created_at: string;
-};
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "-";
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${y}-${m}-${day} ${hh}:${mm}`;
-}
+import { InquiriesClient } from "./InquiriesClient";
+import type { InquiryRowFull } from "@/components/inquiries/InquiryThread";
 
 export default async function MyInquiriesPage() {
   const supabase = await createClient();
   const appUser = await requireAppUser(supabase);
 
-  // RLS: "Users can view own inquiries" — auth 클라이언트로 본인 행만 조회됨.
-  const { data: rows, error } = await supabase
+  // RLS "Users can view own inquiries" — auth 클라이언트로 본인 row 만 조회됨.
+  const { data: rows } = await supabase
     .from("inquiries")
     .select(
-      "id, category, title, content, reply_email, reply_content, replied_at, created_at"
+      "id, category, title, content, reply_content, replied_at, closed_at, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(50);
 
-  const inquiries: InquiryRow[] = (rows ?? []) as InquiryRow[];
+  const inquiries: InquiryRowFull[] = (rows ?? []).map((r) => ({
+    id: String(r.id),
+    category: (r.category as string | null) ?? "etc",
+    title: (r.title as string | null) ?? "",
+    content: (r.content as string | null) ?? "",
+    reply_content: (r.reply_content as string | null) ?? null,
+    replied_at: (r.replied_at as string | null) ?? null,
+    closed_at: (r.closed_at as string | null) ?? null,
+    created_at: (r.created_at as string | null) ?? new Date().toISOString(),
+  }));
 
   return (
     <>
@@ -48,93 +35,8 @@ export default async function MyInquiriesPage() {
         title="문의함"
         natBalance={appUser.coin_balance ?? 0}
       />
-
-      <main className="mx-auto max-w-3xl px-6 py-12">
-        <p className="mb-1 text-xs font-medium uppercase tracking-widest text-sky-400/90">
-          1:1 문의
-        </p>
-        <h1 className="text-2xl font-bold text-stone-100">내 문의 내역</h1>
-        <p className="mt-2 text-sm text-stone-400">
-          작성하신 문의와 답변을 확인하실 수 있습니다. 답변이 도착하면 헤더 알림으로
-          알려드립니다.
-        </p>
-
-        {error && (
-          <div className="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-            문의 내역을 불러오지 못했습니다: {error.message}
-          </div>
-        )}
-
-        {!error && inquiries.length === 0 && (
-          <div className="mt-8 rounded-xl border border-stone-800 bg-stone-900/40 p-8 text-center">
-            <p className="text-sm text-stone-400">아직 작성한 문의가 없습니다.</p>
-            <p className="mt-2 text-xs text-stone-500">
-              사이트 우측 하단 문의 버튼으로 문의를 보낼 수 있습니다.
-            </p>
-          </div>
-        )}
-
-        <ul className="mt-8 space-y-4">
-          {inquiries.map((inq) => {
-            const replied = inq.replied_at != null && inq.reply_content != null;
-            return (
-              <li
-                key={inq.id}
-                className="rounded-xl border border-stone-800 bg-stone-900/50 p-5 shadow-sm shadow-black/20"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-sm font-semibold text-stone-100">
-                      {inq.title}
-                    </h2>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-stone-500">
-                      <span className="rounded bg-stone-800/80 px-2 py-0.5 text-[11px] text-stone-300">
-                        {inquiryCategoryLabel(inq.category ?? "general")}
-                      </span>
-                      <span>{formatDateTime(inq.created_at)}</span>
-                    </div>
-                  </div>
-                  {replied ? (
-                    <span className="shrink-0 rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-300">
-                      답변완료
-                    </span>
-                  ) : (
-                    <span className="shrink-0 rounded bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-300">
-                      답변 대기중
-                    </span>
-                  )}
-                </div>
-
-                <p className="mt-4 whitespace-pre-wrap text-sm text-stone-300">
-                  {inq.content}
-                </p>
-
-                {replied && (
-                  <div className="mt-5 rounded-lg border border-sky-500/20 bg-sky-500/[0.04] p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-sky-300">
-                        Novel Agent 답변
-                      </span>
-                      <span className="text-xs text-stone-500">
-                        {inq.replied_at ? formatDateTime(inq.replied_at) : ""}
-                      </span>
-                    </div>
-                    <p className="mt-3 whitespace-pre-wrap text-sm text-stone-200">
-                      {inq.reply_content}
-                    </p>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-
-        <Link
-          href="/studio"
-          className="mt-10 inline-flex rounded-lg border border-stone-600 px-4 py-2 text-sm text-stone-200 hover:border-stone-500 hover:bg-stone-900/60"
-        >
-          ← 스튜디오로
-        </Link>
+      <main className="h-[calc(100vh-3rem)] min-h-0">
+        <InquiriesClient initialInquiries={inquiries} />
       </main>
     </>
   );

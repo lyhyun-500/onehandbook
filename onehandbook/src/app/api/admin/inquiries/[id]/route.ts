@@ -160,7 +160,7 @@ export async function PATCH(
     userAuthId: (updated.user_auth_id as string | null) ?? null,
     userEmail,
     userNickname,
-    category: (updated.category as string | null) ?? "general",
+    category: (updated.category as string | null) ?? "etc",
     title: (updated.title as string | null) ?? "",
     content: (updated.content as string | null) ?? "",
     replyEmail:
