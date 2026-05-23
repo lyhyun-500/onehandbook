@@ -297,7 +297,7 @@ export function InquiriesClient({ initialInquiries }: InquiriesClientProps) {
                 결제·NAT, 분석 모델, 계정 관련 답변을 먼저 확인해보세요.
               </div>
               <a
-                href="/guide"
+                href="/faq"
                 className="mt-2 inline-block font-mono text-[11px] uppercase tracking-widest text-sky-300/85 hover:text-sky-200"
               >
                 FAQ 보기 →
