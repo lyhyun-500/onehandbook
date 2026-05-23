@@ -42,6 +42,10 @@ export async function GET(request: Request) {
     }
   });
 
+  // 발견 11 정정 (fixup 8a): fixup 7a 가 추가한 onboarding_seen_at 분기 제거.
+  // 시뮬 3단계는 /auth/callback page 에서 직접 노출 → 본 라우트는 fixup 7a 이전 상태로 복원
+  // (단순 /studio redirect). 신규 가입자 온보딩 진입은 /studio server gate 가 담당
+  // (works 0건 + onboarding_seen_at IS NULL → /onboarding redirect).
   const res = NextResponse.redirect(new URL("/studio", url.origin));
   res.cookies.set(OHB_SESSION_HINT_COOKIE, "1", {
     path: "/",

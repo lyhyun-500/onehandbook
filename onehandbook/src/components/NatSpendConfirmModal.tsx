@@ -1,46 +1,90 @@
 "use client";
 
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
+import {
+  ANALYSIS_PROFILES,
+  type AnalysisProfileConfig,
+} from "@/config/analysis-profiles";
 import { CopyWithBreaks } from "@/components/CopyWithBreaks";
+import { formatEpisodeLabel } from "@/lib/episodeLabel";
 
 export type NatSpendLine = { label: string; nat: number };
 
-type NatSpendConfirmModalProps = {
+const PLATFORM_PROFILES: AnalysisProfileConfig[] = ANALYSIS_PROFILES.filter(
+  (p) => p.id !== "generic",
+);
+
+type Props = {
   open: boolean;
-  title: string;
-  description?: string;
-  lines: NatSpendLine[];
-  totalNat: number;
+
+  /** 회차 영역 — 헤더 EP.NN · title 표기 */
+  episode: { episode_number: number; title: string | null };
+  workTitle: string;
+  charCount: number;
+
+  /** 옵션/플랫폼 controlled state */
+  includeLore: boolean;
+  onIncludeLoreChange: (value: boolean) => void;
+  includePlatformOptimization: boolean;
+  onIncludePlatformOptimizationChange: (value: boolean) => void;
+  agentVersion: string;
+  onAgentVersionChange: (value: string) => void;
+
+  /** NAT 영역 — AnalyzePanel buildNatBreakdown 결과 전달 */
+  natLines: NatSpendLine[];
+  natTotal: number;
   balance: number;
-  confirmLabel?: string;
-  loading?: boolean;
+
+  /** 액션 */
+  loading: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+
+  /** 에러 (선택) */
+  errorMessage?: string | null;
 };
 
+/**
+ * 회차 분석 진입 모달 — BatchSpendConfirmModal 패턴 정합.
+ *
+ * - 옵션/플랫폼 영역 통합 (AnalyzePanel state controlled)
+ * - NAT breakdown (글자수 tier 기본 + 옵션 +1 NAT × 2)
+ * - 플랫폼 카드 grid (includePlatformOptimization 분기)
+ * - 잔량 arrow + 잔액 부족 분기 + ohb-scan-beam loading 유지
+ */
 export function NatSpendConfirmModal({
   open,
-  title,
-  description,
-  lines,
-  totalNat,
+  episode,
+  workTitle,
+  charCount,
+  includeLore,
+  onIncludeLoreChange,
+  includePlatformOptimization,
+  onIncludePlatformOptimizationChange,
+  agentVersion,
+  onAgentVersionChange,
+  natLines,
+  natTotal,
   balance,
-  confirmLabel = "확인 후 분석",
   loading,
   onCancel,
   onConfirm,
-}: NatSpendConfirmModalProps) {
+  errorMessage,
+}: Props) {
   if (!open) return null;
 
-  const canAfford = balance >= totalNat;
+  const canAfford = balance >= natTotal;
+  const afterBalance = canAfford ? balance - natTotal : balance;
+  const baseLine = natLines[0];
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/65 p-4 backdrop-blur-[2px]">
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="nat-modal-title"
-        className="relative w-full max-w-md overflow-hidden rounded-xl border border-cyan-500/10 bg-zinc-900 shadow-2xl shadow-black/40"
+        aria-labelledby="nat-spend-modal-title"
+        className="relative w-full max-w-lg overflow-hidden rounded-xl border border-sky-400/15 bg-stone-900 shadow-2xl shadow-black/40"
       >
         {loading && (
           <>
@@ -50,7 +94,7 @@ export function NatSpendConfirmModal({
             >
               <div className="ohb-scan-beam" />
             </div>
-            <p className="pointer-events-none absolute bottom-[5.25rem] left-0 right-0 z-20 px-4 text-center text-[11px] leading-snug text-cyan-400/90 sm:text-xs">
+            <p className="pointer-events-none absolute bottom-[5.25rem] left-0 right-0 z-20 px-4 text-center text-[11px] leading-snug text-sky-300/90 sm:text-xs">
               <CopyWithBreaks as="span">
                 에이전트가 원고를 정밀 분석 중입니다...
               </CopyWithBreaks>
@@ -58,63 +102,141 @@ export function NatSpendConfirmModal({
           </>
         )}
         <div className="relative z-0 p-6">
+          <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-sky-300/70">
+            회차 분석 진입
+          </div>
           <h2
-            id="nat-modal-title"
-            className="text-lg font-semibold text-zinc-100"
+            id="nat-spend-modal-title"
+            className="mt-1 font-serif text-[18px] text-stone-100"
           >
-            {title}
+            {formatEpisodeLabel(episode)}
           </h2>
-          {description && (
-            <p className="mt-2 text-sm text-zinc-400">
-              <CopyWithBreaks as="span" className="block">
-                {description}
-              </CopyWithBreaks>
-            </p>
-          )}
-
-          <ul className="mt-4 space-y-2 rounded-lg border border-zinc-800 bg-zinc-950/50 px-4 py-3 text-sm">
-          {lines.map((line, i) => (
-            <li
-              key={i}
-              className="flex items-start justify-between gap-3 text-zinc-300"
-            >
-              <span className="text-zinc-400">
-                <CopyWithBreaks as="span">{line.label}</CopyWithBreaks>
-              </span>
-              <span className="shrink-0 tabular-nums font-medium text-cyan-300">
-                {line.nat} NAT
-              </span>
-            </li>
-          ))}
-            <li className="flex items-center justify-between border-t border-zinc-800 pt-2 text-zinc-100">
-              <span className="font-medium">합계</span>
-              <span className="tabular-nums text-lg font-bold text-cyan-400">
-                {totalNat} NAT
-              </span>
-            </li>
-          </ul>
-
-          <p className="mt-3 text-sm text-zinc-500">
-            보유 NAT:{" "}
-            <span className="font-medium text-zinc-300">{balance}</span>
+          <p className="mt-1 font-mono text-[11px] tabular-nums text-stone-500">
+            {workTitle} · 약 {charCount.toLocaleString()}자
           </p>
 
-          {!canAfford ? (
-            <div className="mt-4 rounded-lg border border-amber-500/25 bg-amber-950/25 px-3 py-2 text-sm text-amber-200/95">
-              <CopyWithBreaks as="p">
-                잔액이 부족합니다. 충전 후 다시 시도해 주세요.
-              </CopyWithBreaks>
-              <p className="mt-1 text-xs text-amber-200/70">
-                필요 {totalNat} NAT · 보유 {balance} NAT
-              </p>
+          {/* NAT breakdown */}
+          <div className="mt-5 rounded-lg border border-stone-800 bg-stone-950/50 p-4">
+            <ul className="space-y-2 text-[12.5px]">
+              {baseLine && (
+                <li className="flex items-center justify-between text-stone-300">
+                  <span className="text-stone-400">{baseLine.label}</span>
+                  <span className="shrink-0 font-medium tabular-nums text-sky-300">
+                    {baseLine.nat} NAT
+                  </span>
+                </li>
+              )}
+              <li className="flex items-center justify-between text-stone-300">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-stone-400">
+                  <input
+                    type="checkbox"
+                    checked={includeLore}
+                    onChange={(e) => onIncludeLoreChange(e.target.checked)}
+                    className="h-3.5 w-3.5 cursor-pointer accent-sky-400"
+                  />
+                  세계관·인물 설정 포함
+                </label>
+                <span
+                  className={`shrink-0 font-medium tabular-nums ${
+                    includeLore ? "text-sky-300" : "text-stone-600"
+                  }`}
+                >
+                  {includeLore ? "+1" : "—"} NAT
+                </span>
+              </li>
+              <li className="flex items-center justify-between text-stone-300">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-stone-400">
+                  <input
+                    type="checkbox"
+                    checked={includePlatformOptimization}
+                    onChange={(e) =>
+                      onIncludePlatformOptimizationChange(e.target.checked)
+                    }
+                    className="h-3.5 w-3.5 cursor-pointer accent-sky-400"
+                  />
+                  플랫폼 최적화 분석 포함
+                </label>
+                <span
+                  className={`shrink-0 font-medium tabular-nums ${
+                    includePlatformOptimization
+                      ? "text-sky-300"
+                      : "text-stone-600"
+                  }`}
+                >
+                  {includePlatformOptimization ? "+1" : "—"} NAT
+                </span>
+              </li>
+              <li className="flex items-center justify-between border-t border-stone-800 pt-2 text-stone-100">
+                <span className="font-medium">합계</span>
+                <span className="tabular-nums text-[16px] font-semibold text-sky-300">
+                  {natTotal} NAT
+                </span>
+              </li>
+            </ul>
+          </div>
+
+          {/* 플랫폼 카드 — includePlatformOptimization true 일 때만 */}
+          {includePlatformOptimization && (
+            <div className="mt-4">
+              <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-stone-500">
+                플랫폼 선택
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {PLATFORM_PROFILES.map((p) => {
+                  const sel = agentVersion === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => onAgentVersionChange(p.id)}
+                      className={`rounded-md border px-3 py-2 text-left transition-colors ${
+                        sel
+                          ? "border-sky-400/40 bg-sky-400/[0.06]"
+                          : "border-stone-800 bg-stone-900/40 hover:border-stone-700"
+                      }`}
+                    >
+                      <div
+                        className={`font-serif text-[12.5px] ${
+                          sel ? "text-stone-100" : "text-stone-300"
+                        }`}
+                      >
+                        {p.label.replace(/\s*분석\s*$/, "")}
+                      </div>
+                      <div className="mt-0.5 font-mono text-[10px] text-stone-500">
+                        {p.description}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          ) : (
-            <p className="mt-4 text-sm text-cyan-200/80">
-              <span className="font-semibold text-cyan-300">{totalNat} NAT</span>{" "}
-              <CopyWithBreaks as="span">
-                가 소모됩니다. 계속할까요?
-              </CopyWithBreaks>
-            </p>
+          )}
+
+          {/* 잔량 */}
+          <div className="mt-4 flex items-center justify-between rounded-md border border-stone-800/60 bg-stone-950/40 px-3 py-2 text-[12px]">
+            <span className="text-stone-400">보유 NAT</span>
+            <span className="tabular-nums">
+              <span className="text-stone-200">{balance}</span>
+              <span className="mx-1.5 text-stone-700">→</span>
+              <span className={canAfford ? "text-stone-200" : "text-amber-300"}>
+                {afterBalance}
+              </span>
+            </span>
+          </div>
+
+          {!canAfford && (
+            <div className="mt-3 rounded-md border border-amber-400/30 bg-amber-400/[0.05] px-3 py-2 text-[12px] text-amber-200/95">
+              잔액이 부족합니다. NAT를 충전한 뒤 다시 시도해 주세요.
+              <div className="mt-1 font-mono text-[11px] tabular-nums text-amber-200/70">
+                필요 {natTotal} NAT · 보유 {balance} NAT
+              </div>
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="mt-3 rounded-md border border-rose-400/30 bg-rose-400/[0.05] px-3 py-2 text-[12px] text-rose-200/95">
+              <CopyWithBreaks as="span">{errorMessage}</CopyWithBreaks>
+            </div>
           )}
 
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
@@ -122,14 +244,14 @@ export function NatSpendConfirmModal({
               type="button"
               onClick={onCancel}
               disabled={loading}
-              className="rounded-lg border border-zinc-600 bg-zinc-950/50 px-4 py-2.5 text-sm font-medium text-zinc-200 transition-colors hover:border-zinc-500 hover:bg-zinc-800/80 disabled:opacity-50"
+              className="rounded-md border border-stone-700 bg-stone-950/50 px-4 py-2.5 text-[12.5px] font-medium text-stone-200 transition-colors hover:border-stone-600 hover:bg-stone-800/60 disabled:opacity-50"
             >
               취소
             </button>
             {!canAfford ? (
               <Link
-                href="/billing"
-                className="rounded-lg bg-cyan-500 px-4 py-2.5 text-center text-sm font-semibold text-zinc-950 shadow-md shadow-cyan-500/15 transition-colors hover:bg-cyan-400"
+                href="/pricing"
+                className="inline-flex items-center justify-center rounded-md bg-sky-500 px-4 py-2.5 text-center text-[12.5px] font-semibold text-stone-950 transition-colors hover:bg-sky-400"
               >
                 NAT 충전하기
               </Link>
@@ -138,9 +260,10 @@ export function NatSpendConfirmModal({
                 type="button"
                 onClick={onConfirm}
                 disabled={loading}
-                className="rounded-lg bg-cyan-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 shadow-md shadow-cyan-500/15 transition-colors hover:bg-cyan-400 disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-1.5 rounded-md bg-sky-500 px-4 py-2.5 text-[12.5px] font-semibold text-stone-950 transition-colors hover:bg-sky-400 disabled:opacity-50"
               >
-                {loading ? "처리 중…" : confirmLabel}
+                <Sparkles size={11} aria-hidden="true" />
+                {loading ? "진입 중…" : `${natTotal} NAT 차감 후 분석 진입`}
               </button>
             )}
           </div>

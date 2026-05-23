@@ -131,12 +131,17 @@ export async function seedEpisode(
 
 /**
  * Always inserts a new analysis_runs row (no business UNIQUE). Caller manages cleanup.
+ *
+ * createdAt 미지정 시 Postgres NOW() (E2E Supabase 서버 시간) 적용.
+ * 명시 시 ISO 8601 형식 + timezone suffix 필수 (예: '2026-05-12T00:00:00Z',
+ * '2026-05-12T09:00:00+09:00'). Postgres timestamptz 컬럼이 UTC 로 정규화.
  */
 export async function seedAnalysisRun(
   episodeId: number,
   workId: number,
   mockResult?: MockSixAxisScores | Record<string, unknown>,
   client: SupabaseClient = getAdminClient(),
+  createdAt?: string,
 ): Promise<number> {
   const result_json =
     mockResult && typeof mockResult === 'object' && 'dimensions' in mockResult
@@ -149,11 +154,154 @@ export async function seedAnalysisRun(
       work_id: workId,
       agent_version: 'e2e-mock-v1',
       result_json,
+      ...(createdAt ? { created_at: createdAt } : {}),
     })
     .select('id')
     .single();
   if (error) throw new Error(`seedAnalysisRun insert failed: ${error.message}`);
   return Number(data.id);
+}
+
+const STUDIO_BASELINE_TAG = 'studio-baseline';
+
+type StudioBaselineWorkSpec = {
+  title: string;
+  genre: string;
+  status: '연재중' | '휴재' | '완결';
+  scores: number[]; // 회차당 overall_score (Sparkline + agentScore)
+  /**
+   * 작품 내 모든 analysis_runs 의 created_at 고정값 (ISO 8601, UTC suffix 권장).
+   * 결정성 확보 — page.clock 의 mock 시점과 매핑되어 baseline 라벨 ("X일 전" 등) 안정화.
+   * lastAnalyzedAt = MAX(created_at) 라 모든 run 동일 시점으로 두어도 결과 동일.
+   */
+  createdAt: string;
+};
+
+/**
+ * Phase 2-D-7 /studio visual baseline용 작품 4건 idempotent seed.
+ *
+ * 작품 구성 (filter 분기 + GenreTag 색상 5종 + Sparkline 패턴 다양화):
+ *   - 로맨스 / 연재중 / 5화 / rising trend (avg 84 → amber 80+)
+ *   - 무협 / 연재중 / 6화 / high stable (avg 91 → emerald 90+)
+ *   - 판타지 / 휴재 / 4화 / low (avg 66 → orange 60+)
+ *   - 스포츠 / 완결 / 6화 / mid-high stable (avg 88 → amber 80+)
+ *
+ * 'studio-baseline' 태그로 격리 — 기존 seedEmptyWork ('e2e' 태그) 와 공존.
+ * 동일 author + 동일 title 조합으로 idempotent (기존 행 발견 시 재사용, 회차/분석은 upsert).
+ */
+export async function seedStudioBaselineWorks(
+  authUserId: string,
+  client: SupabaseClient = getAdminClient(),
+): Promise<number[]> {
+  // clock fixed = '2026-05-13T12:00:00+09:00' 기준 라벨 매핑:
+  //   2026-05-12 → "1일 전" / 2026-05-06 → "1주 전" / 2026-04-23 → "2주 전" / 2026-02-12 → "3개월 전"
+  const specs: StudioBaselineWorkSpec[] = [
+    {
+      title: 'E2E baseline · 황실의 그림자',
+      genre: '로맨스',
+      status: '연재중',
+      scores: [78, 82, 89, 84, 87],
+      createdAt: '2026-05-12T00:00:00Z',
+    },
+    {
+      title: 'E2E baseline · 검신 무제',
+      genre: '무협',
+      status: '연재중',
+      scores: [88, 90, 89, 92, 91, 93],
+      createdAt: '2026-05-06T00:00:00Z',
+    },
+    {
+      title: 'E2E baseline · 마지막 마법사',
+      genre: '판타지',
+      status: '휴재',
+      scores: [62, 68, 70, 65],
+      createdAt: '2026-04-23T00:00:00Z',
+    },
+    {
+      title: 'E2E baseline · 구단주의 백서',
+      genre: '스포츠',
+      status: '완결',
+      scores: [85, 88, 89, 87, 90, 88],
+      createdAt: '2026-02-12T00:00:00Z',
+    },
+  ];
+
+  const userId = await resolvePublicUserIdByAuthId(client, authUserId);
+  const workIds: number[] = [];
+
+  for (const spec of specs) {
+    // 1) work upsert by (author_id, title) — idempotent on rerun
+    const { data: existing, error: lookupErr } = await client
+      .from('works')
+      .select('id')
+      .eq('author_id', userId)
+      .eq('title', spec.title)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (lookupErr) throw new Error(`seedStudioBaselineWorks lookup failed: ${lookupErr.message}`);
+
+    let workId: number;
+    if (existing) {
+      workId = Number(existing.id);
+    } else {
+      const { data: inserted, error: insErr } = await client
+        .from('works')
+        .insert({
+          title: spec.title,
+          genre: spec.genre,
+          status: spec.status,
+          author_id: userId,
+          tags: [STUDIO_BASELINE_TAG],
+        })
+        .select('id')
+        .single();
+      if (insErr) throw new Error(`seedStudioBaselineWorks insert failed: ${insErr.message}`);
+      workId = Number(inserted.id);
+    }
+    workIds.push(workId);
+
+    // 2) 회차별 episode + analysis_run upsert
+    //    seedEpisode는 (work_id, episode_number) UNIQUE로 idempotent.
+    //    seedAnalysisRun은 매번 INSERT → 중복 방지 위해 사전 조회 후 skip.
+    for (let i = 0; i < spec.scores.length; i++) {
+      const episodeNumber = i + 1;
+      const episodeId = await seedEpisode(
+        workId,
+        {
+          episodeNumber,
+          title: `${spec.title} ${episodeNumber}화`,
+        },
+        client,
+      );
+
+      const { data: existingRun } = await client
+        .from('analysis_runs')
+        .select('id')
+        .eq('episode_id', episodeId)
+        .eq('work_id', workId)
+        .eq('agent_version', 'e2e-mock-v1')
+        .limit(1)
+        .maybeSingle();
+      if (existingRun) continue;
+
+      await seedAnalysisRun(
+        episodeId,
+        workId,
+        {
+          hook: spec.scores[i],
+          character: spec.scores[i],
+          world: spec.scores[i],
+          tension: spec.scores[i],
+          emotion: spec.scores[i],
+          originality: spec.scores[i],
+        },
+        client,
+        spec.createdAt,
+      );
+    }
+  }
+
+  return workIds;
 }
 
 /**

@@ -7,6 +7,7 @@ import { ensureStorageState } from './fixtures/auth';
 async function globalSetup(_config: FullConfig): Promise<void> {
   await ensureStorageState('writer');
   await ensureStorageState('admin');
+  await ensureStorageState('empty');
 }
 
 export default globalSetup;

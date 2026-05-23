@@ -132,7 +132,7 @@ export async function listAdminInquiries(
         userAuthId: (r.user_auth_id as string | null) ?? null,
         userEmail: email,
         userNickname: nickname,
-        category: (r.category as string | null) ?? "general",
+        category: (r.category as string | null) ?? "etc",
         title: (r.title as string | null) ?? "",
         content: (r.content as string | null) ?? "",
         replyEmail:

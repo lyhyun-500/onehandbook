@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { TagChip, PopularTagChip } from "@/components/atoms/TagChip";
 
 function normalizeTagToken(raw: string): string {
   const t = String(raw ?? "").trim();
@@ -92,7 +93,7 @@ export function TagInput({
       try {
         const res = await fetch(
           `/api/tags/search?q=${encodeURIComponent(q)}&limit=12`,
-          { cache: "no-store" }
+          { cache: "no-store" },
         );
         const data = (await res.json().catch(() => ({}))) as { tags?: string[] };
         if (lastQueryRef.current !== q) return;
@@ -117,30 +118,34 @@ export function TagInput({
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  return (
-    <div ref={rootRef} className="rounded-lg border border-zinc-700 bg-zinc-900/40 p-3">
-      <div className="flex flex-wrap gap-2">
-        {normalized.map((t) => (
-          <span
-            key={t.toLowerCase()}
-            className="inline-flex items-center gap-1 rounded-full border border-zinc-700 bg-zinc-800 px-2.5 py-1 text-sm text-zinc-100"
-          >
-            <span className="text-zinc-300">#{t}</span>
-            <button
-              type="button"
-              onClick={() => remove(t)}
-              className="rounded-full px-1 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
-              aria-label={`${t} 태그 삭제`}
-            >
-              ×
-            </button>
-          </span>
-        ))}
-      </div>
+  const popularFiltered = popular
+    .map((t) => ({ raw: t, prefix: t.startsWith("#") ? t : `#${t}` }))
+    .filter(
+      (t) =>
+        !normalized.some(
+          (x) => x.toLowerCase() === t.raw.toLowerCase().replace(/^#+/, ""),
+        ),
+    )
+    .slice(0, 20);
 
-      <div className="relative mt-3">
-        <div className="flex gap-2">
+  return (
+    <div ref={rootRef} className="flex flex-col gap-3">
+      {normalized.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {normalized.map((t) => (
+            <TagChip
+              key={t.toLowerCase()}
+              tag={`#${t}`}
+              onRemove={() => remove(t)}
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="relative">
+        <div className="flex items-center gap-2">
           <input
+            type="text"
             value={input}
             onChange={(e) => {
               setInput(e.target.value);
@@ -148,7 +153,6 @@ export function TagInput({
             }}
             onFocus={() => setOpen(true)}
             onKeyDown={(e) => {
-              // 한글 IME 조합 중 Enter 처리 시 마지막 글자 중복 입력 방지
               if (e.nativeEvent.isComposing) return;
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -164,21 +168,25 @@ export function TagInput({
               }
             }}
             placeholder="태그 입력 후 Enter (예: #회귀물)"
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            className="flex-1 rounded-md border border-stone-800/80 bg-stone-900/60 px-4 py-2.5 font-serif text-[13.5px] text-stone-100 placeholder:text-stone-600 focus:border-sky-400/40 focus:outline-none"
           />
           <button
             type="button"
             onClick={addFromInput}
-            className="shrink-0 rounded-lg border border-zinc-600 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
+            className="rounded-md border border-stone-700 bg-stone-900/60 px-4 py-2.5 font-serif text-[13px] text-stone-200 hover:border-sky-400/40 hover:text-sky-200"
           >
             추가
           </button>
         </div>
 
         {open && (loading || suggestions.length > 0 || input.trim()) && (
-          <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/40">
+          <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-md border border-stone-800 bg-stone-950/95 shadow-[0_18px_48px_-12px_rgba(0,0,0,0.7)] backdrop-blur">
             <div className="max-h-56 overflow-y-auto p-2">
-              {loading && <p className="px-2 py-2 text-xs text-zinc-500">검색 중…</p>}
+              {loading && (
+                <p className="px-2 py-2 font-mono text-[10px] uppercase tracking-widest text-stone-500">
+                  검색 중…
+                </p>
+              )}
               {!loading && suggestions.length === 0 && normalizeTagToken(input) && (
                 <button
                   type="button"
@@ -187,16 +195,18 @@ export function TagInput({
                     setInput("");
                     setOpen(false);
                   }}
-                  className="w-full rounded-lg px-2 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-900"
+                  className="w-full rounded-md px-2 py-2 text-left font-serif text-[13px] text-stone-300 hover:bg-stone-900"
                 >
                   새 태그 만들기:{" "}
-                  <span className="font-semibold text-cyan-300">
+                  <span className="font-mono text-sky-300">
                     #{normalizeTagToken(input)}
                   </span>
                 </button>
               )}
               {suggestions
-                .filter((s) => !normalized.some((t) => t.toLowerCase() === s.toLowerCase()))
+                .filter(
+                  (s) => !normalized.some((t) => t.toLowerCase() === s.toLowerCase()),
+                )
                 .slice(0, 12)
                 .map((s) => (
                   <button
@@ -207,7 +217,7 @@ export function TagInput({
                       setInput("");
                       setOpen(false);
                     }}
-                    className="w-full rounded-lg px-2 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-900"
+                    className="w-full rounded-md px-2 py-2 text-left font-serif text-[13px] text-stone-200 hover:bg-stone-900"
                   >
                     #{s}
                   </button>
@@ -217,27 +227,22 @@ export function TagInput({
         )}
       </div>
 
-      {popular.length > 0 && (
-        <div className="mt-4 border-t border-zinc-800/70 pt-3">
-          <p className="mb-2 text-xs font-medium text-zinc-500">요즘 인기 있는 태그</p>
-          <div className="flex flex-wrap gap-2">
-            {popular
-              .filter((t) => !normalized.some((x) => x.toLowerCase() === t.toLowerCase()))
-              .slice(0, 20)
-              .map((t) => (
-                <button
-                  key={t.toLowerCase()}
-                  type="button"
-                  onClick={() => addTag(t)}
-                  className="rounded-full border border-zinc-700 bg-zinc-950/40 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-900"
-                >
-                  #{t}
-                </button>
-              ))}
+      {popularFiltered.length > 0 && (
+        <div className="border-t border-stone-800/50 pt-4">
+          <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-stone-500">
+            요즘 인기 태그
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {popularFiltered.map(({ raw, prefix }) => (
+              <PopularTagChip
+                key={raw.toLowerCase()}
+                tag={prefix}
+                onAdd={() => addTag(raw)}
+              />
+            ))}
           </div>
         </div>
       )}
     </div>
   );
 }
-

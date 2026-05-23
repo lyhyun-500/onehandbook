@@ -144,6 +144,25 @@ body {
 }
 
 /*
+ * J-B 정정 (LEE 라운드2): 전역 클릭 active 피드백 — mousedown 순간 scale 살짝 줄어듦.
+ * 모든 button + role="button" 일괄 적용 (입력 input/textarea 제외 — 텍스트 입력은 active scale 부자연).
+ * reduced-motion 환경에서는 비활성.
+ * 강도 조율: scale(0.97) + 100ms — 표준값. LEE 시각검증 후 미세 조율 사이클.
+ */
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active {
+  transform: scale(0.97);
+  transition: transform 100ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button:active,
+  [role="button"]:active {
+    transform: none;
+  }
+}
+
+/*
  * Input autofill override (ADR-0024 시각 검증으로 발견된 함정):
  * 브라우저 user-agent stylesheet 가 autofill 시 연보라 배경/검정 글자 강제 박음.
  * box-shadow inset 트릭 + transition 5000s 로 토큰 색상 유지.

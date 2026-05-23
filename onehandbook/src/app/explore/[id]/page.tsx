@@ -6,6 +6,7 @@ import {
   agentScoreFromAnalysisRuns,
   type AnalysisRunRow,
 } from "@/lib/analysisSummary";
+import { formatEpisodeLabel } from "@/lib/episodeLabel";
 
 const STATUS_LABEL: Record<string, string> = {
   연재중: "연재중",
@@ -115,9 +116,13 @@ export default async function ExploreWorkPage({
               >
                 <div className="min-w-0">
                   <span className="text-sm tabular-nums text-cyan-400/90">
-                    {ep.episode_number}화
+                    {formatEpisodeLabel(
+                      { episode_number: ep.episode_number, title: null },
+                      { withTitle: false },
+                    )}
                   </span>
-                  <span className="ml-3 text-zinc-100">{ep.title}</span>
+                  <span className="mx-2 text-zinc-600">·</span>
+                  <span className="text-zinc-100">{ep.title}</span>
                 </div>
                 <span className="shrink-0 text-xs text-zinc-500">
                   {new Date(ep.created_at).toLocaleDateString("ko-KR")}

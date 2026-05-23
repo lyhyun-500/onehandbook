@@ -78,6 +78,57 @@ export function agentScoresByWorkFromRuns(
   return out;
 }
 
+/**
+ * 작품 id → 최근 N화의 종합 점수 배열 (회차 오름차순).
+ * Phase 2-D StudioWorkCard 의 Sparkline 박음.
+ */
+export function recentScoresByWorkFromRuns(
+  runs: Array<AnalysisRunRow & { work_id: number }>,
+  limit = 5,
+): Record<number, number[] | null> {
+  const byWork = new Map<number, AnalysisRunRow[]>();
+  for (const r of runs) {
+    const wid = r.work_id;
+    if (!byWork.has(wid)) byWork.set(wid, []);
+    byWork.get(wid)!.push(r);
+  }
+  const out: Record<number, number[] | null> = {};
+  for (const [wid, list] of byWork) {
+    const latest = latestAnalysisPerEpisode(list);
+    // episode_id 오름차순으로 정렬 후 마지막 N개 박음 (회차 순서대로 추이)
+    const sorted = [...latest.values()].sort((a, b) => {
+      const ea = Number((a as unknown as { episode_id?: unknown }).episode_id) || 0;
+      const eb = Number((b as unknown as { episode_id?: unknown }).episode_id) || 0;
+      return ea - eb;
+    });
+    const recent = sorted.slice(-limit).map((r) => r.result_json.overall_score);
+    out[wid] = recent.length > 0 ? recent : null;
+  }
+  return out;
+}
+
+/**
+ * 작품 id → 마지막 분석 created_at (ISO string). 분석 부재 시 null.
+ * Phase 2-D StudioWorkCard 의 "마지막 분석 · {date}" 박음.
+ */
+export function lastAnalyzedAtByWorkFromRuns(
+  runs: Array<AnalysisRunRow & { work_id: number }>,
+): Record<number, string | null> {
+  const byWork = new Map<number, string>();
+  for (const r of runs) {
+    const wid = r.work_id;
+    const existing = byWork.get(wid);
+    if (!existing || r.created_at > existing) {
+      byWork.set(wid, r.created_at);
+    }
+  }
+  const out: Record<number, string | null> = {};
+  for (const [wid, ts] of byWork) {
+    out[wid] = ts;
+  }
+  return out;
+}
+
 export type RangeScoreStats = {
   /** 선택된 회차 수 */
   selectedCount: number;

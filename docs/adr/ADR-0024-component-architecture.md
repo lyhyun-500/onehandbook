@@ -1,12 +1,13 @@
 # ADR-0024: 컴포넌트 아키텍처 — atoms 위치 / 0 dep / forwardRef / cn() / 시각 검증
 
 - **Status**: Accepted
-- **Date**: 2026-05-09
+- **Date**: 2026-05-09 (페이즈 1) / 2026-05-10 갱신 (페이즈 2-A — Spinner 박음 + 사용처 보정 정책)
 - **Related**:
   - ADR-0022 (디자인 토큰) — atoms 가 사용하는 토큰 정의.
   - ADR-0023 (Noto_Sans_KR 제거) — fallback chain 결정.
   - 페이즈 1 Commit 3 (이 ADR 의 적용 사례 — Button / Input / Card 첫 박힘).
   - 페이즈 1 Commit 4 (Badge / Modal — 본 ADR 정책 따름).
+  - **페이즈 2-A** (Spinner 박음 + `/auth/callback` 인라인 Spinner 2건 교체 — 사용처 보정 첫 사례).
   - 페이즈 2~5 atoms 추가 시 기준점.
 
 ---
@@ -227,6 +228,177 @@ ghost: "border border-border bg-transparent text-foreground hover:bg-accent-mute
 - `cn()` 사용.
 - atoms-preview 페이지에 새 atoms 섹션 추가 (시각 검증 의무).
 - 서브컴포넌트가 있으면 named export.
+
+### 결정 10 — Spinner 정책 (페이즈 2-A 박음)
+
+페이즈 2-A 에서 atoms 6 번째로 박음 — 단일 variant, size 만 분기.
+
+#### a. 단일 variant (variant 없음)
+
+- 로딩 상태 표시는 시각 톤 분기가 의미 없음 — 단일 형태 유지.
+- 색상은 `text-accent` 토큰 매핑 + className override 로 호출처별 보정 가능 (예: 빨간 영역에서 `text-destructive` override).
+
+#### b. size scale: sm (h-4) / md (h-6, default) / lg (h-10)
+
+- sm: 텍스트 옆 인라인 ("분석 중..." 옆 박음).
+- md: 카드 내부 / 버튼 로딩 / 일반 컨테이너 (default).
+- lg: 풀스크린 로딩 (예: `/auth/callback` 의 OAuth 교환 대기) — Button 의 `lg` 와 사이즈 일치 안 함 (Spinner 의 의도된 사용 ≠ Button).
+
+#### c. currentColor 기반 토큰 매핑
+
+```
+border-2 border-current/20 border-t-current text-accent
+```
+
+- `text-accent` → `currentColor` = 잉크 블루.
+- `border-current/20` → ring 은 currentColor 의 20% 투명도 (Tailwind v4 의 `current/20` 박음).
+- `border-t-current` → top 만 full currentColor → 회전 시 시각 효과.
+- 호출처에서 `<Spinner className="text-destructive" />` 박으면 빨간색 spinner — 토큰 의존성 끊지 않고 색상만 override.
+
+#### d. role="status" + aria-label
+
+- `role="status"` 표준 — 스크린 리더가 로딩 상태 인식.
+- `aria-label` default: "로딩 중" — `label` prop 으로 override 가능 (예: "분석 중", "저장 중").
+
+#### e. forwardRef 박음 (결정 3 일관)
+
+- imperative 패턴 (Modal 의 결정 8-bis (f)) 박지 않음 — Spinner 는 일반 요소.
+- HTMLSpanElement 기반 (`<span>` + `inline-block` — 텍스트 옆 박을 수 있도록).
+
+### 결정 11 — atoms 사용처 보정 정책 (페이즈 2-A 박음)
+
+페이즈 2-A 의 첫 사용처 보정 사례:
+
+#### 사례 — `/auth/callback/page.tsx` 의 인라인 Spinner 2건 → Spinner atom 교체
+
+| 위치 | 박힌 코드 | 보정 |
+|---|---|---|
+| line 14-22 (메인 로딩 컴포넌트) | `<div className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-600 border-t-cyan-400" />` | `<Spinner size="lg" />` |
+| line 96-100 (Suspense fallback) | 동일 인라인 박음 | `<Spinner size="lg" />` |
+
+#### 정책 박음
+
+새 atoms 박힐 때 **이미 박힌 인라인 사용처 (raw 컴포넌트) 가 있으면 같은 commit 에서 교체**:
+
+1. **장점**: atom 추출 + 첫 reuse 검증 + 토큰 매핑 일관 적용 = 단일 commit 에서 검증 회로 닫힘.
+2. **단점**: 페이지 디자인 마이그레이션 (페이즈 2-B~) 의 "큰" 변경과 같은 commit 에 박히면 진단 어려움 → **인라인 → atom 교체 만** 박음, 다른 시각 변경 박지 않음.
+3. **분리 정책**: 사용처가 페이지 마이그레이션 대상이면 atom 추가 commit 과 페이지 마이그레이션 commit 분리. 인라인 Spinner 처럼 "이미 박힌 사용처" 만 atom 추가 commit 에 박음 (시각 회귀 가드 — 인라인과 atom 의 시각 동등성 검증).
+
+#### Spinner 보정 시 시각 변경 주의
+
+- 기존: `border-zinc-600` (ring) + `border-t-cyan-400` (top) — 잿빛 ring + 시안 top.
+- 보정 후: `border-current/20` (ring) + `border-t-current` (top) + `text-accent` (잉크 블루) — 잉크 블루 ring + 잉크 블루 top.
+- **시각 톤 변경**: 시안 (`#22d3ee`) → 잉크 블루 (`#2563eb`). 토큰 일관성 ↑.
+- baseline 박힌 후 의도된 변경 → snapshot baseline 갱신 (LEE 게이트). 본 사례는 atoms-preview baseline 만 영향 (auth/callback 은 baseline 박지 않음 — phase-1-end snapshot 미포함).
+
+#### 빈틈 박힘 사례 (페이즈 2-A LEE 시각 검증으로 발견)
+
+페이즈 2-A 박은 후 LEE 가 `/auth/callback` 시각 확인 시 **추가 발견 2건**:
+
+| # | 발견 | 보정 처리 |
+|---|------|-----------|
+| 1 | `/auth/callback/page.tsx` 의 cyan-300 / cyan-200 링크 (`로그인 페이지로 돌아가기`) — 토큰 미적용 하드코딩 색상 | **skip + 처리 시점 박제** |
+| 2 | `SITE_NAME` 박힌 "Novel Agent" 텍스트 + 그 아래 별도 박힌 "Novel Agent" 라벨 — 텍스트 중복 박힘 (디자인 의도 불명) | **skip + 처리 시점 박제** |
+
+#### skip 박은 사유 + 처리 시점
+
+**skip 박은 사유**:
+- `/auth/callback` 자체가 **곧 마이그레이션 박힐 페이지** (페이즈 2-D 로그인 모달 작업 또는 별도 페이즈) — 곧 사라질 코드의 보정 = ROI 낮음.
+- Phase 2-A 깔끔 마무리 (Spinner atom + 인라인 2건 교체 만 박음) 가 commit 진단 명확.
+
+**처리 시점**:
+- 페이즈 2-D 로그인 모달 작업 시 `/auth/callback` 의 OAuth 후속 흐름 점검 시점에 일괄 박음.
+- 또는 별도 "auth/callback 디자인 마이그레이션" 페이즈 박힐 때 — 본 ADR 의 갱신으로 처리 트리거 박힘.
+
+**박제 이유**: 발견 자체가 자산. 빈틈 박지 않으면 페이즈 2-D 진입 시 잊힘 → ADR 박혀있어야 트리거.
+
+#### 빈틈 사례 #2 — 페이즈 2-B-4 의 SiteFooter 누락 (페이지 마이그레이션 시점)
+
+페이지 마이그레이션 (page.tsx 풀 마이그레이션) 시점에 발견:
+
+| 영역 | 누락 내용 | 발견 경위 | 처리 |
+|---|---|---|---|
+| `src/components/SiteFooter.tsx` | zinc palette 박힌 footer (Phase 1 이전 톤). `layout.tsx` 가 모든 페이지에 렌더 — 랜딩 박음 page.tsx 자체 footer 추가하면서 footer 2개 동시 노출 | LEE 의 Lighthouse Accessibility audit (CONTRAST fail) 가 SiteFooter 의 zinc 톤 잡아냄 — Phase 2-B-4 의 자체 footer 가 아니라 layout 의 SiteFooter 가 함정 | Phase 2-B-4.5 에서 SiteFooter 박음 stone 마이그레이션 + page.tsx 자체 footer 제거 |
+
+**누락 사유**: page.tsx 마이그레이션 시점에 layout.tsx 박힌 컴포넌트 (SiteFooter / FloatingInquiryButton / AnalysisJobsProvider) 박음 인지 못함. 페이지 단위로만 사고하면 사이트 전역 컴포넌트 (footer/header/floating UI) 가 시야에서 빠짐.
+
+**정책 강화 (페이즈 3+ 페이지 마이그레이션 시점 적용)**:
+
+페이지 마이그레이션 사전 점검 표준 (LEE 인사이트):
+
+1. **layout.tsx 박음 검토 의무** — 마이그레이션 대상 페이지가 들어가는 layout 박힌 컴포넌트 모두 list-up. 시안과 톤/항목 비교.
+2. **같은 영역 (footer/header/sidebar) 컴포넌트 중복 검사** — 페이지 자체 footer/header 박을 때 layout 박힌 동일 영역 컴포넌트 박혀있는지 검색. 중복 박힐 시 통일 우선 (자체 박지 않고 layout 컴포넌트 마이그레이션).
+3. **사이트 전역 영향 검토** — layout 컴포넌트 마이그레이션 시 다른 페이지 (`/login`, `/pricing`, `/terms` 등) 박음 시각 영향 list-up. commit body 박음 명시.
+4. **사전 보고 박음 표준 항목 추가** — "layout.tsx 박힌 영역 검토 결과: ___" 박음 + "사이트 전역 영향: ___" 박음.
+
+**Lighthouse 가 잡은 안전망**: LEE 의 Lighthouse Accessibility audit 박힌 정확한 selector 식별이 본 빈틈 발견의 핵심 layer. atoms-preview 시각 검증 (결정 8) + Lighthouse audit (Phase 2-B 박음 도입) 두 layer 박힘 박음 페이지 마이그레이션 commit 의 안전망 강화.
+
+### 결정 12 — atom 추출 시 사용처 보정 범위 + ROI 게이트 (페이즈 2-A LEE 인사이트 박제)
+
+페이즈 2-A 의 빈틈 사례 박힌 후 정책 강화:
+
+#### 사용처 보정 범위 (3 단)
+
+새 atom 추출 시 같은 파일 grep 검색 + 보정 범위 평가:
+
+1. **인라인 컴포넌트** (직접 추출 대상) — 무조건 보정 박음 (atom 추출의 본 목적).
+2. **같은 파일의 다른 하드코딩 색상 / 토큰 미적용 영역** — 관련 보정 박음 (ROI 게이트 통과 시).
+3. **같은 파일의 다른 하드코딩 패턴** (텍스트 중복, 레거시 패턴 등) — 박지 않음 (atom 추출 범위 외 — 별도 commit 또는 페이지 마이그레이션 시점).
+
+#### ROI 평가 게이트 (박음 vs skip 결정)
+
+같은 파일의 추가 보정 (범위 2) 박을 때 평가:
+
+| 조건 | 결정 |
+|---|---|
+| 페이지 마이그레이션 임박 (1~2 페이즈 내) | **skip** + ADR 박제 (처리 시점 명시) |
+| 페이지 마이그레이션 미박힘 또는 페이즈 5+ | **박음** + atom 추출 commit 에 포함 |
+| 페이지 자체가 production 가시성 0 (예: `/dev/*`) | 박음 (기존 atoms-preview 패턴) |
+| 페이지가 핵심 사용자 플로우 + 마이그레이션 미정 | **박음** (사용자 가시 시각 일관성 우선) |
+
+#### 빈틈 박지 않기 정책
+
+skip 박은 발견은 반드시 **ADR 박제** — 페이지 마이그레이션 시점 잊히지 않도록:
+- ADR-0024 의 "결정 11 빈틈 박힘 사례" 처럼 표 박음.
+- 처리 시점 명시 (페이즈 X 또는 별도).
+- 박제 안 하면 페이지 마이그레이션 박힐 때 발견 손실 → 같은 빈틈 박힘 반복 위험.
+
+#### 메타 회귀
+
+LEE 시각 검증이 atom 추출 commit 의 빈틈 자체를 잡아냄 — 결정 8 의 "시각 회귀 1차 안전망" 정책이 사용처 보정 commit 에서도 작동. atoms-preview 갱신 + 사용처 시각 확인 박은 LEE 게이트가 commit 진단의 핵심 layer.
+
+### 결정 13 — dev preview 페이지 명명 정책 (페이즈 2-B-3 박음)
+
+페이즈 1 의 `atoms-preview` 박힌 시각 검증 페이지가 페이즈 2~5 도메인 컴포넌트 박힐 때 재사용 박음. 명명 표준 박음.
+
+#### 명명 패턴
+
+```
+src/app/dev/<domain>-preview/page.tsx
+```
+
+| 페이즈 | 도메인 | 경로 | 박힌 컴포넌트 |
+|---|---|---|---|
+| 1 | atoms | `src/app/dev/atoms-preview/page.tsx` | Button / Input / Card / Badge / Modal / Spinner |
+| 2-B | landing | `src/app/dev/landing-preview/page.tsx` | LiveScoreCard (2-B-3) |
+| 3+ (예정) | studio / analysis / ... | `src/app/dev/<domain>-preview/page.tsx` | 도메인 컴포넌트 박힐 때 신설 |
+
+#### 박힌 정책
+
+- **격리 시각 검증** — 도메인 컴포넌트 박을 때 페이지 마이그레이션 전 단독 시각 확인 박음. 시안 일치 + 인터랙션 동작 박힘 확인.
+- **/dev/* proxy 차단 재사용** — proxy.ts 박힌 production 차단 정책 (NODE_ENV=production redirect) 그대로 적용. Vercel preview 도 차단됨.
+- **시안 의도 톤 보존** — preview 페이지 자체 박음 시안의 배경/톤 박음 (예: stone-950 + radial gradient). 컴포넌트가 실제 박힐 페이지의 톤을 가짜로 박지 말 것 — 컴포넌트가 톤에 의존하면 컴포넌트 자체에 박힘.
+- **신설 시점** — 도메인 컴포넌트 박는 commit 에 동시 박음. 페이지 마이그레이션 commit 박힐 때 preview 페이지 박지 않음 (preview 는 컴포넌트 시각 검증 용도, 페이지 자체 검증은 visual baseline 박음).
+
+#### scoreColor 사용 정책 (LiveScoreCard 박음 첫 사용처 — 부수 메모)
+
+페이즈 2-B-2 박힌 `scoreColor` utility 의 사용 범위:
+
+- **6축 (객관 평가) — `scoreColor` 사용**: 90+ emerald / 80+ amber-200 / 70+ amber-300/90 / 60+ orange / <60 rose. 시안 명세 톤 그대로.
+- **종합 점수 (후한 톤) — 인라인 분기 박음**: >=80 emerald / else amber-200. 시안 박힌 한 단계 후한 톤 박음 (사용자에게 종합 점수는 더 관대하게 박힘 — 마케팅 의도). `scoreColor` 박지 않음.
+- **막대그래프 fill — oklch 인라인 + `style.background`**: Tailwind class 박을 수 없는 240ms transition + 부드러운 색상 보간 박음 박힘. `scoreColor.bg` 박지 않음.
+
+페이즈 4 (Analysis Report) 박힐 때 본 정책 재검토 박음 — Analysis Report 의 종합 점수가 객관 톤 박음일지 후한 톤 박음일지 결정 박힐 시점.
 
 ---
 

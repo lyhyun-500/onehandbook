@@ -5,10 +5,12 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type {
@@ -24,6 +26,7 @@ import {
   isContentUnchangedFailure,
   isUserCancelledFailure,
 } from "@/lib/analysis/analysisJobFailureHeuristics";
+import { formatEpisodeLabel } from "@/lib/episodeLabel";
 
 export type JobStatus = AnalysisJobListItem["status"];
 
@@ -68,7 +71,7 @@ function analysisHref(j: AnalysisJobListItem): string {
   if (j.job_kind === "holistic_batch") {
     return `/works/${j.work_id}/analysis`;
   }
-  return `/works/${j.work_id}/analysis?focus=${j.episode_id}`;
+  return `/works/${j.work_id}/episodes/${j.episode_id}`;
 }
 
 function analysisJobRowToListItem(
@@ -1157,20 +1160,20 @@ function ToastStack({
   if (toasts.length === 0) return null;
   return (
     <div
-      className="pointer-events-none fixed bottom-6 right-6 z-[80] flex w-[min(calc(100vw-3rem),22rem)] flex-col gap-2"
+      className="pointer-events-none fixed bottom-6 right-6 z-[100] flex w-[min(calc(100vw-3rem),22rem)] flex-col gap-2"
       aria-live="polite"
     >
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="pointer-events-auto flex flex-col gap-2 rounded-xl border border-zinc-700 bg-zinc-900/95 px-4 py-3 text-sm text-zinc-100 shadow-xl shadow-black/40 backdrop-blur-md"
+          className="pointer-events-auto flex flex-col gap-2 rounded-xl border border-stone-700 bg-stone-900/95 px-4 py-3 text-sm text-stone-100 shadow-xl shadow-black/40 backdrop-blur-md"
         >
           <div className="flex items-start justify-between gap-2">
             <p className="leading-snug">{t.message}</p>
             <button
               type="button"
               onClick={() => onDismiss(t.id)}
-              className="shrink-0 rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+              className="shrink-0 rounded p-1 text-stone-400 hover:bg-stone-800 hover:text-stone-300"
               aria-label="닫기"
             >
               ×
@@ -1183,7 +1186,7 @@ function ToastStack({
                 if (t.action?.jobId) onMarkJobRead(t.action.jobId);
                 onDismiss(t.id);
               }}
-              className="text-sm font-medium text-cyan-400 hover:text-cyan-300"
+              className="text-sm font-medium text-sky-400 hover:text-sky-300"
             >
               {t.action.label}
             </Link>
@@ -1222,7 +1225,10 @@ function jobCardTitle(j: AnalysisJobListItem): string {
   }
   const num = j.episode_number;
   if (typeof num === "number" && !Number.isNaN(num)) {
-    return `${wt} · ${num}화`;
+    return `${wt} · ${formatEpisodeLabel(
+      { episode_number: num, title: null },
+      { withTitle: false },
+    )}`;
   }
   return `${wt} · 개별 분석`;
 }
@@ -1281,7 +1287,7 @@ function JobProgressSteps({ job }: { job: AnalysisJobListItem }) {
     label: string,
     mode: "done" | "active" | "wait" | "fail"
   ) => (
-    <li className="flex items-center gap-2 text-xs text-zinc-400">
+    <li className="flex items-center gap-2 text-xs text-stone-400">
       <span className="w-5 shrink-0 text-center" aria-hidden>
         {mode === "done" && "✅"}
         {mode === "active" && (
@@ -1293,10 +1299,10 @@ function JobProgressSteps({ job }: { job: AnalysisJobListItem }) {
       <span
         className={
           mode === "active"
-            ? "font-medium text-cyan-200/95 motion-safe:animate-pulse"
+            ? "font-medium text-sky-200/95 motion-safe:animate-pulse"
             : mode === "done"
-              ? "text-zinc-300"
-              : "text-zinc-500"
+              ? "text-stone-300"
+              : "text-stone-400"
         }
       >
         {label}
@@ -1305,7 +1311,7 @@ function JobProgressSteps({ job }: { job: AnalysisJobListItem }) {
   );
 
   return (
-    <ul className="mt-2 space-y-1 border-t border-zinc-800/80 pt-2">
+    <ul className="mt-2 space-y-1 border-t border-stone-800/80 pt-2">
       {row("원고 접수", s1)}
       {row("AI 분석 중", s2)}
       {row("리포트 작성 중", s3)}
@@ -1351,6 +1357,12 @@ function AnalysisBell({
   const [outcomesLoadingMore, setOutcomesLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  // K-A 정정 (LEE 라운드5): Portal 적용 — dropdownRef + outside click 둘 다 체크 + fixed 좌표.
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{
+    top: number;
+    right: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -1383,6 +1395,10 @@ function AnalysisBell({
         onIngestReadOutcomes(jobs);
         setOutcomesCursor(typeof data.nextCursor === "string" ? data.nextCursor : null);
         setOutcomesHasMore(jobs.length >= NOTIFICATION_OUTCOMES_PAGE_SIZE);
+      } catch (e) {
+        // J-I 정정 (LEE 라운드4): silent failure 방어. console.warn 만, UI 에러 화면 노출 차단.
+        // 근본 원인 진단은 별도 트랙 (production 모니터링 + 로그 보강).
+        console.warn("[AnalysisBell] loadFirst outcomes fetch failed", e);
       } finally {
         if (!cancelled) setOutcomesLoadingInitial(false);
       }
@@ -1453,15 +1469,32 @@ function AnalysisBell({
     onIngestReadOutcomes,
   ]);
 
+  // K-A 정정: Portal 적용 후 dropdown 이 부모 DOM 트리 밖이라
+  // wrapRef.contains 만 체크하면 dropdown 안 클릭도 outside 처리됨. dropdownRef 추가 체크.
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (wrapRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  // K-A 정정: open 시 wrapRef 좌표 측정 → fixed dropdown 위치 계산.
+  // useLayoutEffect 로 paint 전 측정 — 첫 frame 깜빡임 방지.
+  useLayoutEffect(() => {
+    if (!open || !wrapRef.current) {
+      setDropdownPos(null);
+      return;
+    }
+    const rect = wrapRef.current.getBoundingClientRect();
+    setDropdownPos({
+      top: rect.bottom + 8,
+      right: window.innerWidth - rect.right,
+    });
   }, [open]);
 
   const activeJobs = panelJobs.filter(
@@ -1474,24 +1507,31 @@ function AnalysisBell({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="relative rounded-lg p-2 text-zinc-400 transition-colors hover:bg-zinc-800/80 hover:text-cyan-200"
+        className="relative rounded-lg p-2 text-stone-400 transition-colors hover:bg-stone-800/80 hover:text-sky-200"
         aria-label="분석 알림"
         aria-expanded={open}
       >
         <BellIcon className="h-5 w-5" />
         {unreadCount > 0 && (
-          <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-cyan-500 px-1 text-[10px] font-bold text-zinc-950">
+          <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-bold text-stone-950">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
-      {open && (
-        <div className="absolute right-0 top-full z-[60] mt-2 w-[min(calc(100vw-2rem),22rem)] overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/50">
-          <div className="border-b border-zinc-800 bg-zinc-900/90 px-3 py-2.5">
+      {open && dropdownPos && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{
+            position: "fixed",
+            top: dropdownPos.top,
+            right: dropdownPos.right,
+          }}
+          className="z-[100] w-[min(calc(100vw-2rem),22rem)] overflow-hidden rounded-2xl border border-stone-800 bg-stone-950 shadow-2xl shadow-black/50">
+          <div className="border-b border-stone-800 bg-stone-900/90 px-3 py-2.5">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-sm font-semibold text-zinc-100">분석</p>
-                <p className="text-[11px] text-zinc-500">
+                <p className="text-sm font-semibold text-stone-100">분석</p>
+                <p className="text-[11px] text-stone-400">
                   진행 중인 작업과 최근 결과
                 </p>
               </div>
@@ -1506,7 +1546,7 @@ function AnalysisBell({
                     setMarkAllBusy(false);
                   }
                 }}
-                className="rounded-lg border border-zinc-700 px-2.5 py-1 text-[11px] font-medium text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+                className="rounded-lg border border-stone-700 px-2.5 py-1 text-[11px] font-medium text-stone-300 hover:bg-stone-800 disabled:opacity-50"
               >
                 {markAllBusy ? "처리 중…" : "모두 읽음"}
               </button>
@@ -1514,11 +1554,11 @@ function AnalysisBell({
           </div>
           <div className="max-h-[min(70vh,28rem)] overflow-y-auto">
             <div className="px-3 py-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
                 진행 중
               </p>
               {activeJobs.length === 0 ? (
-                <p className="py-3 text-sm text-zinc-500">
+                <p className="py-3 text-sm text-stone-400">
                   진행 중인 분석이 없습니다
                 </p>
               ) : (
@@ -1526,12 +1566,12 @@ function AnalysisBell({
                   {activeJobs.map((j) => (
                     <li
                       key={j.id}
-                      className="rounded-xl border border-zinc-800/90 bg-zinc-900/40 px-3 py-2.5"
+                      className="rounded-xl border border-stone-800/90 bg-stone-900/40 px-3 py-2.5"
                     >
-                      <p className="text-sm font-medium text-zinc-100">
+                      <p className="text-sm font-medium text-stone-100">
                         {jobCardTitle(j)}
                       </p>
-                      <p className="mt-0.5 text-[11px] text-zinc-500">
+                      <p className="mt-0.5 text-[11px] text-stone-400">
                         {j.job_kind === "holistic_batch" &&
                         j.progress_percent != null &&
                         j.progress_percent > 0 ? (
@@ -1546,14 +1586,14 @@ function AnalysisBell({
                         j.progress_percent != null &&
                         j.progress_percent > 0 && (
                           <div
-                            className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800"
+                            className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-stone-800"
                             role="progressbar"
                             aria-valuenow={j.progress_percent}
                             aria-valuemin={0}
                             aria-valuemax={100}
                           >
                             <div
-                              className="h-full rounded-full bg-cyan-500/90 transition-[width] duration-300"
+                              className="h-full rounded-full bg-sky-500/90 transition-[width] duration-300"
                               style={{ width: `${j.progress_percent}%` }}
                             />
                           </div>
@@ -1579,7 +1619,7 @@ function AnalysisBell({
                               setCancellingId(null);
                             }
                           }}
-                          className="rounded-lg border border-zinc-600/80 px-2.5 py-1 text-[11px] font-medium text-zinc-300 transition-colors hover:border-amber-500/40 hover:bg-amber-950/25 hover:text-amber-100 disabled:opacity-50"
+                          className="rounded-lg border border-stone-600/80 px-2.5 py-1 text-[11px] font-medium text-stone-300 transition-colors hover:border-amber-500/40 hover:bg-amber-950/25 hover:text-amber-100 disabled:opacity-50"
                         >
                           {cancellingId === j.id ? "중단 중…" : "중단"}
                         </button>
@@ -1594,8 +1634,8 @@ function AnalysisBell({
             </div>
 
             {bellNotifications.length > 0 && (
-              <div className="border-t border-zinc-800 px-3 py-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              <div className="border-t border-stone-800 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
                   알림
                 </p>
                 <ul className="space-y-2 pt-1">
@@ -1611,25 +1651,25 @@ function AnalysisBell({
                             void onMarkBellNotificationRead(n.id);
                             onNavigate(href, null, null);
                           }}
-                          className={`w-full text-left flex flex-col gap-1 rounded-xl border border-zinc-800/80 px-3 py-2 transition-colors hover:border-zinc-700 hover:bg-zinc-900/60 ${
+                          className={`w-full text-left flex flex-col gap-1 rounded-xl border border-stone-800/80 px-3 py-2 transition-colors hover:border-stone-700 hover:bg-stone-900/60 ${
                             read
-                              ? "bg-zinc-950/40 opacity-55"
-                              : "bg-zinc-900/40 opacity-100"
+                              ? "bg-stone-950/40 opacity-55"
+                              : "bg-stone-900/40 opacity-100"
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="rounded-md bg-cyan-500/15 px-2 py-0.5 text-[10px] font-semibold text-cyan-200">
+                            <span className="rounded-md bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold text-sky-200">
                               {n.type === "inquiry_reply" ? "1:1 답변" : "알림"}
                             </span>
-                            <span className="text-[10px] text-zinc-500">
+                            <span className="text-[10px] text-stone-400">
                               {formatKstYYMMDD(n.created_at)}
                             </span>
                           </div>
-                          <p className="text-sm font-medium text-zinc-100">
+                          <p className="text-sm font-medium text-stone-100">
                             {n.title}
                           </p>
                           {n.body && (
-                            <p className="text-[11px] text-zinc-400">{n.body}</p>
+                            <p className="text-[11px] text-stone-400">{n.body}</p>
                           )}
                         </button>
                       </li>
@@ -1640,14 +1680,14 @@ function AnalysisBell({
             )}
 
             {(outcomeJobs.length > 0 || outcomesLoadingInitial) && (
-              <div className="border-t border-zinc-800 px-3 py-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              <div className="border-t border-stone-800 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
                   최근 완료
                 </p>
                 {outcomesLoadingInitial && outcomeJobs.length === 0 ? (
                   <div className="flex justify-center py-8" aria-busy="true" aria-label="알림 불러오는 중">
                     <span
-                      className="inline-block h-6 w-6 shrink-0 animate-spin rounded-full border-2 border-zinc-600 border-t-cyan-400"
+                      className="inline-block h-6 w-6 shrink-0 animate-spin rounded-full border-2 border-stone-600 border-t-sky-400"
                       role="status"
                     />
                   </div>
@@ -1665,10 +1705,10 @@ function AnalysisBell({
                             setOpen(false);
                             onNavigate(href, j.id, null);
                           }}
-                          className={`w-full text-left flex flex-col gap-1 rounded-xl border border-zinc-800/80 px-3 py-2 transition-colors hover:border-zinc-700 hover:bg-zinc-900/60 ${
+                          className={`w-full text-left flex flex-col gap-1 rounded-xl border border-stone-800/80 px-3 py-2 transition-colors hover:border-stone-700 hover:bg-stone-900/60 ${
                             read
-                              ? "bg-zinc-950/40 opacity-55"
-                              : "bg-zinc-900/40 opacity-100"
+                              ? "bg-stone-950/40 opacity-55"
+                              : "bg-stone-900/40 opacity-100"
                           }`}
                         >
                           <div className="flex items-center justify-between gap-2">
@@ -1679,7 +1719,7 @@ function AnalysisBell({
                                   : isContentUnchangedFailure(j)
                                     ? "rounded-md bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200/95"
                                     : isUserCancelledFailure(j)
-                                      ? "rounded-md bg-zinc-600/25 px-2 py-0.5 text-[10px] font-semibold text-zinc-300"
+                                      ? "rounded-md bg-stone-600/25 px-2 py-0.5 text-[10px] font-semibold text-stone-300"
                                       : "rounded-md bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-300"
                               }
                             >
@@ -1692,18 +1732,18 @@ function AnalysisBell({
                                     : "분석 실패"}
                             </span>
                             {kst ? (
-                              <span className="text-[10px] tabular-nums text-zinc-500">
+                              <span className="text-[10px] tabular-nums text-stone-400">
                                 {kst}
                               </span>
                             ) : null}
                           </div>
-                          <p className="text-xs text-zinc-300">{jobCardTitle(j)}</p>
+                          <p className="text-xs text-stone-300">{jobCardTitle(j)}</p>
                           {read ? (
-                            <p className="text-[10px] font-medium text-zinc-500">
+                            <p className="text-[10px] font-medium text-stone-400">
                               ✓ 읽음
                             </p>
                           ) : null}
-                          <p className="text-left text-xs font-medium text-cyan-400">
+                          <p className="text-left text-xs font-medium text-sky-400">
                             결과 보기 →
                           </p>
                         </button>
@@ -1722,13 +1762,13 @@ function AnalysisBell({
                         aria-label="추가 알림 불러오는 중"
                       >
                         <span
-                          className="inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-zinc-600 border-t-cyan-400"
+                          className="inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-stone-600 border-t-sky-400"
                           role="status"
                         />
                       </div>
                     )}
                     {!outcomesHasMore && outcomeJobs.length > 0 && !outcomesLoadingMore && (
-                      <p className="px-1 py-2 text-center text-[10px] text-zinc-600">
+                      <p className="px-1 py-2 text-center text-[10px] text-stone-400">
                         모든 알림을 불러왔습니다
                       </p>
                     )}
@@ -1738,7 +1778,8 @@ function AnalysisBell({
             )}
 
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

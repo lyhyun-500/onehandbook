@@ -18,12 +18,21 @@ type AdminUser = {
   authUserId: string;
 };
 
+type EmptyUser = {
+  page: Page;
+  role: 'empty';
+  email: string;
+  userId: number;
+  authUserId: string;
+};
+
 type Fixtures = {
   writer: WriterUser;
   admin: AdminUser;
+  empty: EmptyUser;
 };
 
-async function provideUser<T extends WriterUser | AdminUser>(
+async function provideUser<T extends WriterUser | AdminUser | EmptyUser>(
   role: TestRole,
   browser: Browser,
   use: (value: T) => Promise<void>,
@@ -59,6 +68,15 @@ export const test = base.extend<Fixtures>({
     await provideUser<AdminUser>('admin', browser, use, (page, meta) => ({
       page,
       role: 'admin',
+      email: meta.email,
+      userId: meta.userId,
+      authUserId: meta.authUserId,
+    }));
+  },
+  empty: async ({ browser }, use) => {
+    await provideUser<EmptyUser>('empty', browser, use, (page, meta) => ({
+      page,
+      role: 'empty',
       email: meta.email,
       userId: meta.userId,
       authUserId: meta.authUserId,
