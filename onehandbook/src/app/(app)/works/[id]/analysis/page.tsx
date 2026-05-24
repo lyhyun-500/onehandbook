@@ -56,7 +56,9 @@ export default async function WorkAnalysisRoutePage({
 
   const { data: work } = await supabase
     .from("works")
-    .select("id, title, genre, status, total_episodes, author_id, deleted_at")
+    .select(
+      "id, title, genre, status, total_episodes, author_id, worldview_source, characters_source, deleted_at",
+    )
     .eq("id", id)
     .is("deleted_at", null)
     .single();
@@ -130,6 +132,21 @@ export default async function WorkAnalysisRoutePage({
   const holisticMode = resolveMode(mode);
   const preselectMode = resolvePreselect(preselect);
 
+  // 단계 C-5 (결정 30 옵션 F-1): 추출 진행 작품 + 기 피드백 부재 시 노출.
+  const isExtracted =
+    work.worldview_source === "auto_extracted" ||
+    work.characters_source === "auto_extracted";
+  let shouldShowLoreFeedback = false;
+  if (isExtracted) {
+    const { data: existingFb } = await supabase
+      .from("lore_extraction_feedback")
+      .select("id")
+      .eq("work_id", work.id as number)
+      .eq("user_id", appUser.id)
+      .maybeSingle();
+    shouldShowLoreFeedback = !existingFb;
+  }
+
   return (
     <>
       <TopBar
@@ -155,6 +172,7 @@ export default async function WorkAnalysisRoutePage({
         holisticMode={holisticMode}
         preselect={preselectMode}
         natBalance={natBalance}
+        shouldShowLoreFeedback={shouldShowLoreFeedback}
       />
     </>
   );

@@ -18,6 +18,7 @@ import {
   type HolisticRunView,
   type HolisticTabMode,
 } from "./HolisticTab";
+import { LoreFeedback } from "@/components/analysis/LoreFeedback";
 
 interface WorkAnalysisPageProps {
   workId: string;
@@ -36,6 +37,8 @@ interface WorkAnalysisPageProps {
   holisticMode: HolisticTabMode;
   preselect: "missing" | "all" | null;
   natBalance: number;
+  /** 단계 C-5: 추출 진행 작품 + 기 피드백 부재 시 true (결정 30 옵션 F-1 server fetch). */
+  shouldShowLoreFeedback: boolean;
 }
 
 function buildHolisticRunView(row: HolisticRunRow): HolisticRunView {
@@ -117,6 +120,7 @@ export function WorkAnalysisPage({
   activeTab,
   currentRunId,
   holisticMode,
+  shouldShowLoreFeedback,
 }: WorkAnalysisPageProps) {
   const latest = latestAnalysisPerEpisode(runs);
   const analyzedEpisodes = latest.size;
@@ -157,6 +161,14 @@ export function WorkAnalysisPage({
             mode={holisticMode}
           />
         )}
+      </div>
+
+      {/* 단계 C-5 (옵션 M-2): 페이지 하단 inline 피드백 (결정 11 옵션 F-4). */}
+      <div className="mx-auto max-w-6xl px-6 pb-12">
+        <LoreFeedback
+          workId={workId}
+          shouldShow={shouldShowLoreFeedback}
+        />
       </div>
     </>
   );
