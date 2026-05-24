@@ -8,6 +8,10 @@ import {
 } from "@/config/analysis-profiles";
 import { CopyWithBreaks } from "@/components/CopyWithBreaks";
 import { formatEpisodeLabel } from "@/lib/episodeLabel";
+import {
+  getLoreNullPromptText,
+  type LoreNullCase,
+} from "@/lib/works/loreCheck";
 
 export type NatSpendLine = { label: string; nat: number };
 
@@ -39,6 +43,14 @@ type Props = {
   onCancel: () => void;
   onConfirm: () => void;
 
+  /**
+   * NULL 분기 사양 (단계 C-2 — 의제 신규-1+2).
+   * - "both_present" = 현 NAT 차감 컨펌만 (변경 X)
+   * - 기타 = 안내 텍스트 + 「예」 = onLoreConfirm (추출 진입, 단계 C-4 정합) / 「아니오」 = onCancel
+   */
+  loreNullCase?: LoreNullCase;
+  onLoreConfirm?: () => void;
+
   /** 에러 (선택) */
   errorMessage?: string | null;
 };
@@ -66,6 +78,8 @@ export function NatSpendConfirmModal({
   loading,
   onCancel,
   onConfirm,
+  loreNullCase,
+  onLoreConfirm,
   errorMessage,
 }: Props) {
   if (!open) return null;
@@ -73,6 +87,9 @@ export function NatSpendConfirmModal({
   const canAfford = balance >= natTotal;
   const afterBalance = canAfford ? balance - natTotal : balance;
   const baseLine = natLines[0];
+  const lorePrompt = loreNullCase
+    ? getLoreNullPromptText(loreNullCase)
+    : null;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/65 p-4 backdrop-blur-[2px]">
@@ -218,6 +235,13 @@ export function NatSpendConfirmModal({
             </div>
           )}
 
+          {/* NULL 분기 안내 (단계 C-2 — 분기 P-α, lorePrompt 있을 때만 노출) */}
+          {lorePrompt && (
+            <div className="mt-4 rounded-md border border-amber-400/30 bg-amber-400/[0.05] px-4 py-3 text-[12.5px] leading-relaxed text-amber-100/95">
+              <p className="whitespace-pre-wrap">{lorePrompt}</p>
+            </div>
+          )}
+
           <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"
@@ -225,7 +249,7 @@ export function NatSpendConfirmModal({
               disabled={loading}
               className="rounded-md border border-stone-700 bg-stone-950/50 px-4 py-2.5 text-[12.5px] font-medium text-stone-200 transition-colors hover:border-stone-600 hover:bg-stone-800/60 disabled:opacity-50"
             >
-              취소
+              {lorePrompt ? "아니오" : "취소"}
             </button>
             {!canAfford ? (
               <Link
@@ -237,12 +261,16 @@ export function NatSpendConfirmModal({
             ) : (
               <button
                 type="button"
-                onClick={onConfirm}
+                onClick={lorePrompt && onLoreConfirm ? onLoreConfirm : onConfirm}
                 disabled={loading}
                 className="inline-flex items-center justify-center gap-1.5 rounded-md bg-sky-500 px-4 py-2.5 text-[12.5px] font-semibold text-stone-950 transition-colors hover:bg-sky-400 disabled:opacity-50"
               >
                 <Sparkles size={11} aria-hidden="true" />
-                {loading ? "진입 중…" : `${natTotal} NAT 차감 후 분석 진입`}
+                {loading
+                  ? "진입 중…"
+                  : lorePrompt
+                    ? `예 · 자동 추출 후 ${natTotal} NAT 차감`
+                    : `${natTotal} NAT 차감 후 분석 진입`}
               </button>
             )}
           </div>

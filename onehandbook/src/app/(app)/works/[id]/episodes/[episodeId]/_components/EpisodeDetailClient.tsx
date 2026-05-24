@@ -17,6 +17,10 @@ import {
   type HolisticLink,
 } from "@/components/work/HolisticLinkBanner";
 import { formatEpisodeLabel } from "@/lib/episodeLabel";
+import type {
+  CharacterSettings,
+  WorldSetting,
+} from "@/components/side-panel/types";
 
 interface EpisodeDetailClientProps {
   workId: number;
@@ -34,6 +38,9 @@ interface EpisodeDetailClientProps {
   phoneVerified: boolean;
   /** 본 회차가 속한 가장 최신 일괄 분석 link (B-3). null = 단독 분석. */
   holisticLink: HolisticLink | null;
+  /** 의제 신규-1+2 (단계 C-2): works.world_setting / character_settings — AnalyzePanel NULL 분기. */
+  worldSetting: WorldSetting;
+  characterSettings: CharacterSettings;
 }
 
 export function EpisodeDetailClient({
@@ -51,6 +58,8 @@ export function EpisodeDetailClient({
   natBalance,
   phoneVerified,
   holisticLink,
+  worldSetting,
+  characterSettings,
 }: EpisodeDetailClientProps) {
   const router = useRouter();
 
@@ -89,6 +98,8 @@ export function EpisodeDetailClient({
           natBalance={natBalance}
           charCount={charCount}
           phoneVerified={phoneVerified}
+          worldSetting={worldSetting}
+          characterSettings={characterSettings}
         />
 
         <EpisodeBody body={body} charCount={charCount} />

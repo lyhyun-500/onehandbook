@@ -18,6 +18,11 @@ import {
   MANUSCRIPT_TOO_SHORT_MESSAGE,
 } from "@/lib/manuscriptEligibility";
 import { NatSpendConfirmModal } from "@/components/NatSpendConfirmModal";
+import { getLoreNullCase } from "@/lib/works/loreCheck";
+import type {
+  CharacterSettings,
+  WorldSetting,
+} from "@/components/side-panel/types";
 import { ManuscriptLowVolumeModal } from "@/components/ManuscriptLowVolumeModal";
 import { ContentUnchangedModal } from "@/components/ContentUnchangedModal";
 import { CachedAnalysisChoiceModal } from "@/components/CachedAnalysisChoiceModal";
@@ -161,6 +166,8 @@ export function AnalyzePanel({
   natBalance,
   charCount,
   phoneVerified,
+  worldSetting,
+  characterSettings,
 }: {
   workId: number;
   episodeId: number;
@@ -175,6 +182,9 @@ export function AnalyzePanel({
   natBalance: number;
   charCount: number;
   phoneVerified: boolean;
+  /** 의제 신규-1+2 (단계 C-2): NULL 분기 검증용 (server fetch parseWorldSetting 정합). */
+  worldSetting: WorldSetting;
+  characterSettings: CharacterSettings;
 }) {
   const router = useRouter();
   const {
@@ -187,6 +197,12 @@ export function AnalyzePanel({
   // 의제 신규-1+2: 세계관·인물 = 기본 포함 (state 폐기, 항상 true 정합).
   const [includePlatformOptimization, setIncludePlatformOptimization] =
     useState(true);
+
+  // 의제 신규-1+2 (단계 C-2): NULL 분기 영속화 (결정 9 옵션 N-2 + 결정 10 분기 P-α).
+  const loreNullCase = useMemo(
+    () => getLoreNullCase(worldSetting, characterSettings),
+    [worldSetting, characterSettings],
+  );
   const [agentVersion, setAgentVersion] = useState(
     versions.find((v) => v.available)?.id ?? versions[0]?.id ?? ""
   );
@@ -848,6 +864,13 @@ export function AnalyzePanel({
         loading={analyzing}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {
+          setConfirmOpen(false);
+          void requestAnalyze();
+        }}
+        loreNullCase={loreNullCase}
+        onLoreConfirm={() => {
+          // 단계 C-2: callback 사양 영속화만, 추출 LLM 호출 = commit 3 (단계 C-4) 진입.
+          // 본 단계 임시 사양 = requestAnalyze 진입 (분석 통과 사양 영속화).
           setConfirmOpen(false);
           void requestAnalyze();
         }}

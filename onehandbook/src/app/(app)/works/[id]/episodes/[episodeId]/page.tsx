@@ -20,6 +20,10 @@ import type {
 import type { HolisticLink } from "@/components/work/HolisticLinkBanner";
 import { formatEpisodeLabel } from "@/lib/episodeLabel";
 import { EpisodeDetailClient } from "./_components/EpisodeDetailClient";
+import {
+  parseCharacterSettings,
+  parseWorldSetting,
+} from "@/components/side-panel/parseWorkJson";
 
 export default async function EpisodeViewPage({
   params,
@@ -32,7 +36,9 @@ export default async function EpisodeViewPage({
 
   const { data: work } = await supabase
     .from("works")
-    .select("id, title, genre, status, total_episodes, author_id, deleted_at")
+    .select(
+      "id, title, genre, status, total_episodes, author_id, world_setting, character_settings, deleted_at",
+    )
     .eq("id", id)
     .is("deleted_at", null)
     .single();
@@ -230,6 +236,8 @@ export default async function EpisodeViewPage({
         natBalance={natBalance}
         phoneVerified={phoneVerified}
         holisticLink={holisticLink}
+        worldSetting={parseWorldSetting(work.world_setting)}
+        characterSettings={parseCharacterSettings(work.character_settings)}
       />
     </>
   );

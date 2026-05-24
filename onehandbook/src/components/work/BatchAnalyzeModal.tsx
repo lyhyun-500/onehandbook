@@ -16,6 +16,14 @@ import {
 } from "@/lib/nat";
 import { HOLISTIC_CLIENT_CHUNK_SIZE } from "@/lib/analysis/holisticEpisodeChunks";
 import { ANALYSIS_PROFILES } from "@/config/analysis-profiles";
+import {
+  getLoreNullCase,
+  getLoreNullPromptText,
+} from "@/lib/works/loreCheck";
+import type {
+  CharacterSettings,
+  WorldSetting,
+} from "@/components/side-panel/types";
 
 // J-H 정정 (LEE 라운드4): 플랫폼 셀렉트박스 옵션 — generic(범용)은 옵션 끄면 자동 사용, UI 미노출.
 const PLATFORM_OPTIONS = ANALYSIS_PROFILES.filter((p) => p.id !== "generic");
@@ -50,6 +58,9 @@ interface BatchAnalyzeModalProps {
   natBalance: number;
   /** default agentVersion (셀렉트박스 초기값). J-H 정정으로 모달 안에서 사용자 선택 가능. */
   agentVersion: string;
+  /** 의제 신규-1+2 (단계 C-2): NULL 분기 검증용 (결정 23 옵션 X 정합). */
+  worldSetting: WorldSetting;
+  characterSettings: CharacterSettings;
 }
 
 /**
@@ -71,8 +82,21 @@ export function BatchAnalyzeModal({
   episodes,
   natBalance,
   agentVersion,
+  worldSetting,
+  characterSettings,
 }: BatchAnalyzeModalProps) {
   const router = useRouter();
+
+  // 의제 신규-1+2 (단계 C-2): NULL 분기 영속화 (결정 9 옵션 N-2 + 결정 23 옵션 X).
+  // 본 단계 = inline 안내만, 추출 LLM 사양 = commit 3 (단계 C-4) 진입 영속화.
+  const loreNullCase = useMemo(
+    () => getLoreNullCase(worldSetting, characterSettings),
+    [worldSetting, characterSettings],
+  );
+  const loreNullPrompt = useMemo(
+    () => getLoreNullPromptText(loreNullCase),
+    [loreNullCase],
+  );
 
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -483,6 +507,7 @@ export function BatchAnalyzeModal({
                 overLimit={overLimit}
                 chunkCount={chunkCount}
                 error={error}
+                loreNullPrompt={loreNullPrompt}
               />
             </div>
 
@@ -738,6 +763,7 @@ function SummaryPanel({
   overLimit,
   chunkCount,
   error,
+  loreNullPrompt,
 }: {
   state: "A" | "B" | "C" | "D" | "E";
   selectedCount: number;
@@ -755,6 +781,7 @@ function SummaryPanel({
   overLimit: boolean;
   chunkCount: number;
   error: string | null;
+  loreNullPrompt: string | null;
 }) {
   const insufficient = state === "D";
 
@@ -798,6 +825,13 @@ function SummaryPanel({
               )}
             </div>
           </div>
+
+          {/* 의제 신규-1+2 (단계 C-2): NULL 분기 inline 안내 (결정 23 옵션 X). */}
+          {loreNullPrompt && (
+            <div className="rounded-md border border-amber-400/30 bg-amber-400/[0.05] px-3 py-2.5 text-[11.5px] leading-relaxed text-amber-100/95">
+              <p className="whitespace-pre-wrap">{loreNullPrompt}</p>
+            </div>
+          )}
 
           <NatCostMeter
             balance={natBalance}
