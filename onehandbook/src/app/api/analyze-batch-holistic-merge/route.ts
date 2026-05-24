@@ -30,9 +30,9 @@ type ConsumeNatRpcResult = {
 };
 
 function parseNatOptions(body: Record<string, unknown>): NatAnalysisOptions {
-  const includeLore = body.includeLore !== false;
+  // 의제 신규-1+2: includeLore 옵션 폐기 (세계관·인물 = 기본 포함, 가산 0).
   const includePlatformOptimization = body.includePlatformOptimization !== false;
-  return { includeLore, includePlatformOptimization };
+  return { includePlatformOptimization };
 }
 
 type ChunkBody = {
@@ -207,13 +207,7 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    if (jp.includeLore !== opts.includeLore) {
-      await markSessionJobFailed("includeLore 옵션이 원래 작업과 일치하지 않습니다.");
-      return NextResponse.json(
-        { error: "includeLore 옵션이 원래 작업과 일치하지 않습니다." },
-        { status: 400 }
-      );
-    }
+    // 의제 신규-1+2: includeLore 옵션 폐기, 옵션 일치 검사 제거 (항상 true 정합).
     if (jp.includePlatformOptimization !== opts.includePlatformOptimization) {
       await markSessionJobFailed(
         "includePlatformOptimization 옵션이 원래 작업과 일치하지 않습니다."
@@ -529,12 +523,13 @@ export async function POST(request: Request) {
     };
 
     const contents = orderedEps.map((e) => e.content ?? "");
+    // 분기 γ-1: includeLore 항상 true 고정 (의제 신규-1+2 정합).
     const contentHash = md5Hex(
-      `${orderedEpisodeIds.join("|")}|merge|${effectiveVersion}|${opts.includeLore}|${opts.includePlatformOptimization}|${contents.join("||")}`
+      `${orderedEpisodeIds.join("|")}|merge|${effectiveVersion}|true|${opts.includePlatformOptimization}|${contents.join("||")}`
     );
 
     const optionsRecord = {
-      includeLore: opts.includeLore,
+      includeLore: true,
       includePlatformOptimization: opts.includePlatformOptimization,
       requested_agent: requestedVersion,
       effective_agent: effectiveVersion,

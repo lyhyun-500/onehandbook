@@ -207,8 +207,8 @@ export async function executeHolisticAnalysisJob(
     return { ok: false, error: "잘못된 작업 데이터입니다." };
   }
 
+  // 의제 신규-1+2: includeLore 옵션 폐기 (세계관·인물 = 기본 포함, payload 호환용 무시).
   const opts: NatAnalysisOptions = {
-    includeLore: rawPayload.includeLore !== false,
     includePlatformOptimization: rawPayload.includePlatformOptimization !== false,
   };
 

@@ -33,9 +33,9 @@ import { conflictingEpisodeIdsForActiveJobs } from "@/lib/analysis/activeAnalysi
 import { ANALYSIS_JOB_FAILURE_SUPERSEDED_BY_FORCE } from "@/lib/analysis/analysisJobFailureCodes";
 
 function parseNatOptions(body: Record<string, unknown>): NatAnalysisOptions {
-  const includeLore = body.includeLore !== false;
+  // 의제 신규-1+2: includeLore 옵션 폐기 (세계관·인물 = 기본 포함, 가산 0).
   const includePlatformOptimization = body.includePlatformOptimization !== false;
-  return { includeLore, includePlatformOptimization };
+  return { includePlatformOptimization };
 }
 
 /** 이 라우트는 job 생성/트리거만 하고 즉시 반환한다. */
@@ -146,7 +146,8 @@ export async function POST(request: Request) {
   const breakdown = buildNatBreakdown(charCount, opts);
 
   const currentHash = md5Hex(episode.content);
-  const workContextHash = computeWorkAnalysisContextHash(work, opts.includeLore);
+  // 분기 γ-1: hash 함수 시그니처 보존, 호출처 항상 true 고정 (lore 기본 포함 정합).
+  const workContextHash = computeWorkAnalysisContextHash(work, true);
 
   const cachedRun = !force
     ? await findCachedAnalysisRun(
@@ -339,7 +340,8 @@ export async function POST(request: Request) {
       payload: {
         requestedVersion,
         force,
-        includeLore: opts.includeLore,
+        // includeLore = 항상 true (의제 신규-1+2 정합), payload 영속화는 호환용 유지.
+        includeLore: true,
         includePlatformOptimization: opts.includePlatformOptimization,
         estimatedSeconds: 75,
       },

@@ -184,7 +184,7 @@ export function AnalyzePanel({
     getActiveJobCoveringEpisode,
     showUnchangedJobNotice,
   } = useAnalysisJobs();
-  const [includeLore, setIncludeLore] = useState(true);
+  // 의제 신규-1+2: 세계관·인물 = 기본 포함 (state 폐기, 항상 true 정합).
   const [includePlatformOptimization, setIncludePlatformOptimization] =
     useState(true);
   const [agentVersion, setAgentVersion] = useState(
@@ -495,10 +495,9 @@ export function AnalyzePanel({
   const { lines: natLines, total: natTotal } = useMemo(
     () =>
       buildNatBreakdown(charCount, {
-        includeLore,
         includePlatformOptimization,
       }),
-    [charCount, includeLore, includePlatformOptimization]
+    [charCount, includePlatformOptimization]
   );
 
   const requestAnalyze = async (opts?: {
@@ -529,7 +528,8 @@ export function AnalyzePanel({
         body: JSON.stringify({
           episodeId,
           agentVersion,
-          includeLore,
+          // includeLore = 항상 true (의제 신규-1+2 정합), payload 호환용 영속화.
+          includeLore: true,
           includePlatformOptimization,
           ...(force ? { force: true } : {}),
           ...(acceptCached ? { acceptCached: true } : {}),
@@ -838,8 +838,6 @@ export function AnalyzePanel({
         }}
         workTitle={workTitle ?? ""}
         charCount={charCount}
-        includeLore={includeLore}
-        onIncludeLoreChange={setIncludeLore}
         includePlatformOptimization={includePlatformOptimization}
         onIncludePlatformOptimizationChange={setIncludePlatformOptimization}
         agentVersion={agentVersion}

@@ -116,7 +116,8 @@ export async function runEpisodeAnalysisPipeline(
   const cost = computeNatCost(charCount, opts);
   const breakdown = buildNatBreakdown(charCount, opts);
   const currentHash = md5Hex(episode.content);
-  const workContextHash = computeWorkAnalysisContextHash(work, opts.includeLore);
+  // 분기 γ-1: hash 함수 시그니처 보존, 호출처 항상 true 고정 (의제 신규-1+2 정합).
+  const workContextHash = computeWorkAnalysisContextHash(work, true);
 
   if (!isProviderConfigured(profile.provider)) {
     throw new Error(
@@ -155,9 +156,10 @@ export async function runEpisodeAnalysisPipeline(
     throw err;
   }
 
+  // 의제 신규-1+2: 세계관·인물 = 기본 포함 (옵션 분기 폐기, 항상 포함 정합).
   const wLore = normalizeWorldSetting(work.world_setting);
   const world_setting: AnalysisWorldSetting | undefined =
-    opts.includeLore && (wLore.background || wLore.era || wLore.rules)
+    wLore.background || wLore.era || wLore.rules
       ? {
           background: wLore.background || undefined,
           era: wLore.era || undefined,
@@ -165,11 +167,10 @@ export async function runEpisodeAnalysisPipeline(
         }
       : undefined;
 
-  const character_settings: AnalysisCharacterSetting[] = opts.includeLore
-    ? normalizeCharacterSettings(work.character_settings).filter((c) =>
-        c.name.trim()
-      )
-    : [];
+  const character_settings: AnalysisCharacterSetting[] =
+    normalizeCharacterSettings(work.character_settings).filter((c) =>
+      c.name.trim()
+    );
 
   let previousResult: PreviousAnalysisResultPayload | null = null;
   if (previousRow) {
@@ -255,7 +256,8 @@ export async function runEpisodeAnalysisPipeline(
   }
 
   const optionsRecord = {
-    includeLore: opts.includeLore,
+    // includeLore = 항상 true (의제 신규-1+2 정합), DB 영속화는 호환용 유지.
+    includeLore: true,
     includePlatformOptimization: opts.includePlatformOptimization,
     requested_agent: requestedVersion,
     effective_agent: effectiveVersion,

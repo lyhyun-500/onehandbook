@@ -23,9 +23,7 @@ type Props = {
   workTitle: string;
   charCount: number;
 
-  /** 옵션/플랫폼 controlled state */
-  includeLore: boolean;
-  onIncludeLoreChange: (value: boolean) => void;
+  /** 플랫폼 controlled state (의제 신규-1+2: includeLore 폐기, 세계관·인물 = 기본 포함) */
   includePlatformOptimization: boolean;
   onIncludePlatformOptimizationChange: (value: boolean) => void;
   agentVersion: string;
@@ -58,8 +56,6 @@ export function NatSpendConfirmModal({
   episode,
   workTitle,
   charCount,
-  includeLore,
-  onIncludeLoreChange,
   includePlatformOptimization,
   onIncludePlatformOptimizationChange,
   agentVersion,
@@ -126,24 +122,7 @@ export function NatSpendConfirmModal({
                   </span>
                 </li>
               )}
-              <li className="flex items-center justify-between text-stone-300">
-                <label className="inline-flex cursor-pointer items-center gap-2 text-stone-400">
-                  <input
-                    type="checkbox"
-                    checked={includeLore}
-                    onChange={(e) => onIncludeLoreChange(e.target.checked)}
-                    className="h-3.5 w-3.5 cursor-pointer accent-sky-400"
-                  />
-                  세계관·인물 설정 포함
-                </label>
-                <span
-                  className={`shrink-0 font-medium tabular-nums ${
-                    includeLore ? "text-sky-300" : "text-stone-600"
-                  }`}
-                >
-                  {includeLore ? "+1" : "—"} NAT
-                </span>
-              </li>
+              {/* 의제 신규-1+2: 세계관·인물 설정 = 기본 포함, UI toggle 폐기. */}
               <li className="flex items-center justify-between text-stone-300">
                 <label className="inline-flex cursor-pointer items-center gap-2 text-stone-400">
                   <input

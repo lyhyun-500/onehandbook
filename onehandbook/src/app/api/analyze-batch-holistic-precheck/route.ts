@@ -28,9 +28,9 @@ function normalizeWorkId(raw: unknown): number | null {
 }
 
 function parseNatOptions(body: Record<string, unknown>): NatAnalysisOptions {
-  const includeLore = body.includeLore !== false;
+  // 의제 신규-1+2: includeLore 옵션 폐기 (세계관·인물 = 기본 포함, 가산 0).
   const includePlatformOptimization = body.includePlatformOptimization !== false;
-  return { includeLore, includePlatformOptimization };
+  return { includePlatformOptimization };
 }
 
 export async function POST(request: Request) {
@@ -123,7 +123,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "작품을 찾을 수 없습니다." }, { status: 404 });
   }
 
-  const workContextHash = computeWorkAnalysisContextHash(workRow, opts.includeLore);
+  // 분기 γ-1: hash 함수 시그니처 보존, 호출처 항상 true 고정.
+  const workContextHash = computeWorkAnalysisContextHash(workRow, true);
 
   let rows: PrecheckAnalysisResultRow[] | null = null;
   let rowsErr = null as { message: string } | null;

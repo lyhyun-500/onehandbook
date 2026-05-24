@@ -151,8 +151,8 @@ export async function executeAnalysisJob(
   const payloadRec = parseJobPayloadRecord(job.payload);
   const forceFromPayload = payloadRec?.force === true;
 
+  // 의제 신규-1+2: includeLore 옵션 폐기 (세계관·인물 = 기본 포함, payload 호환용 무시).
   const opts: NatAnalysisOptions = {
-    includeLore: raw.includeLore !== false,
     includePlatformOptimization: raw.includePlatformOptimization !== false,
   };
 

@@ -161,12 +161,13 @@ export async function GET(
             .select("id, genre, title, world_setting, character_settings")
             .eq("id", workId)
             .maybeSingle();
+          // 분기 γ-1: hash 함수 시그니처 보존, 호출처 항상 true 고정.
+          // options_json 안 legacy includeLore 영속화는 무시 (의제 신규-1+2 정합).
           const optionsJson =
             (latestHolistic as unknown as { options_json?: Record<string, unknown> | null })
               .options_json ?? {};
-          const includeLore = (optionsJson as { includeLore?: boolean }).includeLore !== false;
           const workContextHash = workRow
-            ? computeWorkAnalysisContextHash(workRow, includeLore)
+            ? computeWorkAnalysisContextHash(workRow, true)
             : "";
           if (workContextHash) {
             await syncPerEpisodeAnalysisFromHolisticRun(supabase, {

@@ -76,7 +76,7 @@ export function BatchAnalyzeModal({
 
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [includeLore, setIncludeLore] = useState(true);
+  // 의제 신규-1+2: 세계관·인물 = 기본 포함 (state 폐기, 항상 true 정합).
   const [includePlatformOptimization, setIncludePlatformOptimization] =
     useState(true);
   // J-H 정정: 플랫폼 셀렉트박스 상태 (default = props agentVersion, 보통 ANALYSIS_PROFILES[0] = kakao-page).
@@ -169,9 +169,8 @@ export function BatchAnalyzeModal({
   const chunkCount = Math.ceil(selectedList.length / HOLISTIC_CLIENT_CHUNK_SIZE) || 0;
   const overLimit = selectedList.length > HOLISTIC_MAX_EPISODES;
 
-  // NAT 비용 (운영 정합 — §0 ★)
+  // NAT 비용 (운영 정합 — 의제 신규-1+2: includeLore 폐기)
   const natOpts: NatAnalysisOptions = {
-    includeLore,
     includePlatformOptimization,
   };
   const natEst = useMemo(
@@ -182,12 +181,12 @@ export function BatchAnalyzeModal({
         natOpts,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedEpisodeIds, includeLore, includePlatformOptimization],
+    [selectedEpisodeIds, includePlatformOptimization],
   );
   const natBreakdown = useMemo(
     () => buildHolisticNatBreakdown(selectedList.length, natOpts),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedList.length, includeLore, includePlatformOptimization],
+    [selectedList.length, includePlatformOptimization],
   );
 
   const insufficient = natEst.total > natBalance;
@@ -330,7 +329,8 @@ export function BatchAnalyzeModal({
           workId,
           // J-H 정정: 셀렉트박스 선택값 전달. 옵션 끄면 백엔드 resolveAnalysisAgentVersion 이 "generic" 으로 변환.
           agentVersion: platform,
-          includeLore,
+          // includeLore = 항상 true (의제 신규-1+2 정합), payload 호환용 영속화.
+          includeLore: true,
           includePlatformOptimization,
         }),
       });
@@ -470,11 +470,6 @@ export function BatchAnalyzeModal({
                 natTotal={natEst.total}
                 balanceAfter={balanceAfter}
                 natLines={natBreakdown.lines}
-                includeLore={includeLore}
-                setIncludeLore={(v) => {
-                  setIncludeLore(v);
-                  setConfirming(false);
-                }}
                 includePlatformOptimization={includePlatformOptimization}
                 setIncludePlatformOptimization={(v) => {
                   setIncludePlatformOptimization(v);
@@ -736,8 +731,6 @@ function SummaryPanel({
   natTotal,
   balanceAfter,
   natLines,
-  includeLore,
-  setIncludeLore,
   includePlatformOptimization,
   setIncludePlatformOptimization,
   platform,
@@ -755,8 +748,6 @@ function SummaryPanel({
   natTotal: number;
   balanceAfter: number;
   natLines: { label: string; nat: number }[];
-  includeLore: boolean;
-  setIncludeLore: (v: boolean) => void;
   includePlatformOptimization: boolean;
   setIncludePlatformOptimization: (v: boolean) => void;
   platform: string;
@@ -835,11 +826,7 @@ function SummaryPanel({
           </div>
 
           <div className="flex flex-col gap-2.5 rounded-md border border-stone-800/70 bg-stone-900/40 px-4 py-3">
-            <OptionToggle
-              checked={includeLore}
-              onChange={setIncludeLore}
-              label="세계관·인물 설정 포함"
-            />
+            {/* 의제 신규-1+2: 세계관·인물 설정 = 기본 포함, UI toggle 폐기. */}
             <OptionToggle
               checked={includePlatformOptimization}
               onChange={setIncludePlatformOptimization}

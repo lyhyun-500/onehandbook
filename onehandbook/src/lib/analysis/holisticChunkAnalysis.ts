@@ -120,9 +120,10 @@ export async function runHolisticChunkAnalysis(
     }
   }
 
+  // 의제 신규-1+2: 세계관·인물 = 기본 포함 (옵션 분기 폐기, 항상 포함 정합).
   const wLore = normalizeWorldSetting(work.world_setting);
   const world_setting: AnalysisWorldSetting | undefined =
-    opts.includeLore && (wLore.background || wLore.era || wLore.rules)
+    wLore.background || wLore.era || wLore.rules
       ? {
           background: wLore.background || undefined,
           era: wLore.era || undefined,
@@ -130,11 +131,10 @@ export async function runHolisticChunkAnalysis(
         }
       : undefined;
 
-  const character_settings: AnalysisCharacterSetting[] = opts.includeLore
-    ? normalizeCharacterSettings(work.character_settings).filter((c) =>
-        c.name.trim()
-      )
-    : [];
+  const character_settings: AnalysisCharacterSetting[] =
+    normalizeCharacterSettings(work.character_settings).filter((c) =>
+      c.name.trim()
+    );
 
   const analysisInputBase = {
     manuscript: "",
