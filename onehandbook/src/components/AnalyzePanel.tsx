@@ -869,10 +869,37 @@ export function AnalyzePanel({
         }}
         loreNullCase={loreNullCase}
         onLoreConfirm={() => {
-          // 단계 C-2: callback 사양 영속화만, 추출 LLM 호출 = commit 3 (단계 C-4) 진입.
-          // 본 단계 임시 사양 = requestAnalyze 진입 (분석 통과 사양 영속화).
+          // 단계 C-4 (commit 3): 추출 API → 분석 진입 (결정 10 옵션 M-2 비동기 + 진행 표시).
           setConfirmOpen(false);
-          void requestAnalyze();
+          void (async () => {
+            try {
+              const res = await fetch(
+                `/api/works/${workId}/extract-lore`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ episodeId }),
+                },
+              );
+              const data = (await res.json().catch(() => ({}))) as {
+                error?: string;
+              };
+              if (!res.ok) {
+                const msg =
+                  typeof data.error === "string" && data.error.length > 0
+                    ? data.error
+                    : "추출 실패";
+                console.error("extract-lore:", msg);
+                window.alert(`추출 실패: ${msg}`);
+                return;
+              }
+              await requestAnalyze();
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "추출 네트워크 오류";
+              console.error("extract-lore network:", msg);
+              window.alert(`추출 실패: ${msg}`);
+            }
+          })();
         }}
       />
 

@@ -345,6 +345,31 @@ export function BatchAnalyzeModal({
     setError(null);
     setConflictIds(new Set());
     try {
+      // 의제 신규-1+2 단계 C-4: NULL 분기 시 추출 API 선행 (결정 11 옵션 EX-3 +
+      // 결정 12 옵션 IN-1). 분석 대상 = 선택 첫 회차 본문 (옵션 B-1 정합).
+      if (loreNullCase !== "both_present") {
+        const firstEpId = selectedEpisodeIds[0];
+        if (firstEpId != null) {
+          const exRes = await fetch(`/api/works/${workId}/extract-lore`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ episodeId: firstEpId }),
+          });
+          if (!exRes.ok) {
+            const exData = (await exRes.json().catch(() => ({}))) as {
+              error?: string;
+            };
+            const msg =
+              typeof exData.error === "string" && exData.error.length > 0
+                ? exData.error
+                : "추출 실패";
+            setError(`추출 실패: ${msg}`);
+            setPhase("idle");
+            return;
+          }
+        }
+      }
+
       const res = await fetch("/api/analyze-batch-holistic", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
