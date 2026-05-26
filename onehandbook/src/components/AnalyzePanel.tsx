@@ -18,6 +18,11 @@ import {
   MANUSCRIPT_TOO_SHORT_MESSAGE,
 } from "@/lib/manuscriptEligibility";
 import { NatSpendConfirmModal } from "@/components/NatSpendConfirmModal";
+import { getLoreNullCase } from "@/lib/works/loreCheck";
+import type {
+  CharacterSettings,
+  WorldSetting,
+} from "@/components/side-panel/types";
 import { ManuscriptLowVolumeModal } from "@/components/ManuscriptLowVolumeModal";
 import { ContentUnchangedModal } from "@/components/ContentUnchangedModal";
 import { CachedAnalysisChoiceModal } from "@/components/CachedAnalysisChoiceModal";
@@ -161,6 +166,8 @@ export function AnalyzePanel({
   natBalance,
   charCount,
   phoneVerified,
+  worldSetting,
+  characterSettings,
 }: {
   workId: number;
   episodeId: number;
@@ -175,6 +182,9 @@ export function AnalyzePanel({
   natBalance: number;
   charCount: number;
   phoneVerified: boolean;
+  /** 의제 신규-1+2 (단계 C-2): NULL 분기 검증용 (server fetch parseWorldSetting 정합). */
+  worldSetting: WorldSetting;
+  characterSettings: CharacterSettings;
 }) {
   const router = useRouter();
   const {
@@ -184,9 +194,15 @@ export function AnalyzePanel({
     getActiveJobCoveringEpisode,
     showUnchangedJobNotice,
   } = useAnalysisJobs();
-  const [includeLore, setIncludeLore] = useState(true);
+  // 의제 신규-1+2: 세계관·인물 = 기본 포함 (state 폐기, 항상 true 정합).
   const [includePlatformOptimization, setIncludePlatformOptimization] =
     useState(true);
+
+  // 의제 신규-1+2 (단계 C-2): NULL 분기 영속화 (결정 9 옵션 N-2 + 결정 10 분기 P-α).
+  const loreNullCase = useMemo(
+    () => getLoreNullCase(worldSetting, characterSettings),
+    [worldSetting, characterSettings],
+  );
   const [agentVersion, setAgentVersion] = useState(
     versions.find((v) => v.available)?.id ?? versions[0]?.id ?? ""
   );
@@ -196,6 +212,8 @@ export function AnalyzePanel({
   const [cachedChoiceOpen, setCachedChoiceOpen] = useState(false);
   /** 분석 API 요청 중 (모달·버튼 로딩용, 화면 전체는 막지 않음) */
   const [analyzing, setAnalyzing] = useState(false);
+  // 단계 D-fixup-1 (결정 33 UX-1 + 34 D-1): 추출 단계 = 통합 "분석 중" UX.
+  const [extracting, setExtracting] = useState(false);
   const [pendingScrollToResult, setPendingScrollToResult] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jobFailedBanner, setJobFailedBanner] = useState<{
@@ -495,10 +513,9 @@ export function AnalyzePanel({
   const { lines: natLines, total: natTotal } = useMemo(
     () =>
       buildNatBreakdown(charCount, {
-        includeLore,
         includePlatformOptimization,
       }),
-    [charCount, includeLore, includePlatformOptimization]
+    [charCount, includePlatformOptimization]
   );
 
   const requestAnalyze = async (opts?: {
@@ -529,7 +546,8 @@ export function AnalyzePanel({
         body: JSON.stringify({
           episodeId,
           agentVersion,
-          includeLore,
+          // includeLore = 항상 true (의제 신규-1+2 정합), payload 호환용 영속화.
+          includeLore: true,
           includePlatformOptimization,
           ...(force ? { force: true } : {}),
           ...(acceptCached ? { acceptCached: true } : {}),
@@ -703,6 +721,24 @@ export function AnalyzePanel({
       {episodeLabel && (
         <p className="mb-4 text-sm text-zinc-400">{episodeLabel}</p>
       )}
+      {/* 단계 D-fixup-1 (결정 33 UX-1 + 34 D-1 + 35 P-1/T-1):
+          추출 + 분석 = 통합 "분석 중" UX + 단계 명시 + spinner only (진행률 X + 추정 시간 X). */}
+      {(extracting || analyzing) && (
+        <div className="mb-4 flex items-center gap-3 rounded-md border border-sky-400/30 bg-sky-400/[0.06] px-4 py-3">
+          <span
+            className="inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-sky-400/30 border-t-sky-300"
+            style={{ animation: "na-spin 1.1s linear infinite" }}
+            aria-hidden="true"
+          />
+          <p className="font-serif text-[13px] text-sky-100">
+            분석 중 —{" "}
+            <span className="text-sky-300">
+              {extracting ? "세계관·인물 추출 중" : "분석 진행 중"}
+            </span>
+            …
+          </p>
+        </div>
+      )}
       <p className="mb-2 text-sm text-zinc-500">
         NAT가 소모됩니다. 옵션에 따라 비용이 달라집니다.{" "}
         <Link
@@ -838,8 +874,6 @@ export function AnalyzePanel({
         }}
         workTitle={workTitle ?? ""}
         charCount={charCount}
-        includeLore={includeLore}
-        onIncludeLoreChange={setIncludeLore}
         includePlatformOptimization={includePlatformOptimization}
         onIncludePlatformOptimizationChange={setIncludePlatformOptimization}
         agentVersion={agentVersion}
@@ -852,6 +886,45 @@ export function AnalyzePanel({
         onConfirm={() => {
           setConfirmOpen(false);
           void requestAnalyze();
+        }}
+        loreNullCase={loreNullCase}
+        onLoreConfirm={() => {
+          // 단계 C-4 (commit 3): 추출 API → 분석 진입.
+          // 단계 D-fixup-1 (결정 33 UX-1): 추출 + 분석 = 통합 "분석 중" UX.
+          setConfirmOpen(false);
+          void (async () => {
+            setExtracting(true);
+            try {
+              const res = await fetch(
+                `/api/works/${workId}/extract-lore`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ episodeId }),
+                },
+              );
+              const data = (await res.json().catch(() => ({}))) as {
+                error?: string;
+              };
+              if (!res.ok) {
+                const msg =
+                  typeof data.error === "string" && data.error.length > 0
+                    ? data.error
+                    : "추출 실패";
+                console.error("extract-lore:", msg);
+                window.alert(`추출 실패: ${msg}`);
+                return;
+              }
+              setExtracting(false);
+              await requestAnalyze();
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "추출 네트워크 오류";
+              console.error("extract-lore network:", msg);
+              window.alert(`추출 실패: ${msg}`);
+            } finally {
+              setExtracting(false);
+            }
+          })();
         }}
       />
 

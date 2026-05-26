@@ -126,8 +126,9 @@ function holisticContentHash(
   const body = orderedIds
     .map((id, i) => `${id}:${md5Hex(contents[i] ?? "")}`)
     .join("|");
+  // 분기 γ-1: includeLore 항상 true 고정 (의제 신규-1+2 정합).
   return md5Hex(
-    `${body}|${effectiveAgent}|${opts.includeLore}|${opts.includePlatformOptimization}`
+    `${body}|${effectiveAgent}|true|${opts.includePlatformOptimization}`
   );
 }
 
@@ -261,9 +262,10 @@ export async function runHolisticBatchPipeline(
     holisticPipelineDbCtx(pipelineDbLog, work.id)
   );
 
+  // 의제 신규-1+2: 세계관·인물 = 기본 포함 (옵션 분기 폐기, 항상 포함 정합).
   const wLore = normalizeWorldSetting(work.world_setting);
   const world_setting: AnalysisWorldSetting | undefined =
-    opts.includeLore && (wLore.background || wLore.era || wLore.rules)
+    wLore.background || wLore.era || wLore.rules
       ? {
           background: wLore.background || undefined,
           era: wLore.era || undefined,
@@ -271,11 +273,10 @@ export async function runHolisticBatchPipeline(
         }
       : undefined;
 
-  const character_settings: AnalysisCharacterSetting[] = opts.includeLore
-    ? normalizeCharacterSettings(work.character_settings).filter((c) =>
-        c.name.trim()
-      )
-    : [];
+  const character_settings: AnalysisCharacterSetting[] =
+    normalizeCharacterSettings(work.character_settings).filter((c) =>
+      c.name.trim()
+    );
 
   const analysisInputBase = {
     manuscript: ordered
@@ -486,12 +487,13 @@ export async function runHolisticBatchPipeline(
   );
 
   const contents = ordered.map((e) => e.content ?? "");
+  // 분기 γ-1: includeLore 항상 true 고정 (의제 신규-1+2 정합).
   const contentHash = md5Hex(
-    `${orderedEpisodeIds.join("|")}|merge|${effectiveVersion}|${opts.includeLore}|${opts.includePlatformOptimization}|${contents.join("||")}`
+    `${orderedEpisodeIds.join("|")}|merge|${effectiveVersion}|true|${opts.includePlatformOptimization}|${contents.join("||")}`
   );
 
   const optionsRecord = {
-    includeLore: opts.includeLore,
+    includeLore: true,
     includePlatformOptimization: opts.includePlatformOptimization,
     requested_agent: requestedVersion,
     effective_agent: effectiveVersion,
@@ -724,7 +726,7 @@ async function finalizeSingleHolisticRun(args: {
   );
 
   const optionsRecord = {
-    includeLore: opts.includeLore,
+    includeLore: true,
     includePlatformOptimization: opts.includePlatformOptimization,
     requested_agent: requestedVersion,
     effective_agent: effectiveVersion,
@@ -807,7 +809,8 @@ async function finalizeSingleHolisticRun(args: {
 
   // 단일 호출(single_call) 통합 분석도 회차별 최신 점수·캐시가 맞도록 동기화한다.
   try {
-    const workContextHash = computeWorkAnalysisContextHash(work, opts.includeLore);
+    // 분기 γ-1: hash 함수 시그니처 보존, 호출처 항상 true 고정.
+    const workContextHash = computeWorkAnalysisContextHash(work, true);
     await syncPerEpisodeAnalysisFromHolisticRun(supabase, {
       workId: work.id,
       holisticRunId: row.id,

@@ -25,9 +25,9 @@ import {
 } from "@/lib/analysis/holisticEpisodeChunks";
 
 function parseNatOptions(body: Record<string, unknown>): NatAnalysisOptions {
-  const includeLore = body.includeLore !== false;
+  // 의제 신규-1+2: includeLore 옵션 폐기 (세계관·인물 = 기본 포함, 가산 0).
   const includePlatformOptimization = body.includePlatformOptimization !== false;
-  return { includeLore, includePlatformOptimization };
+  return { includePlatformOptimization };
 }
 
 function estimateHolisticJobSeconds(episodeCount: number, chunkCount: number): number {
@@ -252,7 +252,8 @@ export async function POST(request: Request) {
     workId: work.id,
     orderedEpisodeIds: episodeIds,
     requestedVersion,
-    includeLore: opts.includeLore,
+    // includeLore = 항상 true (의제 신규-1+2 정합), payload 영속화는 호환용 유지.
+    includeLore: true,
     includePlatformOptimization: opts.includePlatformOptimization,
     estimatedSeconds,
     ...(forceUnchanged ? { force: true } : {}),

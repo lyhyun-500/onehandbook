@@ -6,9 +6,9 @@ import { isMissingHolisticChunkResultsTableError } from "@/lib/db/holisticChunkR
 import { isMissingAnalysisJobsTableError } from "@/lib/db/analysisJobsTable";
 
 function parseNatOptions(body: Record<string, unknown>) {
-  const includeLore = body.includeLore !== false;
+  // 의제 신규-1+2: includeLore 옵션 폐기 (세계관·인물 = 기본 포함, 가산 0).
   const includePlatformOptimization = body.includePlatformOptimization !== false;
-  return { includeLore, includePlatformOptimization };
+  return { includePlatformOptimization };
 }
 
 function numArraysEqual(a: number[], b: number[]) {
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
   }
 
   const opts = parseNatOptions({
-    includeLore: payload.includeLore,
+    // includeLore = payload 호환용 (의제 신규-1+2 정합, parseNatOptions 안 폐기).
     includePlatformOptimization: payload.includePlatformOptimization,
   });
 

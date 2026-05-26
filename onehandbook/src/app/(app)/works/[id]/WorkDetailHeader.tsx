@@ -128,6 +128,8 @@ export function WorkDetailHeader({
         episodes={batchEpisodes}
         natBalance={natBalance}
         agentVersion={agentVersion}
+        worldSetting={worldSetting}
+        characterSettings={characterSettings}
       />
 
       <WorkNotesDrawer

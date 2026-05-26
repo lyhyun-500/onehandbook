@@ -270,8 +270,8 @@ export async function buildAnalyzeJobPollResponse(
     : 0;
 
   const optJson = run.options_json as Record<string, unknown> | null;
+  // 의제 신규-1+2: includeLore 옵션 폐기 (세계관·인물 = 기본 포함).
   const opts: NatAnalysisOptions = {
-    includeLore: optJson?.includeLore !== false,
     includePlatformOptimization: optJson?.includePlatformOptimization !== false,
   };
 

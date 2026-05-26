@@ -1,11 +1,15 @@
 import { extractBalancedJsonObject } from "./jsonExtract";
 import type { HolisticAnalysisResult } from "./types";
 
+// CLAUDE.md §4 영속화: 신규 분석 = 한글 키 6축 고정 사양 정합.
+// 단계 D-fixup-8 (결정 68~71): 일괄 분석 LLM 응답 검증 6축 정합.
 const DIM_KEYS = [
-  "플로우 일관성",
-  "캐릭터 아크",
-  "복선 활용도",
-  "플랫폼 적합성",
+  "첫 훅·몰입",
+  "인물 매력",
+  "세계관",
+  "긴장감",
+  "로맨스·감정선",
+  "독창성",
 ] as const;
 
 function parseEpisodeDimensionsOrUndefined(
@@ -14,15 +18,9 @@ function parseEpisodeDimensionsOrUndefined(
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
 
-  const requiredKeys = [
-    "플로우 일관성",
-    "캐릭터 아크",
-    "복선 활용도",
-    "플랫폼 적합성",
-  ];
   const result: Record<string, { score: number; comment: string }> = {};
 
-  for (const key of requiredKeys) {
+  for (const key of DIM_KEYS) {
     const dim = r[key];
     if (
       !dim ||

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronRight, FileText } from "lucide-react";
 import {
   latestAnalysisPerEpisode,
@@ -150,6 +153,7 @@ export function IndividualTab({
   runs,
   workAvgScore,
 }: IndividualTabProps) {
+  const router = useRouter();
   const dimensions = deriveDimensionSummaries(runs, episodes);
   const episodeRows = deriveEpisodeRows(runs, episodes);
   const hasAnalyses = episodeRows.length > 0;
@@ -280,10 +284,24 @@ export function IndividualTab({
                 </tr>
               </thead>
               <tbody>
-                {episodeRows.map((row) => (
+                {episodeRows.map((row) => {
+                  const goEpisode = () =>
+                    router.push(
+                      `/works/${workId}/episodes/${row.episodeId}`,
+                    );
+                  return (
                   <tr
                     key={row.episodeId}
-                    className="group border-b border-stone-800/40 transition-colors hover:bg-stone-900/40"
+                    role="button"
+                    tabIndex={0}
+                    onClick={goEpisode}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        goEpisode();
+                      }
+                    }}
+                    className="group cursor-pointer border-b border-stone-800/40 transition-colors hover:bg-stone-900/40 focus:bg-stone-900/40 focus:outline-none"
                   >
                     <td className="py-3 pl-5 pr-3 align-middle">
                       <div className="font-mono text-[12px] tabular-nums text-stone-400">
@@ -294,12 +312,9 @@ export function IndividualTab({
                       </div>
                     </td>
                     <td className="py-3 pr-3 align-middle">
-                      <Link
-                        href={`/works/${workId}/episodes/${row.episodeId}`}
-                        className="line-clamp-1 font-serif text-[13.5px] text-stone-100 hover:text-sky-200"
-                      >
+                      <span className="line-clamp-1 font-serif text-[13.5px] text-stone-100 group-hover:text-sky-200">
                         {row.title}
-                      </Link>
+                      </span>
                     </td>
                     <td className="py-3 pr-3 align-middle">
                       <SourceBadge source={row.source} />
@@ -329,7 +344,8 @@ export function IndividualTab({
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

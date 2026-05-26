@@ -24,12 +24,33 @@ function formatKoreanDateTime(input: string): string {
   }).format(d);
 }
 
-const DIM_ORDER = [
-  "플로우 일관성",
-  "캐릭터 아크",
-  "복선 활용도",
-  "플랫폼 적합성",
+// CLAUDE.md §4 영속화: 신규 분석 = 한글 키 6축 고정 사양 정합.
+// 단계 D-fixup-8 (결정 68~71): 6축 신규 분석 우선 + 기 4축 분석 결과 (LEE 사양 §7 데이터 변경 X)
+// 둘 다 표시 사양 영속화 정합 = dynamic order (server response 영속화 정합).
+const CORE_DIM_ORDER = [
+  "첫 훅·몰입",
+  "인물 매력",
+  "세계관",
+  "긴장감",
+  "로맨스·감정선",
+  "독창성",
 ] as const;
+
+/** 6축 우선 + 기 분석 결과(plus 잔여 키) 영속화 정합 통과 사양 영속화. */
+function deriveDimOrder(
+  dimensions: Record<string, { score: number; comment: string }>,
+): string[] {
+  const present = new Set(Object.keys(dimensions));
+  const ordered: string[] = [];
+  for (const key of CORE_DIM_ORDER) {
+    if (present.has(key)) {
+      ordered.push(key);
+      present.delete(key);
+    }
+  }
+  for (const key of present) ordered.push(key);
+  return ordered;
+}
 
 function ScoreLineChart({ points }: { points: HolisticChartPoint[] }) {
   if (points.length === 0) return null;
@@ -194,7 +215,7 @@ export function BatchHolisticReport({
           항목별 종합 평가
         </h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          {DIM_ORDER.map((key) => {
+          {deriveDimOrder(result.dimensions).map((key) => {
             const d = result.dimensions[key];
             if (!d) return null;
             return (

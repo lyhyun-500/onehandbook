@@ -4,8 +4,11 @@ import { HOLISTIC_CLIENT_CHUNK_SIZE } from "@/lib/analysis/holisticEpisodeChunks
 /** 플랫폼 비특화 범용 분석 (NAT 옵션 미포함 시 사용) — Claude + generic 프롬프트 */
 export const NAT_GENERIC_AGENT_ID = "generic";
 
+// 의제 신규-1+2 정합: 세계관·인물 = 기본 포함 (옵션 폐기).
+// 결정 1 (옵션 A-1): includeLore 옵션 폐기 + 가산 코드 제거.
+// 결정 8/13/14 (분기 γ-1 + H-2-γ): workAnalysisContextHash 시그니처 보존,
+// 호출처에서 true 고정 (별 라운드, 본 파일과 분리).
 export type NatAnalysisOptions = {
-  includeLore: boolean;
   includePlatformOptimization: boolean;
 };
 
@@ -34,7 +37,6 @@ export function computeNatCost(
   opts: NatAnalysisOptions
 ): number {
   let total = natBaseCostByLength(charCount);
-  if (opts.includeLore) total += 1;
   if (opts.includePlatformOptimization) total += 1;
   return total;
 }
@@ -49,9 +51,6 @@ export function buildNatBreakdown(
   const lines: NatBreakdownLine[] = [
     { label: `기본 (${natLengthTierLabel(charCount)})`, nat: base },
   ];
-  if (opts.includeLore) {
-    lines.push({ label: "세계관·인물 설정 포함", nat: 1 });
-  }
   if (opts.includePlatformOptimization) {
     lines.push({ label: "플랫폼 최적화 분석 포함", nat: 1 });
   }
@@ -96,14 +95,6 @@ export function buildBatchNatBreakdown(
     },
   ];
   let total = totalBase;
-  if (opts.includeLore && episodeCount > 0) {
-    const add = episodeCount;
-    lines.push({
-      label: `세계관·인물 설정 포함 (회차당 1 NAT × ${episodeCount})`,
-      nat: add,
-    });
-    total += add;
-  }
   if (opts.includePlatformOptimization && episodeCount > 0) {
     const add = episodeCount;
     lines.push({
@@ -116,7 +107,7 @@ export function buildBatchNatBreakdown(
 }
 
 /**
- * 통합 일괄 분석 1회(선택 회차 한 번에 묶음): **회차당 1 NAT** + 로어·플랫폼 각 통합 1회 가산.
+ * 통합 일괄 분석 1회(선택 회차 한 번에 묶음): **회차당 1 NAT** + 플랫폼 통합 1회 가산.
  * (단일 회차·통합 모두 글자 구간이 아닌 회차 수 기준)
  */
 export function computeHolisticNatCost(
@@ -124,14 +115,13 @@ export function computeHolisticNatCost(
   opts: NatAnalysisOptions
 ): number {
   let total = Math.max(0, episodeCount);
-  if (opts.includeLore) total += 1;
   if (opts.includePlatformOptimization) total += 1;
   return total;
 }
 
 /**
  * 다청크 통합(10화 초과): 각 청크 기본 = **해당 청크 회차 수만큼 1 NAT/회차**,
- * 로어·플랫폼은 **전체 작업당 1회**로 첫 청크에만 가산.
+ * 플랫폼은 **전체 작업당 1회**로 첫 청크에만 가산.
  */
 export function computeHolisticChunkNatCost(
   episodeCountInChunk: number,
@@ -140,7 +130,6 @@ export function computeHolisticChunkNatCost(
 ): number {
   let total = Math.max(0, episodeCountInChunk);
   if (chunkIndexZeroBased === 0) {
-    if (opts.includeLore) total += 1;
     if (opts.includePlatformOptimization) total += 1;
   }
   return total;
@@ -160,9 +149,6 @@ export function buildHolisticNatBreakdown(
       nat: base,
     },
   ];
-  if (opts.includeLore) {
-    lines.push({ label: "세계관·인물 설정 포함 (통합 1회)", nat: 1 });
-  }
   if (opts.includePlatformOptimization) {
     lines.push({ label: "플랫폼 최적화 분석 포함 (통합 1회)", nat: 1 });
   }

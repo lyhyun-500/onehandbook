@@ -1,11 +1,26 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { TopBar } from "@/components/shell/TopBar";
 import { formatEpisodeLabel } from "@/lib/episodeLabel";
-import { EpisodeEditor } from "./EpisodeEditor";
+import {
+  parseCharacterSettings,
+  parseWorldSetting,
+} from "@/components/side-panel/parseWorkJson";
+import { EpisodeEditForm } from "../[episodeId]/edit/EpisodeEditForm";
 
+/**
+ * 새 회차 등록 page — 단계 D-fixup-3 (결정 53 옵션 U-1) 정합.
+ *
+ * 편집 page UI 정합 통과: EpisodeEditForm mode="new" 재사용.
+ * works SELECT 안 world_setting + character_settings 정합 (편집 page 사양).
+ *
+ * SettingsDrawer 사용 사양:
+ * - mode="new" = SettingsDrawer 비활성화 (episodeId 부재, MemoBody UPSERT 정합 부재).
+ * - 「설정」 button click → 안내 노출 ("회차 등록 후 사용 가능").
+ * - 「등록」 통과 후 = /works/[id]/episodes/[insertedId]/edit redirect →
+ *   SettingsDrawer 사용 사양 정합.
+ */
 export default async function NewEpisodePage({
   params,
 }: {
@@ -17,7 +32,9 @@ export default async function NewEpisodePage({
 
   const { data: work, error: workError } = await supabase
     .from("works")
-    .select("id, title, author_id, deleted_at")
+    .select(
+      "id, title, author_id, deleted_at, world_setting, character_settings",
+    )
     .eq("id", id)
     .is("deleted_at", null)
     .single();
@@ -34,38 +51,33 @@ export default async function NewEpisodePage({
   const nextEpisodeNumber = (episodes?.length ?? 0) + 1;
 
   const natBalance = appUser.coin_balance ?? 0;
+  const worldSetting = parseWorldSetting(work.world_setting);
+  const characterSettings = parseCharacterSettings(work.character_settings);
 
   return (
     <>
       <TopBar
-        breadcrumb={["스튜디오", work.title, "회차"]}
+        breadcrumb={[
+          "스튜디오",
+          work.title as string,
+          "회차",
+          formatEpisodeLabel(
+            { episode_number: nextEpisodeNumber, title: null },
+            { withTitle: false },
+          ),
+        ]}
         title="새 회차"
         natBalance={natBalance}
       />
 
-      <main className="mx-auto max-w-4xl px-6 py-12">
-        <Link
-          href={`/works/${id}`}
-          className="mb-6 inline-block text-sm text-stone-400 hover:text-stone-100"
-        >
-          ← {work.title}으로 돌아가기
-        </Link>
-
-        <h1 className="mb-2 text-2xl font-bold text-stone-100">
-          회차 등록 (
-          {formatEpisodeLabel(
-            { episode_number: nextEpisodeNumber, title: null },
-            { withTitle: false },
-          )}
-          )
-        </h1>
-        <p className="mb-8 text-stone-400">{work.title}</p>
-
-        <EpisodeEditor
-          workId={work.id}
-          episodeNumber={nextEpisodeNumber}
-        />
-      </main>
+      <EpisodeEditForm
+        mode="new"
+        workId={work.id as number}
+        workTitle={work.title as string}
+        episodeNumber={nextEpisodeNumber}
+        initialWorld={worldSetting}
+        initialCharacters={characterSettings}
+      />
     </>
   );
 }

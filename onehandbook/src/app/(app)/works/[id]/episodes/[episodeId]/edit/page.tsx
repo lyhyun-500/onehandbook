@@ -63,6 +63,7 @@ export default async function EpisodeEditPage({
       />
 
       <EpisodeEditForm
+        mode="edit"
         workId={work.id as number}
         workTitle={work.title as string}
         episodeId={episode.id as number}
