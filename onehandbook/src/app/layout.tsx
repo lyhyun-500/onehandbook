@@ -101,13 +101,12 @@ export const metadata: Metadata = {
 
   manifest: "/site.webmanifest",
 
-  // 인증 코드 발급 후 .env.local 등록하고 주석 해제
-  // verification: {
-  //   google: process.env.GOOGLE_SITE_VERIFICATION,
-  //   other: {
-  //     "naver-site-verification": process.env.NAVER_SITE_VERIFICATION ?? "",
-  //   },
-  // },
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION,
+    other: {
+      "naver-site-verification": process.env.NAVER_SITE_VERIFICATION ?? "",
+    },
+  },
 
   formatDetection: {
     telephone: false,
