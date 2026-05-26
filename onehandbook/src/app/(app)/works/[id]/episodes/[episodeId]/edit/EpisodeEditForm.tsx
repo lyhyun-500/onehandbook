@@ -20,23 +20,32 @@ import type {
 } from "@/components/side-panel/types";
 
 interface EpisodeEditFormProps {
+  /** 단계 D-fixup-3 (결정 53 옵션 U-1): mode 분기 — 편집 / 새 회차 등록. */
+  mode: "new" | "edit";
   workId: number;
   workTitle: string;
-  episodeId: number;
   episodeNumber: number;
-  initialTitle: string;
-  initialContent: string;
   initialWorld: WorldSetting;
   initialCharacters: CharacterSettings;
+  /** mode === "edit" 시 필수, "new" 시 부재. */
+  episodeId?: number;
+  initialTitle?: string;
+  initialContent?: string;
 }
 
 /**
- * 회차 편집 client — 시안 episode-edit.jsx EpisodeEditScreen 정합.
+ * 회차 편집 + 새 회차 등록 통합 client — 시안 episode-edit.jsx EpisodeEditScreen 정합.
  *
  * 풀폭 에디터(max-w-1100) + floating `설정` 버튼(panelRight) → SettingsDrawer 호출.
  * 통합 저장은 SettingsDrawer 가 책임 (D-16). 본 form 은 회차 본문 저장만.
+ *
+ * 단계 D-fixup-3 (결정 53 옵션 U-1):
+ * - mode === "edit": 기존 사양 정합 (episodes.update + redirect /works/[id])
+ * - mode === "new": episodes.insert + works.total_episodes 갱신 + redirect /works/[id]/episodes/[insertedId]/edit
+ *   (SettingsDrawer 사용 사양 = 등록 후 편집 page 진입에서 정합)
  */
 export function EpisodeEditForm({
+  mode,
   workId,
   workTitle,
   episodeId,
@@ -46,9 +55,10 @@ export function EpisodeEditForm({
   initialWorld,
   initialCharacters,
 }: EpisodeEditFormProps) {
+  const isEdit = mode === "edit";
   const router = useRouter();
-  const [title, setTitle] = useState(initialTitle);
-  const [content, setContent] = useState(initialContent);
+  const [title, setTitle] = useState(initialTitle ?? "");
+  const [content, setContent] = useState(initialContent ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -60,7 +70,8 @@ export function EpisodeEditForm({
   const overLimit = !isEpisodeContentWithinLimit(content);
   const nearLimit =
     !overLimit && charCount >= EPISODE_CONTENT_MAX_CHARS * 0.9;
-  const bodyDirty = title !== initialTitle || content !== initialContent;
+  const bodyDirty =
+    title !== (initialTitle ?? "") || content !== (initialContent ?? "");
   const totalUnsaved = bodyDirty || drawerUnsaved;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,19 +88,50 @@ export function EpisodeEditForm({
     }
 
     try {
-      const { error: updateError } = await supabase
-        .from("episodes")
-        .update({ title, content, content_hash: md5Hex(content) })
-        .eq("id", episodeId);
-
-      if (updateError) throw updateError;
-
-      router.push(`/works/${workId}`);
+      if (isEdit && episodeId != null) {
+        const { error: updateError } = await supabase
+          .from("episodes")
+          .update({ title, content, content_hash: md5Hex(content) })
+          .eq("id", episodeId);
+        if (updateError) throw updateError;
+        router.push(`/works/${workId}`);
+      } else {
+        // 단계 D-fixup-3 (결정 53 옵션 U-1): 새 회차 등록 → episodeId 받음 →
+        // /edit page redirect (SettingsDrawer 사용 사양 정합).
+        const { data: ins, error: insertError } = await supabase
+          .from("episodes")
+          .insert({
+            work_id: workId,
+            episode_number: episodeNumber,
+            title,
+            content,
+            content_hash: md5Hex(content),
+          })
+          .select("id")
+          .single();
+        if (insertError || !ins) {
+          throw insertError ?? new Error("등록 실패");
+        }
+        // works.total_episodes 갱신 (기존 사양 정합)
+        const { count } = await supabase
+          .from("episodes")
+          .select("id", { count: "exact", head: true })
+          .eq("work_id", workId);
+        await supabase
+          .from("works")
+          .update({ total_episodes: count ?? episodeNumber })
+          .eq("id", workId);
+        router.push(
+          `/works/${workId}/episodes/${ins.id as number}/edit`,
+        );
+      }
     } catch (err: unknown) {
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)
-          : "수정에 실패했습니다. 다시 시도해주세요.";
+          : isEdit
+            ? "수정에 실패했습니다. 다시 시도해주세요."
+            : "등록에 실패했습니다. 다시 시도해주세요.";
       setError(message);
     } finally {
       setLoading(false);
@@ -105,7 +147,7 @@ export function EpisodeEditForm({
         <header className="flex items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="font-mono text-[10.5px] uppercase tracking-[0.3em] text-sky-300/70">
-              회차 편집
+              {isEdit ? "회차 편집" : "새 회차 등록"}
             </div>
             <div className="mt-1.5 flex items-center gap-2 text-[12.5px] text-stone-400">
               <Link
@@ -124,16 +166,45 @@ export function EpisodeEditForm({
           </div>
           <button
             type="button"
-            onClick={() => setDrawerOpen(true)}
-            className="group relative flex items-center gap-2 rounded-md border border-stone-700 bg-stone-900/70 px-3 py-2 text-[12px] text-stone-200 backdrop-blur transition-colors hover:border-sky-400/40 hover:bg-sky-400/[0.08] hover:text-sky-200"
+            onClick={() => {
+              if (!isEdit) {
+                // 단계 D-fixup-3: 새 회차 mode = SettingsDrawer 비활성화
+                // (episodeId 부재, MemoBody UPSERT 사양 정합 위해 등록 후 진입 필수).
+                setError(
+                  "회차 등록 후 설정 (세계관·인물·메모) 을 편집할 수 있습니다. 먼저 회차를 등록해 주세요.",
+                );
+                return;
+              }
+              setDrawerOpen(true);
+            }}
+            className={`group relative flex items-center gap-2 rounded-md border border-stone-700 bg-stone-900/70 px-3 py-2 text-[12px] text-stone-200 backdrop-blur transition-colors ${
+              isEdit
+                ? "hover:border-sky-400/40 hover:bg-sky-400/[0.08] hover:text-sky-200"
+                : "opacity-60"
+            }`}
             aria-label="설정 패널 열기"
+            title={
+              isEdit
+                ? "세계관·인물·메모 설정"
+                : "회차 등록 후 사용 가능"
+            }
           >
             <PanelRight
               size={13}
               aria-hidden="true"
-              className="text-stone-400 group-hover:text-sky-300"
+              className={
+                isEdit
+                  ? "text-stone-400 group-hover:text-sky-300"
+                  : "text-stone-500"
+              }
             />
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-stone-500 group-hover:text-sky-300/80">
+            <span
+              className={`font-mono text-[10.5px] uppercase tracking-[0.2em] ${
+                isEdit
+                  ? "text-stone-500 group-hover:text-sky-300/80"
+                  : "text-stone-600"
+              }`}
+            >
               설정
             </span>
             <span className="font-serif text-[12.5px]">세계관·인물·메모</span>
@@ -249,22 +320,30 @@ export function EpisodeEditForm({
               }}
             >
               <Check size={12} aria-hidden="true" />
-              {loading ? "저장 중..." : "저장"}
+              {loading
+                ? isEdit
+                  ? "저장 중..."
+                  : "등록 중..."
+                : isEdit
+                  ? "저장"
+                  : "등록"}
             </button>
           </div>
         </footer>
       </form>
 
-      <SettingsDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        workId={workId}
-        episodeId={episodeId}
-        episodeNumber={episodeNumber}
-        initialWorld={initialWorld}
-        initialCharacters={initialCharacters}
-        onUnsavedChange={setDrawerUnsaved}
-      />
+      {isEdit && episodeId != null && (
+        <SettingsDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          workId={workId}
+          episodeId={episodeId}
+          episodeNumber={episodeNumber}
+          initialWorld={initialWorld}
+          initialCharacters={initialCharacters}
+          onUnsavedChange={setDrawerUnsaved}
+        />
+      )}
     </>
   );
 }
