@@ -26,7 +26,12 @@ interface SettingsDrawerProps {
   open: boolean;
   onClose: () => void;
   workId: number;
-  episodeId: number;
+  /**
+   * 단계 D-fixup-4 (분기 X-5-α + δ 통합): 새 회차 mode 시 null 정합.
+   * memo tab = episodeId null 시 비활성 + 안내 (MemoBody UPSERT 사양 정합).
+   * world / characters tab = episodeId 무관 (works UPDATE 사양 영속화 정합).
+   */
+  episodeId: number | null;
   episodeNumber: number;
   initialWorld: WorldSetting;
   initialCharacters: CharacterSettings;
@@ -246,17 +251,32 @@ export function SettingsDrawer({
           ] as const
         ).map(({ id, label }) => {
           const isActive = tab === id;
+          // 단계 D-fixup-4: memo tab = episodeId null 시 비활성 (MemoBody UPSERT 정합).
+          const isMemoDisabled = id === "memo" && episodeId == null;
           return (
             <button
               key={id}
               type="button"
-              onClick={() => setTab(id)}
+              onClick={() => {
+                if (isMemoDisabled) return;
+                setTab(id);
+              }}
+              disabled={isMemoDisabled}
+              title={
+                isMemoDisabled
+                  ? "회차 등록 후 메모를 사용할 수 있습니다."
+                  : undefined
+              }
               className={`relative flex-1 py-3.5 text-center font-serif text-[14px] transition-colors ${
-                isActive ? "text-stone-100" : "text-stone-500 hover:text-stone-300"
+                isMemoDisabled
+                  ? "cursor-not-allowed text-stone-700"
+                  : isActive
+                    ? "text-stone-100"
+                    : "text-stone-500 hover:text-stone-300"
               }`}
             >
               {label}
-              {isActive && (
+              {isActive && !isMemoDisabled && (
                 <span className="absolute bottom-0 left-1/4 right-1/4 h-px bg-sky-400" />
               )}
             </button>
@@ -288,7 +308,7 @@ export function SettingsDrawer({
             onDelete={removeCharacter}
           />
         </div>
-        {tab === "memo" && (
+        {tab === "memo" && episodeId != null && (
           <MemoBody episodeId={episodeId} episodeNumber={episodeNumber} />
         )}
       </div>

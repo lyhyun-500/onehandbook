@@ -166,48 +166,26 @@ export function EpisodeEditForm({
           </div>
           <button
             type="button"
-            onClick={() => {
-              if (!isEdit) {
-                // 단계 D-fixup-3: 새 회차 mode = SettingsDrawer 비활성화
-                // (episodeId 부재, MemoBody UPSERT 사양 정합 위해 등록 후 진입 필수).
-                setError(
-                  "회차 등록 후 설정 (세계관·인물·메모) 을 편집할 수 있습니다. 먼저 회차를 등록해 주세요.",
-                );
-                return;
-              }
-              setDrawerOpen(true);
-            }}
-            className={`group relative flex items-center gap-2 rounded-md border border-stone-700 bg-stone-900/70 px-3 py-2 text-[12px] text-stone-200 backdrop-blur transition-colors ${
-              isEdit
-                ? "hover:border-sky-400/40 hover:bg-sky-400/[0.08] hover:text-sky-200"
-                : "opacity-60"
-            }`}
+            onClick={() => setDrawerOpen(true)}
+            className="group relative flex items-center gap-2 rounded-md border border-stone-700 bg-stone-900/70 px-3 py-2 text-[12px] text-stone-200 backdrop-blur transition-colors hover:border-sky-400/40 hover:bg-sky-400/[0.08] hover:text-sky-200"
             aria-label="설정 패널 열기"
             title={
               isEdit
                 ? "세계관·인물·메모 설정"
-                : "회차 등록 후 사용 가능"
+                : "세계관·인물 설정 (메모는 회차 등록 후 사용 가능)"
             }
           >
             <PanelRight
               size={13}
               aria-hidden="true"
-              className={
-                isEdit
-                  ? "text-stone-400 group-hover:text-sky-300"
-                  : "text-stone-500"
-              }
+              className="text-stone-400 group-hover:text-sky-300"
             />
-            <span
-              className={`font-mono text-[10.5px] uppercase tracking-[0.2em] ${
-                isEdit
-                  ? "text-stone-500 group-hover:text-sky-300/80"
-                  : "text-stone-600"
-              }`}
-            >
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-stone-500 group-hover:text-sky-300/80">
               설정
             </span>
-            <span className="font-serif text-[12.5px]">세계관·인물·메모</span>
+            <span className="font-serif text-[12.5px]">
+              {isEdit ? "세계관·인물·메모" : "세계관·인물"}
+            </span>
             {drawerUnsaved && (
               <span className="absolute right-2.5 top-2 flex h-1.5 w-1.5">
                 <span className="absolute inset-0 animate-ping rounded-full bg-amber-400/60" />
@@ -332,18 +310,19 @@ export function EpisodeEditForm({
         </footer>
       </form>
 
-      {isEdit && episodeId != null && (
-        <SettingsDrawer
-          open={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          workId={workId}
-          episodeId={episodeId}
-          episodeNumber={episodeNumber}
-          initialWorld={initialWorld}
-          initialCharacters={initialCharacters}
-          onUnsavedChange={setDrawerUnsaved}
-        />
-      )}
+      {/* 단계 D-fixup-4 (분기 X-5-α+δ 통합):
+          새 회차 mode 도 SettingsDrawer mount (세계관 + 인물 = works UPDATE, episodeId 무관).
+          메모 tab = SettingsDrawer 내부에서 episodeId null 시 비활성 (MemoBody UPSERT 정합). */}
+      <SettingsDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        workId={workId}
+        episodeId={episodeId ?? null}
+        episodeNumber={episodeNumber}
+        initialWorld={initialWorld}
+        initialCharacters={initialCharacters}
+        onUnsavedChange={setDrawerUnsaved}
+      />
     </>
   );
 }
