@@ -109,6 +109,8 @@ export function BatchAnalyzeModal({
   const [phase, setPhase] = useState<"idle" | "submitting" | "launched">(
     "idle",
   );
+  // 단계 D-fixup-1 (결정 33 UX-1 + 34 D-1): 추출 단계 = 통합 "분석 중" UX.
+  const [extracting, setExtracting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conflictIds, setConflictIds] = useState<Set<number>>(new Set());
 
@@ -347,9 +349,11 @@ export function BatchAnalyzeModal({
     try {
       // 의제 신규-1+2 단계 C-4: NULL 분기 시 추출 API 선행 (결정 11 옵션 EX-3 +
       // 결정 12 옵션 IN-1). 분석 대상 = 선택 첫 회차 본문 (옵션 B-1 정합).
+      // 단계 D-fixup-1 (결정 33 UX-1): 추출 단계 = 통합 "분석 중" UX (extracting state).
       if (loreNullCase !== "both_present") {
         const firstEpId = selectedEpisodeIds[0];
         if (firstEpId != null) {
+          setExtracting(true);
           const exRes = await fetch(`/api/works/${workId}/extract-lore`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -365,8 +369,10 @@ export function BatchAnalyzeModal({
                 : "추출 실패";
             setError(`추출 실패: ${msg}`);
             setPhase("idle");
+            setExtracting(false);
             return;
           }
+          setExtracting(false);
         }
       }
 
@@ -533,6 +539,8 @@ export function BatchAnalyzeModal({
                 chunkCount={chunkCount}
                 error={error}
                 loreNullPrompt={loreNullPrompt}
+                extracting={extracting}
+                analyzing={phase === "submitting"}
               />
             </div>
 
@@ -789,6 +797,8 @@ function SummaryPanel({
   chunkCount,
   error,
   loreNullPrompt,
+  extracting,
+  analyzing,
 }: {
   state: "A" | "B" | "C" | "D" | "E";
   selectedCount: number;
@@ -807,6 +817,8 @@ function SummaryPanel({
   chunkCount: number;
   error: string | null;
   loreNullPrompt: string | null;
+  extracting: boolean;
+  analyzing: boolean;
 }) {
   const insufficient = state === "D";
 
@@ -855,6 +867,25 @@ function SummaryPanel({
           {loreNullPrompt && (
             <div className="rounded-md border border-amber-400/30 bg-amber-400/[0.05] px-3 py-2.5 text-[11.5px] leading-relaxed text-amber-100/95">
               <p className="whitespace-pre-wrap">{loreNullPrompt}</p>
+            </div>
+          )}
+
+          {/* 단계 D-fixup-1 (결정 33 UX-1 + 34 D-1 + 35 P-1/T-1):
+              추출 + 분석 = 통합 "분석 중" UX + 단계 명시 + spinner only. */}
+          {(extracting || analyzing) && (
+            <div className="flex items-center gap-2.5 rounded-md border border-sky-400/30 bg-sky-400/[0.06] px-3 py-2.5">
+              <span
+                className="inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-sky-400/30 border-t-sky-300"
+                style={{ animation: "na-spin 1.1s linear infinite" }}
+                aria-hidden="true"
+              />
+              <p className="font-serif text-[11.5px] text-sky-100">
+                분석 중 —{" "}
+                <span className="text-sky-300">
+                  {extracting ? "세계관·인물 추출 중" : "분석 진행 중"}
+                </span>
+                …
+              </p>
             </div>
           )}
 
