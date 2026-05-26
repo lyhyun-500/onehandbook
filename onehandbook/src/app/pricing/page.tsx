@@ -11,7 +11,7 @@ import { PolicySection } from "./_components/PolicySection";
 import { FAQSection } from "./_components/FAQSection";
 
 export const metadata: Metadata = {
-  title: `NAT 충전 · ${SITE_NAME}`,
+  title: "NAT 충전",
   description: `${SITE_NAME} NAT 패키지 안내 + 차감 정책 + FAQ`,
 };
 
