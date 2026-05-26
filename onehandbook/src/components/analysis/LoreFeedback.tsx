@@ -97,7 +97,7 @@ export function LoreFeedback({ workId, shouldShow }: LoreFeedbackProps) {
         에이전트가 추출한 세계관·인물이 적합한가요?
       </h3>
       <p className="mt-1 font-serif text-[12.5px] leading-relaxed text-stone-400">
-        피드백은 추출 정확도 개선에 사용됩니다. 인센티브는 별도로 없습니다.
+        피드백은 추출 정확도 개선에 사용됩니다.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
