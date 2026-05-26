@@ -194,6 +194,8 @@ export function BatchAnalyzeModal({
 
   const chunkCount = Math.ceil(selectedList.length / HOLISTIC_CLIENT_CHUNK_SIZE) || 0;
   const overLimit = selectedList.length > HOLISTIC_MAX_EPISODES;
+  // Inngest 전환 전 임시 차단 (client-driven chunking driver 부재로 11화 이상 좀비 잡 방지).
+  const chunkingDisabled = selectedList.length > HOLISTIC_CLIENT_CHUNK_SIZE;
 
   // NAT 비용 (운영 정합 — 의제 신규-1+2: includeLore 폐기)
   const natOpts: NatAnalysisOptions = {
@@ -343,6 +345,12 @@ export function BatchAnalyzeModal({
     if (selectedList.length === 0) return;
     if (insufficient) return;
     if (overLimit) return;
+    if (chunkingDisabled) {
+      setError(
+        "현재 11회차 이상 일괄분석은 시스템 개선 작업으로 일시 중단되었습니다.",
+      );
+      return;
+    }
     setPhase("submitting");
     setError(null);
     setConflictIds(new Set());
@@ -418,6 +426,16 @@ export function BatchAnalyzeModal({
         // NAT 부족은 이미 D상태로 사전 표시됨 — 서버 응답 일치 확인용 fallback
         setError(data.error ?? "NAT가 부족합니다.");
         setPhase("idle");
+        return;
+      }
+      if (res.status === 503 && data.code === "BATCH_TEMPORARILY_DISABLED") {
+        // UI 가드 우회 (cache stale / 직접 API 호출) 대비 fallback.
+        setError(
+          data.error ??
+            "현재 11회차 이상 일괄분석은 시스템 개선 작업으로 일시 중단되었습니다.",
+        );
+        setPhase("idle");
+        setConfirming(false);
         return;
       }
       setError(data.error ?? "분석 작업을 시작할 수 없습니다.");
@@ -536,6 +554,7 @@ export function BatchAnalyzeModal({
                   setConfirming(false);
                 }}
                 overLimit={overLimit}
+                chunkingDisabled={chunkingDisabled}
                 chunkCount={chunkCount}
                 error={error}
                 loreNullPrompt={loreNullPrompt}
@@ -552,6 +571,11 @@ export function BatchAnalyzeModal({
                     (최대 {HOLISTIC_MAX_EPISODES}화 초과)
                   </span>
                 )}
+                {!overLimit && chunkingDisabled && (
+                  <span className="ml-2 text-rose-300/90">
+                    (11회차 이상 일시 중단)
+                  </span>
+                )}
               </div>
               <FooterActions
                 state={state}
@@ -562,7 +586,7 @@ export function BatchAnalyzeModal({
                 onTopUp={() => router.push("/billing")}
                 submitting={phase === "submitting"}
                 natTotal={natEst.total}
-                disabledExecute={overLimit}
+                disabledExecute={overLimit || chunkingDisabled}
               />
             </footer>
           </>
@@ -794,6 +818,7 @@ function SummaryPanel({
   platform,
   setPlatform,
   overLimit,
+  chunkingDisabled,
   chunkCount,
   error,
   loreNullPrompt,
@@ -814,6 +839,7 @@ function SummaryPanel({
   platform: string;
   setPlatform: (v: string) => void;
   overLimit: boolean;
+  chunkingDisabled: boolean;
   chunkCount: number;
   error: string | null;
   loreNullPrompt: string | null;
@@ -951,6 +977,13 @@ function SummaryPanel({
           {overLimit && (
             <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-[11.5px] text-rose-200">
               한 번에 최대 {HOLISTIC_MAX_EPISODES}화까지 분석할 수 있습니다.
+            </div>
+          )}
+
+          {!overLimit && chunkingDisabled && (
+            <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-[11.5px] leading-relaxed text-rose-200">
+              11회차 이상 일괄분석은 시스템 개선 작업으로 일시 중단되었습니다.
+              10회차 이하로 선택해주세요.
             </div>
           )}
 

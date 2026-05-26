@@ -77,6 +77,18 @@ export async function POST(request: Request) {
     );
   }
 
+  // 임시 차단 (Inngest 전환 전까지): client-driven chunking driver 부재로 11화 이상 좀비 잡 방지.
+  if (episodeIds.length > HOLISTIC_CLIENT_CHUNK_SIZE) {
+    return NextResponse.json(
+      {
+        error:
+          "현재 11회차 이상 일괄분석은 시스템 개선 작업으로 일시 중단되었습니다.",
+        code: "BATCH_TEMPORARILY_DISABLED" as const,
+      },
+      { status: 503 }
+    );
+  }
+
   const forceUnchanged = body.force === true;
 
   const opts = parseNatOptions(body);

@@ -8,6 +8,7 @@ import {
   workContextAllowsContentUnchanged,
 } from "@/lib/analysis/workAnalysisContextHash";
 import { isMissingWorkContextHashColumnError } from "@/lib/analysis/analysisResultsWorkContextSupport";
+import { HOLISTIC_CLIENT_CHUNK_SIZE } from "@/lib/analysis/holisticEpisodeChunks";
 
 type PrecheckAnalysisResultRow = {
   episode_id: unknown;
@@ -64,6 +65,18 @@ export async function POST(request: Request) {
 
   if (episodeIds.length === 0) {
     return NextResponse.json({ error: "유효한 episodeId가 없습니다." }, { status: 400 });
+  }
+
+  // 임시 차단 (Inngest 전환 전까지): /api/analyze-batch-holistic 와 동일 정책.
+  if (episodeIds.length > HOLISTIC_CLIENT_CHUNK_SIZE) {
+    return NextResponse.json(
+      {
+        error:
+          "현재 11회차 이상 일괄분석은 시스템 개선 작업으로 일시 중단되었습니다.",
+        code: "BATCH_TEMPORARILY_DISABLED" as const,
+      },
+      { status: 503 }
+    );
   }
 
   const appUser = await syncAppUser(supabase);
