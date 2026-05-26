@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SITE_NAME, CONTACT_EMAIL } from "@/config/site";
 
 export const metadata: Metadata = {
-  title: `개인정보처리방침 · ${SITE_NAME}`,
+  title: "개인정보처리방침",
   description: `${SITE_NAME} 개인정보 수집·이용 안내`,
 };
 

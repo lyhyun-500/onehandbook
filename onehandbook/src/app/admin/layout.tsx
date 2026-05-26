@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/admin/requireAdmin";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 
 export const metadata = {
-  title: "Novel Agent — 어드민",
+  title: "어드민",
 };
 
 export default async function AdminLayout({

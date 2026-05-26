@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SITE_NAME, CONTACT_EMAIL } from "@/config/site";
 
 export const metadata: Metadata = {
-  title: `환불 정책 · ${SITE_NAME}`,
+  title: "환불 정책",
   description: `${SITE_NAME} NAT 구매 환불 안내`,
 };
 

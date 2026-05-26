@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SITE_NAME, CONTACT_EMAIL } from "@/config/site";
 
 export const metadata: Metadata = {
-  title: `이용약관 · ${SITE_NAME}`,
+  title: "이용약관",
   description: `${SITE_NAME} 서비스 이용약관`,
 };
 
