@@ -343,4 +343,52 @@
 
 ---
 
+## ADR-0028 정정 사항 (2026-05-27)
+
+본 세션의 Paddle 진단 결과로 식별된 사실 정정. 상세는 `docs/adr/ADR-0028-paddle-price-id-root-cause-and-p4-fallback.md` 참조.
+
+### Paddle 스키마 사실 (8건 정정)
+- `paddle_price_nat_mapping.active` (NOT `is_active`)
+- `paddle_price_nat_mapping.description` (NOT `product_code`)
+- `paddle_transactions.id` = paddle txn id 자체 (별도 `paddle_transaction_id` 컬럼 없음)
+- `paddle_transactions.nat_credited` = integer (NOT boolean, 충전 NAT 양 저장)
+- `paddle_transactions.status` enum: `completed` / `failed` / `refunded` / `unmapped`
+- `paddle_webhooks.id` = paddle event id 자체 (별도 `event_id` 컬럼 없음)
+- `paddle_webhooks` 에 `received_at` 컬럼 없음 (`created_at` 사용)
+- `paddle_subscriptions.id` = paddle sub id 자체 (별도 `paddle_subscription_id` 컬럼 없음)
+
+### credit_nat RPC 사실 (4건)
+- arg 8개: `p_user_id`, `p_amount`, `p_reason`, `p_ref_type`, `p_ref_id`, `p_metadata`, `p_expires_at`, `p_grant_type`
+- reason allowlist (lowercase 6종): `purchase_credit` / `refund` / `bonus` / `admin_adjust` / `manual_adjust` / `other`
+- `coin_logs.reason` 저장값 = UPPERCASE 매핑 (예: `purchase_credit` → `PURCHASE_CREDIT`)
+- `grant_type` 자동 추론 (`purchase_credit`/`refund` → `paid`, 그 외 → `bonus`)
+- `expires_at` default = 5년 (ADR-0011)
+
+### coin_logs 스키마 사실 (4건)
+- `balance_after` 컬럼 없음 (delta only)
+- `amount = 0` 금지 (DB CHECK)
+- `type` enum: `EARN` / `USE` / `EXPIRE` (sign 강제)
+- `reason` 자유 문자열 (DB CHECK 없음, RPC 내부 룰만)
+
+### Paddle webhook 처리 메커니즘 사실
+- `paddle_webhooks.error` 컬럼 = 마킹 용도만 (`markWebhookProcessed` 가 항상 NULL UPDATE, handler throw 시 자동 기록 안 됨)
+- `waitUntil` 의 `.catch` 가 `console.error` 만 → webhook 응답 항상 200 (Paddle 재시도 trigger 안 됨)
+- Cron 워커 미구현 → queue 분기 (`subscription.canceled`/`updated` 등 5종) 영구 정체
+- TS-003 처방 (sync 강제) 후에도 handler 내부 throw 시 동일 정체
+
+### 본 세션 처방 (ADR-0028)
+- price_id 추출 path 처방 (commit `82f67ae`): `items[0].price.id` (nested) 우선 + `items[0].price_id` (단축) fallback
+- P4 custom_data fallback (commit `f6c68b8` + `0761860`): `paddle_customer_id` 미매핑 케이스 처방
+- LEE-only E2E 진입점 (commit `819a08b` + `c6c3deb`): `userRow.id IN (1, 12)` 화이트리스트 + TopBar + 홈 Link
+- production 진입 (ADR-0004 Go/No-Go) 전 `PADDLE_E2E_TEST_TEMPORARY` 마커 2건 제거 의제
+
+### TS 정의 갭 사실
+`event-types.ts` 의 Paddle 타입 정의 일관성:
+- `PaddleSubscription.items[]` = nested 정의 (`price: { id: string }`)
+- `PaddleTransaction.items[]` = 단축 정의 (`price_id: string`) — 본 처방으로 nested 추가 + price_id optional 화
+
+→ Paddle webhook payload 사실 = 둘 다 nested (`items[].price.id`). 단축 path 는 Paddle 측 미발송 사실.
+
+---
+
 **End of CLAUDE.md**
