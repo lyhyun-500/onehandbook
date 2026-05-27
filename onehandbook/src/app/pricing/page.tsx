@@ -269,7 +269,6 @@ export default async function PricingPage({
         <span className="text-stone-700" title="사업자 등록 완료 후 안내 예정">
           사업자 정보
         </span>
-        <span className="ml-auto">Powered by Paddle</span>
       </footer>
       </div>
     </div>

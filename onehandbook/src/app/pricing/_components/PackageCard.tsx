@@ -94,10 +94,6 @@ export function PackageCard({ pkg, autoFeatured, userEmail, userId }: PackageCar
         userId={userId}
         recommended={recommended}
       />
-
-      <div className="mt-2 text-center font-mono text-[9.5px] uppercase tracking-widest text-stone-600">
-        Powered by Paddle
-      </div>
     </article>
   );
 }
