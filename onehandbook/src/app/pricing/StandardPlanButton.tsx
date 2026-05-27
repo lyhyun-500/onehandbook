@@ -6,7 +6,13 @@ import { useAnalysisJobs } from "@/contexts/AnalysisJobsContext";
 import { openCheckout } from "@/lib/paddle/client";
 import { PADDLE_PRICES } from "@/lib/paddle/config";
 
-export function StandardPlanButton({ userEmail }: { userEmail: string | null }) {
+export function StandardPlanButton({
+  userEmail,
+  userId,
+}: {
+  userEmail: string | null;
+  userId: number | null;
+}) {
   const router = useRouter();
   const { pushToast } = useAnalysisJobs();
   const [busy, setBusy] = useState(false);
@@ -25,6 +31,7 @@ export function StandardPlanButton({ userEmail }: { userEmail: string | null }) 
     try {
       await openCheckout(PADDLE_PRICES.STANDARD_MONTHLY, {
         customerEmail: userEmail,
+        customData: userId != null ? { user_id: String(userId) } : undefined,
         onSuccess: () => {
           pushToast({
             message: "결제가 완료되었습니다. 잠시 후 NAT이 충전됩니다.",

@@ -85,7 +85,7 @@ export async function handleTransactionCompleted(
   }
 
   // 3) customer_id -> users.id 매핑
-  const { data: user, error: userError } = await supabase
+  let { data: user, error: userError } = await supabase
     .from("users")
     .select("id")
     .eq("paddle_customer_id", customerId)
@@ -95,6 +95,36 @@ export async function handleTransactionCompleted(
   if (userError) {
     console.error("[handleTransactionCompleted] 유저 조회 실패:", userError.message);
     return { success: false, reason: "user_lookup_failed" };
+  }
+
+  // P4 fallback — custom_data.user_id 로 매핑 재시도 (paddle_customer_id 미매핑 케이스)
+  if (!user) {
+    const customDataUserIdRaw = (txn.custom_data as Record<string, unknown> | undefined)?.user_id;
+    const customDataUserId =
+      typeof customDataUserIdRaw === "string" ? Number(customDataUserIdRaw) : NaN;
+
+    if (!isNaN(customDataUserId) && customDataUserId > 0) {
+      const { data: fallbackUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", customDataUserId)
+        .is("deleted_at", null)
+        .maybeSingle<{ id: number }>();
+
+      if (fallbackUser) {
+        user = fallbackUser;
+        // paddle_customer_id 영구 매핑 (후속 webhook 처리 최적화)
+        await supabase
+          .from("users")
+          .update({ paddle_customer_id: customerId })
+          .eq("id", fallbackUser.id);
+        console.log("[handleTransactionCompleted] custom_data fallback 매핑 성공:", {
+          txnId,
+          customDataUserId,
+          customerId,
+        });
+      }
+    }
   }
 
   if (!user) {

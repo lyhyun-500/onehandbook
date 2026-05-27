@@ -69,6 +69,7 @@ export default async function PricingPage({
   // PADDLE_E2E_TEST_TEMPORARY: 재테스트 후 제거 예정
   let allowPaddleTest = false;
   let userEmailForTest: string | null = null;
+  let userIdForTest: number | null = null;
 
   if (user) {
     // public.users 행 + coin_logs 적립 최신 영역 (LEE 결정 Y1 (a) 정합)
@@ -81,6 +82,7 @@ export default async function PricingPage({
     if (userRow && (userRow.id === 1 || userRow.id === 12)) {
       allowPaddleTest = true;
       userEmailForTest = user.email ?? null;
+      userIdForTest = Number(userRow.id);
     }
 
     if (userRow) {
@@ -145,7 +147,7 @@ export default async function PricingPage({
           <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.25em] text-amber-300/85">
             ⚠ E2E TEST (admin only)
           </div>
-          <StandardPlanButton userEmail={userEmailForTest} />
+          <StandardPlanButton userEmail={userEmailForTest} userId={userIdForTest} />
         </div>
       )}
 
