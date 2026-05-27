@@ -24,30 +24,82 @@ export const metadata: Metadata = {
  */
 const PRICING_PACKAGES: PricingPackage[] = [
   {
-    id: "starter",
-    name: "스타터",
-    nat: 10,
+    id: "nat_5k",
+    name: "NAT 25팩",
+    nat: 25,
+    base_nat: 25,
+    bonus_nat: 0,
+    bonus_pct: 0,
     price_krw: 5000,
     is_recommended: false,
-    blurb: "감 잡고 싶을 때",
+    is_max: false,
+    paddle_price_id: "pri_01ksmh44g0636shcw5p4va893r",
+    blurb: "가볍게 시작",
   },
   {
-    id: "writer",
-    name: "작가",
-    nat: 30,
-    price_krw: 12000,
-    is_recommended: true,
-    blurb: "한 달 연재 분량",
-    save_pct: 20,
-  },
-  {
-    id: "pro",
-    name: "프로",
-    nat: 100,
-    price_krw: 35000,
+    id: "nat_10k",
+    name: "NAT 54팩",
+    nat: 54,
+    base_nat: 50,
+    bonus_nat: 4,
+    bonus_pct: 5,
+    price_krw: 10000,
     is_recommended: false,
-    blurb: "전업 작가용",
-    save_pct: 30,
+    is_max: false,
+    paddle_price_id: "pri_01ksmhc8zs3r9cyxjt99q17fqn",
+    blurb: "보너스 +4 NAT",
+  },
+  {
+    id: "nat_20k",
+    name: "NAT 110팩",
+    nat: 110,
+    base_nat: 100,
+    bonus_nat: 10,
+    bonus_pct: 10,
+    price_krw: 20000,
+    is_recommended: false,
+    is_max: false,
+    paddle_price_id: "pri_01ksmheefcc88njq29mt1mcfht",
+    blurb: "보너스 +10 NAT",
+  },
+  {
+    id: "nat_30k",
+    name: "NAT 174팩",
+    nat: 174,
+    base_nat: 150,
+    bonus_nat: 24,
+    bonus_pct: 15,
+    price_krw: 30000,
+    is_recommended: true,
+    is_max: false,
+    paddle_price_id: "pri_01ksmhfm5ch2svrh2y1tzytbeb",
+    blurb: "보너스 +24 NAT (추천)",
+  },
+  {
+    id: "nat_40k",
+    name: "NAT 240팩",
+    nat: 240,
+    base_nat: 200,
+    bonus_nat: 40,
+    bonus_pct: 20,
+    price_krw: 40000,
+    is_recommended: false,
+    is_max: false,
+    paddle_price_id: "pri_01ksmhgs0tbpgk9rj0ka073chf",
+    blurb: "보너스 +40 NAT",
+  },
+  {
+    id: "nat_50k",
+    name: "NAT 314팩",
+    nat: 314,
+    base_nat: 250,
+    bonus_nat: 64,
+    bonus_pct: 25,
+    price_krw: 50000,
+    is_recommended: false,
+    is_max: true,
+    paddle_price_id: "pri_01ksmhhqyea2ebm4v7jwendk14",
+    blurb: "보너스 +64 NAT (MAX)",
   },
 ];
 
@@ -71,6 +123,8 @@ export default async function PricingPage({
   let allowPaddleTest = false;
   let userEmailForTest: string | null = null;
   let userIdForTest: number | null = null;
+  let userEmail: string | null = null;
+  let userId: number | null = null;
 
   if (user) {
     // public.users 행 + coin_logs 적립 최신 영역 (LEE 결정 Y1 (a) 정합)
@@ -79,6 +133,9 @@ export default async function PricingPage({
       .select("id, coin_balance")
       .eq("auth_id", user.id)
       .maybeSingle();
+
+    userEmail = user.email ?? null;
+    userId = userRow?.id ?? null;
 
     if (userRow && (userRow.id === 1 || userRow.id === 12)) {
       allowPaddleTest = true;
@@ -184,7 +241,9 @@ export default async function PricingPage({
             <PackageCard
               key={pkg.id}
               pkg={pkg}
-              autoFeatured={lowBalance && pkg.id === "writer"}
+              autoFeatured={pkg.is_recommended}
+              userEmail={userEmail}
+              userId={userId}
             />
           ))}
         </div>

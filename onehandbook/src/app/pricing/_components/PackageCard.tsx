@@ -1,21 +1,27 @@
-import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RecommendedBadge } from "@/components/atoms/RecommendedBadge";
+import { NatPackageButton } from "../NatPackageButton";
 
 export interface PricingPackage {
   id: string;
   name: string;
   nat: number;
+  base_nat: number;
+  bonus_nat: number;
+  bonus_pct: number;
   price_krw: number;
   is_recommended: boolean;
+  is_max: boolean;
+  paddle_price_id: string;
   blurb: string;
-  save_pct?: number;
 }
 
 interface PackageCardProps {
   pkg: PricingPackage;
   /** 402 INSUFFICIENT_NAT + 작가 패키지 영역 강조 본질. */
   autoFeatured: boolean;
+  userEmail: string | null;
+  userId: number | null;
 }
 
 function formatKRW(n: number): string {
@@ -29,7 +35,7 @@ function formatKRW(n: number): string {
  * StandardPlanButton.tsx 파일 = LEE 결정 Y5 보존 (Paddle 본질 영역 유지).
  * 별 sub-phase 에서 PackageCard 영역 결제 본질 통합 예정.
  */
-export function PackageCard({ pkg, autoFeatured }: PackageCardProps) {
+export function PackageCard({ pkg, autoFeatured, userEmail, userId }: PackageCardProps) {
   const recommended = pkg.is_recommended || autoFeatured;
   const perNat = Math.round(pkg.price_krw / pkg.nat);
 
@@ -71,9 +77,9 @@ export function PackageCard({ pkg, autoFeatured }: PackageCardProps) {
           <span className="font-mono text-[20px] tabular-nums text-stone-200">
             {formatKRW(pkg.price_krw)}
           </span>
-          {pkg.save_pct ? (
+          {pkg.bonus_pct > 0 ? (
             <span className="font-mono text-[10px] uppercase tracking-widest text-emerald-300/85">
-              −{pkg.save_pct}%
+              +{pkg.bonus_pct}%
             </span>
           ) : null}
         </div>
@@ -82,21 +88,12 @@ export function PackageCard({ pkg, autoFeatured }: PackageCardProps) {
         </div>
       </div>
 
-      <button
-        type="button"
-        disabled
-        title="베타 기간 — 결제 연동 준비 중"
-        className={cn(
-          "mt-auto flex items-center justify-center gap-1.5 rounded-md px-3 py-2.5 text-[12.5px] font-medium",
-          "cursor-not-allowed opacity-60",
-          recommended
-            ? "bg-sky-400 text-stone-950"
-            : "bg-sky-500 text-stone-950",
-        )}
-      >
-        구매하기
-        <ChevronRight size={12} aria-hidden="true" />
-      </button>
+      <NatPackageButton
+        priceId={pkg.paddle_price_id}
+        userEmail={userEmail}
+        userId={userId}
+        recommended={recommended}
+      />
 
       <div className="mt-2 text-center font-mono text-[9.5px] uppercase tracking-widest text-stone-600">
         Powered by Paddle
