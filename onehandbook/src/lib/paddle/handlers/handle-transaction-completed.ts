@@ -34,7 +34,10 @@ export async function handleTransactionCompleted(
   const txn = event.data;
   const txnId = txn.id;
   const customerId = txn.customer_id;
-  const priceId = txn.items[0]?.price_id;
+  const firstItem = txn.items?.[0];
+  const priceId =
+    (firstItem as { price?: { id?: string } } | undefined)?.price?.id ??
+    (firstItem as { price_id?: string } | undefined)?.price_id;
 
   if (!customerId) {
     console.error("[handleTransactionCompleted] customer_id 없음:", txnId);
