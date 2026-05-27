@@ -10,6 +10,7 @@ import {
 import { PolicySection } from "./_components/PolicySection";
 import { FAQSection } from "./_components/FAQSection";
 import { StandardPlanButton } from "./StandardPlanButton";
+import { TopBar } from "@/components/shell/TopBar";
 
 export const metadata: Metadata = {
   title: "NAT 충전",
@@ -103,7 +104,17 @@ export default async function PricingPage({
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
+    <div className="flex min-h-screen flex-col bg-stone-950 text-stone-200">
+      <TopBar
+        title="NAT 충전"
+        natBalance={balance}
+        actions={
+          <Link href="/" className="text-sm text-stone-400 transition hover:text-stone-200">
+            홈으로
+          </Link>
+        }
+      />
+      <div className="mx-auto w-full max-w-5xl px-6 py-8">
       {/* 402 INSUFFICIENT_NAT alert strip (?from=insufficient 진입) */}
       {lowBalance && (
         <div className="mb-5 flex items-start gap-3 rounded-lg border border-amber-400/30 bg-amber-400/[0.06] px-4 py-3">
@@ -201,6 +212,7 @@ export default async function PricingPage({
         </span>
         <span className="ml-auto">Powered by Paddle</span>
       </footer>
+      </div>
     </div>
   );
 }
