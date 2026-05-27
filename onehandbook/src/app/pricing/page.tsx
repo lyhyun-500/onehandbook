@@ -9,6 +9,7 @@ import {
 } from "./_components/PackageCard";
 import { PolicySection } from "./_components/PolicySection";
 import { FAQSection } from "./_components/FAQSection";
+import { StandardPlanButton } from "./StandardPlanButton";
 
 export const metadata: Metadata = {
   title: "NAT 충전",
@@ -65,6 +66,9 @@ export default async function PricingPage({
 
   let balance = 0;
   let lastChargedAt: string | null = null;
+  // PADDLE_E2E_TEST_TEMPORARY: 재테스트 후 제거 예정
+  let allowPaddleTest = false;
+  let userEmailForTest: string | null = null;
 
   if (user) {
     // public.users 행 + coin_logs 적립 최신 영역 (LEE 결정 Y1 (a) 정합)
@@ -73,6 +77,11 @@ export default async function PricingPage({
       .select("id, coin_balance")
       .eq("auth_id", user.id)
       .maybeSingle();
+
+    if (userRow && (userRow.id === 1 || userRow.id === 12)) {
+      allowPaddleTest = true;
+      userEmailForTest = user.email ?? null;
+    }
 
     if (userRow) {
       balance = (userRow.coin_balance as number | null) ?? 0;
@@ -129,6 +138,16 @@ export default async function PricingPage({
         lastChargedAt={lastChargedAt}
         lowBalance={lowBalance}
       />
+
+      {/* PADDLE_E2E_TEST_TEMPORARY: 재테스트 후 제거 예정 */}
+      {allowPaddleTest && (
+        <div className="mt-6 rounded-lg border-2 border-dashed border-amber-400/60 bg-amber-400/[0.04] p-4">
+          <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.25em] text-amber-300/85">
+            ⚠ E2E TEST (admin only)
+          </div>
+          <StandardPlanButton userEmail={userEmailForTest} />
+        </div>
+      )}
 
       <section className="mt-8">
         <header className="mb-4 flex items-end justify-between">
