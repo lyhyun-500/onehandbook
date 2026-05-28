@@ -7,7 +7,6 @@
 const NAT_POLICY: { range: string; cost: string; hint: string }[] = [
   { range: "6,000자 이하", cost: "1", hint: "단편·콩트" },
   { range: "6,001 – 10,000자", cost: "2", hint: "일반 연재 회차" },
-  { range: "10,001자 이상", cost: "3", hint: "장편 회차·합본" },
   { range: "플랫폼 최적화 옵션", cost: "+1", hint: "회차당 추가, 선택 옵션" },
 ];
 
@@ -24,7 +23,7 @@ export function PolicySection() {
           </h3>
         </div>
         <span className="font-mono text-[10px] text-stone-600">
-          v1.4 · 2026-04 기준
+          v1.5 · 2026-05 기준
         </span>
       </header>
 
