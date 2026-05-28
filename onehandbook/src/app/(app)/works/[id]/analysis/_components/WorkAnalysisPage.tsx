@@ -41,18 +41,26 @@ interface WorkAnalysisPageProps {
   shouldShowLoreFeedback: boolean;
 }
 
-function buildHolisticRunView(row: HolisticRunRow): HolisticRunView {
+function buildHolisticRunView(
+  row: HolisticRunRow,
+  episodes: EpisodeRef[],
+): HolisticRunView {
   const r = row.result_json;
   const platform = getAgentPlatformLabel(row.agent_version) ?? "범용";
 
-  const episodeIds = row.episode_ids;
-  const minEp = episodeIds.length > 0 ? Math.min(...episodeIds) : null;
-  const maxEp = episodeIds.length > 0 ? Math.max(...episodeIds) : null;
+  // episode_ids = episodes.id 배열 → 실제 회차(episode_number)로 매핑·정렬 후 라벨 생성
+  const episodeIds = row.episode_ids ?? [];
+  const epNums = episodeIds
+    .map((eid) => episodes.find((e) => e.id === eid)?.episode_number)
+    .filter((n): n is number => typeof n === "number")
+    .sort((a, b) => a - b);
+  const minEp = epNums.length > 0 ? epNums[0] : null;
+  const maxEp = epNums.length > 0 ? epNums[epNums.length - 1] : null;
   const label =
     minEp != null && maxEp != null
       ? minEp === maxEp
         ? `${minEp}화`
-        : `${minEp}~${maxEp}화 통합`
+        : `${minEp}~${maxEp}화 (${epNums.length}개 회차)`
       : "선택 회차 통합";
 
   type RawEpisodeScore = { episode_number: number; score: number };
@@ -127,7 +135,9 @@ export function WorkAnalysisPage({
   const workAvgScore = averageOverallScore(latest);
   const lastAnalyzedAt = runs.length > 0 ? runs[0].created_at : null;
 
-  const holisticViews = holisticRuns.map(buildHolisticRunView);
+  const holisticViews = holisticRuns.map((r) =>
+    buildHolisticRunView(r, episodes),
+  );
 
   return (
     <>
