@@ -14,6 +14,7 @@ export interface PricingPackage {
   is_max: boolean;
   paddle_price_id: string;
   blurb: string;
+  analysis_chars_max: number;
 }
 
 interface PackageCardProps {
@@ -67,6 +68,9 @@ export function PackageCard({ pkg, autoFeatured, userEmail, userId }: PackageCar
           <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-sky-300/70">
             NAT
           </span>
+        </div>
+        <div className="mt-1.5 text-[12px] font-medium text-sky-300/90">
+          최대 {pkg.analysis_chars_max}만자 분석
         </div>
       </div>
 
