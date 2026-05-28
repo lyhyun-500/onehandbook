@@ -35,6 +35,7 @@ const PRICING_PACKAGES: PricingPackage[] = [
     is_max: false,
     paddle_price_id: "pri_01ksmh44g0636shcw5p4va893r",
     blurb: "가볍게 시작",
+    analysis_chars_max: 15,
   },
   {
     id: "nat_10k",
@@ -48,6 +49,7 @@ const PRICING_PACKAGES: PricingPackage[] = [
     is_max: false,
     paddle_price_id: "pri_01ksmhc8zs3r9cyxjt99q17fqn",
     blurb: "보너스 +4 NAT",
+    analysis_chars_max: 32,
   },
   {
     id: "nat_20k",
@@ -61,6 +63,7 @@ const PRICING_PACKAGES: PricingPackage[] = [
     is_max: false,
     paddle_price_id: "pri_01ksmheefcc88njq29mt1mcfht",
     blurb: "보너스 +10 NAT",
+    analysis_chars_max: 66,
   },
   {
     id: "nat_30k",
@@ -73,7 +76,8 @@ const PRICING_PACKAGES: PricingPackage[] = [
     is_recommended: true,
     is_max: false,
     paddle_price_id: "pri_01ksmhfm5ch2svrh2y1tzytbeb",
-    blurb: "보너스 +24 NAT (추천)",
+    blurb: "보너스 +24 NAT",
+    analysis_chars_max: 104,
   },
   {
     id: "nat_40k",
@@ -87,6 +91,7 @@ const PRICING_PACKAGES: PricingPackage[] = [
     is_max: false,
     paddle_price_id: "pri_01ksmhgs0tbpgk9rj0ka073chf",
     blurb: "보너스 +40 NAT",
+    analysis_chars_max: 144,
   },
   {
     id: "nat_50k",
@@ -99,7 +104,8 @@ const PRICING_PACKAGES: PricingPackage[] = [
     is_recommended: false,
     is_max: true,
     paddle_price_id: "pri_01ksmhhqyea2ebm4v7jwendk14",
-    blurb: "보너스 +64 NAT (MAX)",
+    blurb: "보너스 +64 NAT",
+    analysis_chars_max: 188,
   },
 ];
 
@@ -269,7 +275,6 @@ export default async function PricingPage({
         <span className="text-stone-700" title="사업자 등록 완료 후 안내 예정">
           사업자 정보
         </span>
-        <span className="ml-auto">Powered by Paddle</span>
       </footer>
       </div>
     </div>

@@ -91,28 +91,6 @@ export function CurrentBalanceCard({
           </div>
         </div>
 
-        {/* RIGHT — beta banner */}
-        <div className="shrink-0 rounded-lg border border-sky-400/25 bg-sky-400/[0.05] px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full border border-sky-400/30 bg-sky-400/[0.10] px-1.5 py-px font-mono text-[9px] uppercase tracking-widest text-sky-200">
-              <span
-                aria-hidden="true"
-                className="h-1 w-1 rounded-full bg-sky-300"
-              />
-              Beta
-            </span>
-            <span className="font-serif text-[13px] text-stone-200">
-              베타 기간 한정
-            </span>
-          </div>
-          <div className="mt-1.5 text-[11.5px] text-stone-400">
-            가입 시{" "}
-            <span className="font-mono tabular-nums text-sky-200">20 NAT</span>{" "}
-            자동 지급
-            <br />· 모든 패키지{" "}
-            <span className="text-stone-200">−15% 추가 할인</span> 적용 중
-          </div>
-        </div>
       </div>
     </section>
   );

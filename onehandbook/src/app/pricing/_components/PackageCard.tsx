@@ -14,6 +14,7 @@ export interface PricingPackage {
   is_max: boolean;
   paddle_price_id: string;
   blurb: string;
+  analysis_chars_max: number;
 }
 
 interface PackageCardProps {
@@ -68,6 +69,9 @@ export function PackageCard({ pkg, autoFeatured, userEmail, userId }: PackageCar
             NAT
           </span>
         </div>
+        <div className="mt-1.5 text-[12px] font-medium text-sky-300/90">
+          최대 {pkg.analysis_chars_max}만자 분석
+        </div>
       </div>
 
       <div className="mb-4 h-px bg-stone-800/70" aria-hidden="true" />
@@ -94,10 +98,6 @@ export function PackageCard({ pkg, autoFeatured, userEmail, userId }: PackageCar
         userId={userId}
         recommended={recommended}
       />
-
-      <div className="mt-2 text-center font-mono text-[9.5px] uppercase tracking-widest text-stone-600">
-        Powered by Paddle
-      </div>
     </article>
   );
 }
