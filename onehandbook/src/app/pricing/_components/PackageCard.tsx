@@ -38,7 +38,6 @@ function formatKRW(n: number): string {
  */
 export function PackageCard({ pkg, autoFeatured, userEmail, userId }: PackageCardProps) {
   const recommended = pkg.is_recommended || autoFeatured;
-  const perNat = Math.round(pkg.price_krw / pkg.nat);
 
   return (
     <article
@@ -86,9 +85,6 @@ export function PackageCard({ pkg, autoFeatured, userEmail, userId }: PackageCar
               +{pkg.bonus_pct}%
             </span>
           ) : null}
-        </div>
-        <div className="font-mono text-[10.5px] tabular-nums text-stone-500">
-          1 NAT 당 {formatKRW(perNat)}
         </div>
       </div>
 

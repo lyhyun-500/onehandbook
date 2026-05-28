@@ -21,15 +21,13 @@ export function countManuscriptChars(text: string): number {
 export function natBaseCostByLength(charCount: number): number {
   const n = Math.max(0, charCount);
   if (n <= 6000) return 1;
-  if (n <= 10000) return 2;
-  return 3;
+  return 2;
 }
 
 export function natLengthTierLabel(charCount: number): string {
   const n = Math.max(0, charCount);
   if (n <= 6000) return "6,000자 이하";
-  if (n <= 10000) return "6,001~10,000자";
-  return "10,000자 초과 (상한 구간)";
+  return "6,001~10,000자";
 }
 
 export function computeNatCost(
