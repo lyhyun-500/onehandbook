@@ -905,8 +905,15 @@ export function AnalyzePanel({
               );
               const data = (await res.json().catch(() => ({}))) as {
                 error?: string;
+                code?: string;
               };
               if (!res.ok) {
+                if (data.code === "LORE_ALREADY_PRESENT") {
+                  // 세계관·인물 양쪽 이미 존재 = 추출 불필요 → 분석 그대로 진행
+                  setExtracting(false);
+                  await requestAnalyze();
+                  return;
+                }
                 const msg =
                   typeof data.error === "string" && data.error.length > 0
                     ? data.error

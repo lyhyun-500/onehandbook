@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronRight, Plus, Trash2, X } from "lucide-react";
 import { Drawer } from "@/components/atoms/Drawer";
 import { RoleBadge } from "@/components/atoms/RoleBadge";
@@ -66,6 +67,7 @@ export function SettingsDrawer({
   initialCharacters,
   onUnsavedChange,
 }: SettingsDrawerProps) {
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("characters");
   const supabase = useMemo(() => createClient(), []);
 
@@ -172,6 +174,9 @@ export function SettingsDrawer({
         .update(payload)
         .eq("id", workId);
       if (error) throw error;
+
+      // 세계관·인물 저장 후 server component props 갱신 (lore 추출 stale 판정 방지)
+      router.refresh();
 
       setWorldInitial({ era, rules, background });
       initialCharsByKey.current.clear();

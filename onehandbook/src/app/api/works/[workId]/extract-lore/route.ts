@@ -106,7 +106,10 @@ export async function POST(
   const loreCase = getLoreNullCase(worldSetting, characterSettings);
   if (loreCase === "both_present") {
     return NextResponse.json(
-      { error: "세계관·인물 양쪽 이미 존재 — 추출 사양 부적용." },
+      {
+        error: "세계관·인물 양쪽 이미 존재 — 추출 사양 부적용.",
+        code: "LORE_ALREADY_PRESENT",
+      },
       { status: 400 },
     );
   }

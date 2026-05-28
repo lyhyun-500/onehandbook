@@ -370,15 +370,19 @@ export function BatchAnalyzeModal({
           if (!exRes.ok) {
             const exData = (await exRes.json().catch(() => ({}))) as {
               error?: string;
+              code?: string;
             };
-            const msg =
-              typeof exData.error === "string" && exData.error.length > 0
-                ? exData.error
-                : "추출 실패";
-            setError(`추출 실패: ${msg}`);
-            setPhase("idle");
-            setExtracting(false);
-            return;
+            if (exData.code !== "LORE_ALREADY_PRESENT") {
+              const msg =
+                typeof exData.error === "string" && exData.error.length > 0
+                  ? exData.error
+                  : "추출 실패";
+              setError(`추출 실패: ${msg}`);
+              setPhase("idle");
+              setExtracting(false);
+              return;
+            }
+            // 세계관·인물 양쪽 이미 존재 = 추출 불필요 → 일괄 분석 그대로 진행
           }
           setExtracting(false);
         }
