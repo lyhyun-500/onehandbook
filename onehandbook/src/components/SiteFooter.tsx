@@ -46,6 +46,7 @@ export function SiteFooter() {
             비즈니스 문의 · {CONTACT_EMAIL}
           </a>
         )}
+        <span className="text-stone-400">사업자 등록번호 884-02-03976</span>
       </div>
     </footer>
   );

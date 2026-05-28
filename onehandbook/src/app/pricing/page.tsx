@@ -277,10 +277,6 @@ export default async function PricingPage({
         <Link href="/refund" className="hover:text-stone-400">
           환불 정책
         </Link>
-        {/* 사업자 정보 = 9월 사업자 등록 후 link 적용 영역 (LEE 결정 Y3, CLAUDE.md 정합) */}
-        <span className="text-stone-700" title="사업자 등록 완료 후 안내 예정">
-          사업자 정보
-        </span>
       </footer>
       </div>
     </div>
