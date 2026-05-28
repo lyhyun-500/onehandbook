@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, FileText } from "lucide-react";
@@ -15,6 +16,7 @@ import { EmptyState } from "@/components/atoms/EmptyState";
 import { ScoreRangeLegend } from "@/components/atoms/ScoreRangeLegend";
 import { SourceBadge } from "@/components/atoms/SourceBadge";
 import { DimensionCard, type DimensionSummary } from "./DimensionCard";
+import { type EpisodeScorePoint } from "./EpisodeTrendChart";
 
 export interface EpisodeRef {
   id: number;
@@ -65,27 +67,33 @@ function deriveDimensionSummaries(
   const latest = latestAnalysisPerEpisode(runs);
   if (latest.size === 0) return [];
 
-  // 회차 오름차순으로 latest run 순회
+  // 회차 오름차순으로 latest run 순회 (회차번호 보존 — 펼침 차트용)
   const orderedRuns = episodes
-    .map((e) => latest.get(e.id))
-    .filter((r): r is AnalysisRunRow => r != null);
+    .map((e) => {
+      const run = latest.get(e.id);
+      return run ? { run, episodeNumber: e.episode_number } : null;
+    })
+    .filter(
+      (x): x is { run: AnalysisRunRow; episodeNumber: number } => x != null,
+    );
   if (orderedRuns.length === 0) return [];
 
   // 등장하는 dimension 키 (첫 latest run 기준 + fallback)
-  const firstKeys = Object.keys(orderedRuns[0].result_json.dimensions ?? {});
+  const firstKeys = Object.keys(orderedRuns[0].run.result_json.dimensions ?? {});
   const dimensionKeys =
     firstKeys.length > 0 ? firstKeys : TOP_DIMENSION_KEYS_FALLBACK;
 
   return dimensionKeys.map((key) => {
-    const scores: number[] = [];
+    const trend: EpisodeScorePoint[] = [];
     let latestComment = "";
-    for (const run of orderedRuns) {
+    for (const { run, episodeNumber } of orderedRuns) {
       const dim = run.result_json.dimensions?.[key];
       if (dim && typeof dim.score === "number") {
-        scores.push(dim.score);
+        trend.push({ episode_number: episodeNumber, score: dim.score });
         latestComment = dim.comment ?? latestComment;
       }
     }
+    const scores = trend.map((t) => t.score);
     const avgScore =
       scores.length > 0
         ? Math.round(scores.reduce((s, v) => s + v, 0) / scores.length)
@@ -96,6 +104,7 @@ function deriveDimensionSummaries(
       avgScore,
       trendDelta: null, // Phase 2-D-8-3 view-only — 후속 sub-phase 에서 본질 계산
       sparkline: scores,
+      trend,
       summary: latestComment || "코멘트 부재",
     };
   });
@@ -154,6 +163,7 @@ export function IndividualTab({
   workAvgScore,
 }: IndividualTabProps) {
   const router = useRouter();
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const dimensions = deriveDimensionSummaries(runs, episodes);
   const episodeRows = deriveEpisodeRows(runs, episodes);
   const hasAnalyses = episodeRows.length > 0;
@@ -237,7 +247,14 @@ export function IndividualTab({
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {dimensions.map((d) => (
-            <DimensionCard key={d.key} dim={d} />
+            <DimensionCard
+              key={d.key}
+              dim={d}
+              isExpanded={expandedKey === d.key}
+              onToggle={() =>
+                setExpandedKey((cur) => (cur === d.key ? null : d.key))
+              }
+            />
           ))}
         </div>
       </section>
