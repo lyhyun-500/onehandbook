@@ -9,7 +9,6 @@ import {
 } from "./_components/PackageCard";
 import { PolicySection } from "./_components/PolicySection";
 import { FAQSection } from "./_components/FAQSection";
-import { StandardPlanButton } from "./StandardPlanButton";
 import { TopBar } from "@/components/shell/TopBar";
 
 export const metadata: Metadata = {
@@ -22,6 +21,33 @@ export const metadata: Metadata = {
  *
  * X2 (a) 정합: 시안 본질 우선. CLAUDE.md 기존 패키지 (50/100/200) 영역과 충돌 — 별 sub-phase #88 영역 갱신.
  */
+const PADDLE_ENV = (
+  process.env.NEXT_PUBLIC_PADDLE_ENVIRONMENT ?? "sandbox"
+)
+  .trim()
+  .toLowerCase();
+
+const PADDLE_PRICE_IDS: Record<string, Record<string, string>> = {
+  sandbox: {
+    nat_5k: "pri_01ksmh44g0636shcw5p4va893r",
+    nat_10k: "pri_01ksmhc8zs3r9cyxjt99q17fqn",
+    nat_20k: "pri_01ksmheefcc88njq29mt1mcfht",
+    nat_30k: "pri_01ksmhfm5ch2svrh2y1tzytbeb",
+    nat_40k: "pri_01ksmhgs0tbpgk9rj0ka073chf",
+    nat_50k: "pri_01ksmhhqyea2ebm4v7jwendk14",
+  },
+  production: {
+    nat_5k: "pri_01kspd7ancysqn8rrkxwq69ysm",
+    nat_10k: "pri_01kspd8jd6z04g5darm0681txy",
+    nat_20k: "pri_01kspd9r2z3azknv8cmgzvp8pb",
+    nat_30k: "pri_01kspdaw2sv40hw5ys4k63004p",
+    nat_40k: "pri_01kspdcd8kg5dw224pqvfkk9vh",
+    nat_50k: "pri_01kspddg9w65zm9qdt5gwptqgw",
+  },
+};
+
+const priceIds = PADDLE_PRICE_IDS[PADDLE_ENV] ?? PADDLE_PRICE_IDS.sandbox;
+
 const PRICING_PACKAGES: PricingPackage[] = [
   {
     id: "nat_5k",
@@ -33,7 +59,7 @@ const PRICING_PACKAGES: PricingPackage[] = [
     price_krw: 5000,
     is_recommended: false,
     is_max: false,
-    paddle_price_id: "pri_01ksmh44g0636shcw5p4va893r",
+    paddle_price_id: priceIds.nat_5k,
     blurb: "가볍게 시작",
     analysis_chars_max: 15,
   },
@@ -47,7 +73,7 @@ const PRICING_PACKAGES: PricingPackage[] = [
     price_krw: 10000,
     is_recommended: false,
     is_max: false,
-    paddle_price_id: "pri_01ksmhc8zs3r9cyxjt99q17fqn",
+    paddle_price_id: priceIds.nat_10k,
     blurb: "보너스 +4 NAT",
     analysis_chars_max: 32,
   },
@@ -61,7 +87,7 @@ const PRICING_PACKAGES: PricingPackage[] = [
     price_krw: 20000,
     is_recommended: false,
     is_max: false,
-    paddle_price_id: "pri_01ksmheefcc88njq29mt1mcfht",
+    paddle_price_id: priceIds.nat_20k,
     blurb: "보너스 +10 NAT",
     analysis_chars_max: 66,
   },
@@ -75,7 +101,7 @@ const PRICING_PACKAGES: PricingPackage[] = [
     price_krw: 30000,
     is_recommended: true,
     is_max: false,
-    paddle_price_id: "pri_01ksmhfm5ch2svrh2y1tzytbeb",
+    paddle_price_id: priceIds.nat_30k,
     blurb: "보너스 +24 NAT",
     analysis_chars_max: 104,
   },
@@ -89,7 +115,7 @@ const PRICING_PACKAGES: PricingPackage[] = [
     price_krw: 40000,
     is_recommended: false,
     is_max: false,
-    paddle_price_id: "pri_01ksmhgs0tbpgk9rj0ka073chf",
+    paddle_price_id: priceIds.nat_40k,
     blurb: "보너스 +40 NAT",
     analysis_chars_max: 144,
   },
@@ -103,7 +129,7 @@ const PRICING_PACKAGES: PricingPackage[] = [
     price_krw: 50000,
     is_recommended: false,
     is_max: true,
-    paddle_price_id: "pri_01ksmhhqyea2ebm4v7jwendk14",
+    paddle_price_id: priceIds.nat_50k,
     blurb: "보너스 +64 NAT",
     analysis_chars_max: 188,
   },
@@ -125,10 +151,6 @@ export default async function PricingPage({
 
   let balance = 0;
   let lastChargedAt: string | null = null;
-  // PADDLE_E2E_TEST_TEMPORARY: 재테스트 후 제거 예정
-  let allowPaddleTest = false;
-  let userEmailForTest: string | null = null;
-  let userIdForTest: number | null = null;
   let userEmail: string | null = null;
   let userId: number | null = null;
 
@@ -142,12 +164,6 @@ export default async function PricingPage({
 
     userEmail = user.email ?? null;
     userId = userRow?.id ?? null;
-
-    if (userRow && (userRow.id === 1 || userRow.id === 12)) {
-      allowPaddleTest = true;
-      userEmailForTest = user.email ?? null;
-      userIdForTest = Number(userRow.id);
-    }
 
     if (userRow) {
       balance = (userRow.coin_balance as number | null) ?? 0;
@@ -214,16 +230,6 @@ export default async function PricingPage({
         lastChargedAt={lastChargedAt}
         lowBalance={lowBalance}
       />
-
-      {/* PADDLE_E2E_TEST_TEMPORARY: 재테스트 후 제거 예정 */}
-      {allowPaddleTest && (
-        <div className="mt-6 rounded-lg border-2 border-dashed border-amber-400/60 bg-amber-400/[0.04] p-4">
-          <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.25em] text-amber-300/85">
-            ⚠ E2E TEST (admin only)
-          </div>
-          <StandardPlanButton userEmail={userEmailForTest} userId={userIdForTest} />
-        </div>
-      )}
 
       <section className="mt-8">
         <header className="mb-4 flex items-end justify-between">
