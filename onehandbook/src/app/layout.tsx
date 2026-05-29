@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SiteFooter } from "@/components/SiteFooter";
 import { AnalysisJobsProvider } from "@/contexts/AnalysisJobsContext";
+import { GoogleTagManager } from "@next/third-parties/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -170,8 +171,12 @@ export default function RootLayout({
     ],
   };
 
+  // NEXT_PUBLIC_GTM_ID 미설정 시(로컬/E2E) GTM 미로드 — 추적 격리. literal access (DefinePlugin inline).
+  const gtmId = process.env.NEXT_PUBLIC_GTM_ID;
+
   return (
     <html lang="ko">
+      {gtmId ? <GoogleTagManager gtmId={gtmId} /> : null}
       <body
         className={`${geistSans.variable} ${geistMono.variable} m-0 flex min-h-screen flex-col p-0 antialiased`}
       >
