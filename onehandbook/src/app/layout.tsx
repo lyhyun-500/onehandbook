@@ -71,12 +71,12 @@ export const metadata: Metadata = {
     type: "website",
     locale: "ko_KR",
     url: SITE_URL,
-    siteName: SITE_NAME,
+    siteName: SITE_NAME_EN,
     title: DEFAULT_TITLE,
     description: DEFAULT_DESCRIPTION,
     images: [
       {
-        url: "/og-image.png",
+        url: "/og-final.png",
         width: 1200,
         height: 630,
         alt: "노벨에이전트 - 웹소설 작가를 위한 AI 분석 스튜디오",
@@ -88,7 +88,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: DEFAULT_TITLE,
     description: DEFAULT_DESCRIPTION,
-    images: ["/og-image.png"],
+    images: ["/og-final.png"],
   },
 
   icons: {
