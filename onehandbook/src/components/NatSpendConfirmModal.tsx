@@ -15,9 +15,11 @@ import {
 
 export type NatSpendLine = { label: string; nat: number };
 
-const PLATFORM_PROFILES: AnalysisProfileConfig[] = ANALYSIS_PROFILES.filter(
-  (p) => p.id !== "generic",
-);
+// 정책 변경: 단일 택1 모델 — generic(범용) UI 노출 + 맨 앞 정렬.
+const PLATFORM_PROFILES: AnalysisProfileConfig[] = [
+  ...ANALYSIS_PROFILES.filter((p) => p.id === "generic"),
+  ...ANALYSIS_PROFILES.filter((p) => p.id !== "generic"),
+];
 
 type Props = {
   open: boolean;
@@ -27,9 +29,7 @@ type Props = {
   workTitle: string;
   charCount: number;
 
-  /** 플랫폼 controlled state (의제 신규-1+2: includeLore 폐기, 세계관·인물 = 기본 포함) */
-  includePlatformOptimization: boolean;
-  onIncludePlatformOptimizationChange: (value: boolean) => void;
+  /** 플랫폼 controlled state — 단일 택1 (범용/플랫폼 4종) */
   agentVersion: string;
   onAgentVersionChange: (value: string) => void;
 
@@ -68,8 +68,6 @@ export function NatSpendConfirmModal({
   episode,
   workTitle,
   charCount,
-  includePlatformOptimization,
-  onIncludePlatformOptimizationChange,
   agentVersion,
   onAgentVersionChange,
   natLines,
@@ -131,37 +129,18 @@ export function NatSpendConfirmModal({
           {/* NAT breakdown */}
           <div className="mt-5 rounded-lg border border-stone-800 bg-stone-950/50 p-4">
             <ul className="space-y-2 text-[12.5px]">
-              {baseLine && (
-                <li className="flex items-center justify-between text-stone-300">
-                  <span className="text-stone-400">{baseLine.label}</span>
+              {/* 정책 변경: 단일 택1. 체크박스·하드코딩 줄 폐기, natLines 전체 렌더(NM-1 a). */}
+              {natLines.map((line, i) => (
+                <li
+                  key={i}
+                  className="flex items-center justify-between text-stone-300"
+                >
+                  <span className="text-stone-400">{line.label}</span>
                   <span className="shrink-0 font-medium tabular-nums text-sky-300">
-                    {baseLine.nat} NAT
+                    {line.nat} NAT
                   </span>
                 </li>
-              )}
-              {/* 의제 신규-1+2: 세계관·인물 설정 = 기본 포함, UI toggle 폐기. */}
-              <li className="flex items-center justify-between text-stone-300">
-                <label className="inline-flex cursor-pointer items-center gap-2 text-stone-400">
-                  <input
-                    type="checkbox"
-                    checked={includePlatformOptimization}
-                    onChange={(e) =>
-                      onIncludePlatformOptimizationChange(e.target.checked)
-                    }
-                    className="h-3.5 w-3.5 cursor-pointer accent-sky-400"
-                  />
-                  플랫폼 최적화 분석 포함
-                </label>
-                <span
-                  className={`shrink-0 font-medium tabular-nums ${
-                    includePlatformOptimization
-                      ? "text-sky-300"
-                      : "text-stone-600"
-                  }`}
-                >
-                  {includePlatformOptimization ? "+1" : "—"} NAT
-                </span>
-              </li>
+              ))}
               <li className="flex items-center justify-between border-t border-stone-800 pt-2 text-stone-100">
                 <span className="font-medium">합계</span>
                 <span className="tabular-nums text-[16px] font-semibold text-sky-300">
@@ -171,42 +150,40 @@ export function NatSpendConfirmModal({
             </ul>
           </div>
 
-          {/* 플랫폼 카드 — includePlatformOptimization true 일 때만 */}
-          {includePlatformOptimization && (
-            <div className="mt-4">
-              <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-stone-500">
-                플랫폼 선택
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {PLATFORM_PROFILES.map((p) => {
-                  const sel = agentVersion === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => onAgentVersionChange(p.id)}
-                      className={`rounded-md border px-3 py-2 text-left transition-colors ${
-                        sel
-                          ? "border-sky-400/40 bg-sky-400/[0.06]"
-                          : "border-stone-800 bg-stone-900/40 hover:border-stone-700"
+          {/* 정책 변경: 단일 택1 — 카드 그리드 항상 노출 (범용 포함 4개, 2×2). */}
+          <div className="mt-4">
+            <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.25em] text-stone-500">
+              플랫폼 선택
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {PLATFORM_PROFILES.map((p) => {
+                const sel = agentVersion === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => onAgentVersionChange(p.id)}
+                    className={`rounded-md border px-3 py-2 text-left transition-colors ${
+                      sel
+                        ? "border-sky-400/40 bg-sky-400/[0.06]"
+                        : "border-stone-800 bg-stone-900/40 hover:border-stone-700"
+                    }`}
+                  >
+                    <div
+                      className={`font-serif text-[12.5px] ${
+                        sel ? "text-stone-100" : "text-stone-300"
                       }`}
                     >
-                      <div
-                        className={`font-serif text-[12.5px] ${
-                          sel ? "text-stone-100" : "text-stone-300"
-                        }`}
-                      >
-                        {p.label.replace(/\s*분석\s*$/, "")}
-                      </div>
-                      <div className="mt-0.5 font-mono text-[10px] text-stone-500">
-                        {p.description}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+                      {p.label.replace(/\s*분석\s*$/, "")}
+                    </div>
+                    <div className="mt-0.5 font-mono text-[10px] text-stone-500">
+                      {p.description}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-          )}
+          </div>
 
           {/* 잔량 */}
           <div className="mt-4 flex items-center justify-between rounded-md border border-stone-800/60 bg-stone-950/40 px-3 py-2 text-[12px]">
