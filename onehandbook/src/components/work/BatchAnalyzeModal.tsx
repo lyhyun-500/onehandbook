@@ -1046,37 +1046,6 @@ function NatCostMeter({
   );
 }
 
-function OptionToggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <label className="flex cursor-pointer items-center justify-between gap-3 text-[12.5px] text-stone-200">
-      <span className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-          className="h-4 w-4 cursor-pointer accent-sky-400"
-        />
-        <span className="font-serif">{label}</span>
-      </span>
-      <span
-        className={`font-mono text-[10.5px] tabular-nums ${
-          checked ? "text-sky-300" : "text-stone-600"
-        }`}
-      >
-        {checked ? "+1" : "—"} NAT
-      </span>
-    </label>
-  );
-}
-
 function FooterActions({
   state,
   onCancel,
