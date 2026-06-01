@@ -25,8 +25,12 @@ import type {
   WorldSetting,
 } from "@/components/side-panel/types";
 
-// J-H 정정 (LEE 라운드4): 플랫폼 셀렉트박스 옵션 — generic(범용)은 옵션 끄면 자동 사용, UI 미노출.
-const PLATFORM_OPTIONS = ANALYSIS_PROFILES.filter((p) => p.id !== "generic");
+// 정책 변경: 단일 택1 모델 — generic(범용) UI 노출 + 맨 앞 정렬.
+// payload 호환: platform === "generic" → includePlatformOptimization=false derive.
+const PLATFORM_OPTIONS = [
+  ...ANALYSIS_PROFILES.filter((p) => p.id === "generic"),
+  ...ANALYSIS_PROFILES.filter((p) => p.id !== "generic"),
+];
 
 const HOLISTIC_MAX_EPISODES = 50;
 
@@ -100,11 +104,10 @@ export function BatchAnalyzeModal({
 
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  // 의제 신규-1+2: 세계관·인물 = 기본 포함 (state 폐기, 항상 true 정합).
-  const [includePlatformOptimization, setIncludePlatformOptimization] =
-    useState(true);
-  // J-H 정정: 플랫폼 셀렉트박스 상태 (default = props agentVersion, 보통 ANALYSIS_PROFILES[0] = kakao-page).
-  const [platform, setPlatform] = useState<string>(agentVersion);
+  // 정책 변경: 단일 택1 모델 (범용 포함). default = "generic".
+  // includePlatformOptimization은 platform에서 derive (독립 상태 폐기).
+  const [platform, setPlatform] = useState<string>("generic");
+  const includePlatformOptimization = platform !== "generic";
   const [confirming, setConfirming] = useState(false);
   const [phase, setPhase] = useState<"idle" | "submitting" | "launched">(
     "idle",
@@ -209,12 +212,12 @@ export function BatchAnalyzeModal({
         natOpts,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedEpisodeIds, includePlatformOptimization],
+    [selectedEpisodeIds, platform],
   );
   const natBreakdown = useMemo(
     () => buildHolisticNatBreakdown(selectedList.length, natOpts),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedList.length, includePlatformOptimization],
+    [selectedList.length, platform],
   );
 
   const insufficient = natEst.total > natBalance;
@@ -394,7 +397,7 @@ export function BatchAnalyzeModal({
         body: JSON.stringify({
           episodeIds: selectedEpisodeIds,
           workId,
-          // J-H 정정: 셀렉트박스 선택값 전달. 옵션 끄면 백엔드 resolveAnalysisAgentVersion 이 "generic" 으로 변환.
+          // 정책 변경: 단일 택1. platform === "generic" → includePlatformOptimization=false derive (payload 호환 유지).
           agentVersion: platform,
           // includeLore = 항상 true (의제 신규-1+2 정합), payload 호환용 영속화.
           includeLore: true,
@@ -547,11 +550,6 @@ export function BatchAnalyzeModal({
                 natTotal={natEst.total}
                 balanceAfter={balanceAfter}
                 natLines={natBreakdown.lines}
-                includePlatformOptimization={includePlatformOptimization}
-                setIncludePlatformOptimization={(v) => {
-                  setIncludePlatformOptimization(v);
-                  setConfirming(false);
-                }}
                 platform={platform}
                 setPlatform={(v) => {
                   setPlatform(v);
@@ -817,8 +815,6 @@ function SummaryPanel({
   natTotal,
   balanceAfter,
   natLines,
-  includePlatformOptimization,
-  setIncludePlatformOptimization,
   platform,
   setPlatform,
   overLimit,
@@ -838,8 +834,6 @@ function SummaryPanel({
   natTotal: number;
   balanceAfter: number;
   natLines: { label: string; nat: number }[];
-  includePlatformOptimization: boolean;
-  setIncludePlatformOptimization: (v: boolean) => void;
   platform: string;
   setPlatform: (v: string) => void;
   overLimit: boolean;
@@ -945,23 +939,16 @@ function SummaryPanel({
             </ul>
           </div>
 
+          {/* 정책 변경: 단일 택1 (범용 포함). 체크박스 폐기, 셀렉트 항상 활성. */}
           <div className="flex flex-col gap-2.5 rounded-md border border-stone-800/70 bg-stone-900/40 px-4 py-3">
-            {/* 의제 신규-1+2: 세계관·인물 설정 = 기본 포함, UI toggle 폐기. */}
-            <OptionToggle
-              checked={includePlatformOptimization}
-              onChange={setIncludePlatformOptimization}
-              label="플랫폼 최적화 분석"
-            />
-            {/* J-H: 플랫폼 셀렉트 — 플랫폼 최적화 체크박스 켜졌을 때만 활성. */}
-            <div className="mt-1 flex flex-col gap-1.5 pl-6">
+            <div className="flex flex-col gap-1.5">
               <label className="font-mono text-[10px] uppercase tracking-widest text-stone-500">
                 플랫폼
               </label>
               <select
                 value={platform}
                 onChange={(e) => setPlatform(e.target.value)}
-                disabled={!includePlatformOptimization}
-                className="w-full rounded-md border border-stone-800 bg-stone-900/60 px-3 py-2 font-serif text-[12.5px] text-stone-100 focus:border-sky-400/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+                className="w-full rounded-md border border-stone-800 bg-stone-900/60 px-3 py-2 font-serif text-[12.5px] text-stone-100 focus:border-sky-400/40 focus:outline-none"
               >
                 {PLATFORM_OPTIONS.map((p) => (
                   <option key={p.id} value={p.id} className="bg-stone-900">
