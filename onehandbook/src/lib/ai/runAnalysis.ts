@@ -221,6 +221,7 @@ async function completeAndParseModelJson<T>(
           : {}),
       };
     } catch (e2) {
+      console.error("[runAnalysis] JSON parse failed twice, raw (first 1000 chars):", raw.slice(0, 1000));
       throw new Error(
         `AI 응답 JSON 파싱에 실패했습니다. ${formatJsonParseFailures(e1, e2)}`
       );
