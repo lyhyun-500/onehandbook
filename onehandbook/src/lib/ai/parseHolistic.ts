@@ -12,6 +12,26 @@ const DIM_KEYS = [
   "독창성",
 ] as const;
 
+// LLM이 분리자(·/・/･/‧)나 공백을 미세 변형해도 키 매칭 흡수. NFC 후 분리자·공백 strip.
+function normalizeKey(s: string): string {
+  return s
+    .normalize("NFC")
+    .replace(/[·・･‧]/g, "")
+    .replace(/\s+/g, "");
+}
+
+function getNormalizedDim(
+  dims: Record<string, unknown>,
+  key: string,
+): unknown {
+  if (dims[key] !== undefined) return dims[key];
+  const target = normalizeKey(key);
+  for (const [k, v] of Object.entries(dims)) {
+    if (normalizeKey(k) === target) return v;
+  }
+  return undefined;
+}
+
 function parseEpisodeDimensionsOrUndefined(
   raw: unknown
 ): Record<string, { score: number; comment: string }> | undefined {
@@ -86,7 +106,9 @@ export function parseHolisticAnalysisJson(raw: string): HolisticAnalysisResult {
   }
   const dims = o.dimensions as Record<string, { score: number; comment: string }>;
   for (const k of DIM_KEYS) {
-    const d = dims[k];
+    const d = getNormalizedDim(dims, k) as
+      | { score?: unknown; comment?: unknown }
+      | undefined;
     if (!d || typeof d.score !== "number" || typeof d.comment !== "string") {
       throw new Error(`dimensions["${k}"] 형식이 올바르지 않습니다.`);
     }
