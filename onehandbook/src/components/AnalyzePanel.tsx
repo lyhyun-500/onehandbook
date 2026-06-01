@@ -8,7 +8,6 @@ import { TrendReferencesSection } from "@/components/TrendReferencesSection";
 import { formatKoreanDateTime } from "@/lib/formatKoreanDateTime";
 import { getProfileLabel } from "@/lib/ai/profileLookup";
 import {
-  NAT_GENERIC_AGENT_ID,
   buildNatBreakdown,
   resolveAnalysisAgentVersion,
 } from "@/lib/nat";
@@ -194,18 +193,14 @@ export function AnalyzePanel({
     getActiveJobCoveringEpisode,
     showUnchangedJobNotice,
   } = useAnalysisJobs();
-  // 의제 신규-1+2: 세계관·인물 = 기본 포함 (state 폐기, 항상 true 정합).
-  const [includePlatformOptimization, setIncludePlatformOptimization] =
-    useState(true);
-
+  // 정책 변경: 단일 택1 (범용 포함). includePlatformOptimization state 폐기 → agentVersion에서 derive.
+  // default = "generic" (범용 분석). versions에 generic 포함 + ANTHROPIC_API_KEY 설정 시 available 보장.
   // 의제 신규-1+2 (단계 C-2): NULL 분기 영속화 (결정 9 옵션 N-2 + 결정 10 분기 P-α).
   const loreNullCase = useMemo(
     () => getLoreNullCase(worldSetting, characterSettings),
     [worldSetting, characterSettings],
   );
-  const [agentVersion, setAgentVersion] = useState(
-    versions.find((v) => v.available)?.id ?? versions[0]?.id ?? ""
-  );
+  const [agentVersion, setAgentVersion] = useState("generic");
   const [lowVolumeOpen, setLowVolumeOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [unchangedOpen, setUnchangedOpen] = useState(false);
@@ -248,12 +243,6 @@ export function AnalyzePanel({
     setPendingScrollToResult(false);
     setJobFailedBanner(null);
   }, [episodeId, initialAnalyses]);
-
-  useEffect(() => {
-    if (!includePlatformOptimization) {
-      setAgentVersion(NAT_GENERIC_AGENT_ID);
-    }
-  }, [includePlatformOptimization]);
 
   const latestJobForEp = getLatestJobForEpisode(episodeId);
 
@@ -495,10 +484,10 @@ export function AnalyzePanel({
   const effectiveAgentId = useMemo(
     () =>
       resolveAnalysisAgentVersion(
-        includePlatformOptimization,
+        agentVersion !== "generic",
         agentVersion
       ),
-    [includePlatformOptimization, agentVersion]
+    [agentVersion]
   );
 
   const effectiveAvailable = versions.some(
@@ -513,9 +502,9 @@ export function AnalyzePanel({
   const { lines: natLines, total: natTotal } = useMemo(
     () =>
       buildNatBreakdown(charCount, {
-        includePlatformOptimization,
+        includePlatformOptimization: agentVersion !== "generic",
       }),
-    [charCount, includePlatformOptimization]
+    [charCount, agentVersion]
   );
 
   const requestAnalyze = async (opts?: {
@@ -548,7 +537,8 @@ export function AnalyzePanel({
           agentVersion,
           // includeLore = 항상 true (의제 신규-1+2 정합), payload 호환용 영속화.
           includeLore: true,
-          includePlatformOptimization,
+          // 정책 변경: 단일 택1 derive. payload 호환 유지.
+          includePlatformOptimization: agentVersion !== "generic",
           ...(force ? { force: true } : {}),
           ...(acceptCached ? { acceptCached: true } : {}),
         }),
@@ -874,8 +864,6 @@ export function AnalyzePanel({
         }}
         workTitle={workTitle ?? ""}
         charCount={charCount}
-        includePlatformOptimization={includePlatformOptimization}
-        onIncludePlatformOptimizationChange={setIncludePlatformOptimization}
         agentVersion={agentVersion}
         onAgentVersionChange={setAgentVersion}
         natLines={natLines}

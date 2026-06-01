@@ -32,26 +32,23 @@ export function natLengthTierLabel(charCount: number): string {
 
 export function computeNatCost(
   charCount: number,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   opts: NatAnalysisOptions
 ): number {
-  let total = natBaseCostByLength(charCount);
-  if (opts.includePlatformOptimization) total += 1;
-  return total;
+  return natBaseCostByLength(charCount);
 }
 
 export type NatBreakdownLine = { label: string; nat: number };
 
 export function buildNatBreakdown(
   charCount: number,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   opts: NatAnalysisOptions
 ): { lines: NatBreakdownLine[]; total: number } {
   const base = natBaseCostByLength(charCount);
   const lines: NatBreakdownLine[] = [
     { label: `기본 (${natLengthTierLabel(charCount)})`, nat: base },
   ];
-  if (opts.includePlatformOptimization) {
-    lines.push({ label: "플랫폼 최적화 분석 포함", nat: 1 });
-  }
   const total = lines.reduce((s, l) => s + l.nat, 0);
   return { lines, total };
 }
@@ -71,10 +68,14 @@ export function isKnownAnalysisProfileId(id: string): boolean {
   return ANALYSIS_PROFILES.some((p) => p.id === id);
 }
 
-/** 일괄 분석: 선택된 회차마다 동일 옵션 적용 시 총 NAT */
+/**
+ * @deprecated 호출처 0건. Inngest 마이그레이션 클린업 때 batch 잔재와 함께 삭제 예정.
+ * 일괄 분석: 선택된 회차마다 동일 옵션 적용 시 총 NAT
+ */
 export function buildBatchNatBreakdown(
   episodes: { id: number; charCount: number }[],
   selectedIds: number[],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   opts: NatAnalysisOptions
 ): { lines: NatBreakdownLine[]; total: number; episodeCount: number } {
   const selected = episodes.filter((e) => selectedIds.includes(e.id));
@@ -92,15 +93,7 @@ export function buildBatchNatBreakdown(
       nat: totalBase,
     },
   ];
-  let total = totalBase;
-  if (opts.includePlatformOptimization && episodeCount > 0) {
-    const add = episodeCount;
-    lines.push({
-      label: `플랫폼 최적화 (회차당 1 NAT × ${episodeCount})`,
-      nat: add,
-    });
-    total += add;
-  }
+  const total = totalBase;
   return { lines, total, episodeCount };
 }
 
@@ -110,11 +103,10 @@ export function buildBatchNatBreakdown(
  */
 export function computeHolisticNatCost(
   episodeCount: number,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   opts: NatAnalysisOptions
 ): number {
-  let total = Math.max(0, episodeCount);
-  if (opts.includePlatformOptimization) total += 1;
-  return total;
+  return Math.max(0, episodeCount);
 }
 
 /**
@@ -123,18 +115,17 @@ export function computeHolisticNatCost(
  */
 export function computeHolisticChunkNatCost(
   episodeCountInChunk: number,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   chunkIndexZeroBased: number,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   opts: NatAnalysisOptions
 ): number {
-  let total = Math.max(0, episodeCountInChunk);
-  if (chunkIndexZeroBased === 0) {
-    if (opts.includePlatformOptimization) total += 1;
-  }
-  return total;
+  return Math.max(0, episodeCountInChunk);
 }
 
 export function buildHolisticNatBreakdown(
   episodeCount: number,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   opts: NatAnalysisOptions
 ): { lines: NatBreakdownLine[]; total: number } {
   const base = Math.max(0, episodeCount);
@@ -147,9 +138,6 @@ export function buildHolisticNatBreakdown(
       nat: base,
     },
   ];
-  if (opts.includePlatformOptimization) {
-    lines.push({ label: "플랫폼 최적화 분석 포함 (통합 1회)", nat: 1 });
-  }
   const total = lines.reduce((s, l) => s + l.nat, 0);
   return { lines, total };
 }
