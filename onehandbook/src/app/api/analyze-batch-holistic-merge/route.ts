@@ -116,16 +116,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "사용자 정보를 찾을 수 없습니다." }, { status: 403 });
   }
 
-  if (!appUser.phone_verified) {
-    return NextResponse.json(
-      {
-        error: "휴대폰 인증 후 이용 가능합니다.",
-        code: "PHONE_NOT_VERIFIED" as const,
-      },
-      { status: 403 }
-    );
-  }
-
   const { data: work, error: wErr } = await supabase
     .from("works")
     .select("id, genre, title, tags, author_id, world_setting, character_settings")
