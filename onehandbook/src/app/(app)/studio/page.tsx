@@ -110,8 +110,7 @@ export default async function StudioPage() {
         <div className="mx-auto max-w-6xl px-6 pt-6 sm:px-8">
           <div className="rounded-lg border border-amber-500/30 bg-amber-950/25 px-4 py-3 text-sm text-amber-100/95">
             <CopyWithBreaks as="span">
-              {`🎉 베타 오픈 기념! 휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인 즉시 지급
-인증 한 번이면 AI 분석 바로 시작할 수 있어요`}
+              {`🎉 베타 오픈 기념! 휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인 즉시 지급`}
             </CopyWithBreaks>{" "}
             <Link
               href="/verify-phone"

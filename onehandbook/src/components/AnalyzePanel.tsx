@@ -496,8 +496,7 @@ export function AnalyzePanel({
 
   const analyzeDisabled =
     (!charCountKnown ? false : tier === "blocked") ||
-    !effectiveAvailable ||
-    !phoneVerified;
+    !effectiveAvailable;
 
   const { lines: natLines, total: natTotal } = useMemo(
     () =>
@@ -559,14 +558,6 @@ export function AnalyzePanel({
           setAnalyzing(false);
           setUnchangedOpen(true);
           return;
-        }
-        if (data.code === "PHONE_NOT_VERIFIED") {
-          throw new Error(
-            typeof data.error === "string"
-              ? data.error
-              : `🎉 베타 오픈 기념! 휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인 즉시 지급
-인증 한 번이면 AI 분석 바로 시작할 수 있어요`
-          );
         }
         if (data.code === "INSUFFICIENT_NAT") {
           throw new Error(
@@ -757,8 +748,7 @@ export function AnalyzePanel({
       {!phoneVerified && (
         <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-950/25 px-3 py-2 text-sm text-amber-100/95">
           <CopyWithBreaks as="span">
-            {`🎉 베타 오픈 기념! 휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인 즉시 지급
-인증 한 번이면 AI 분석 바로 시작할 수 있어요`}
+            {`🎉 베타 오픈 기념! 휴대폰 인증하면 ${PHONE_SIGNUP_REWARD_COINS}코인 즉시 지급`}
           </CopyWithBreaks>{" "}
           <Link
             href="/verify-phone"
