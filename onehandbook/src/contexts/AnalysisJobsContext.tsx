@@ -718,7 +718,10 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
           }
         )
         .subscribe((status, err) => {
-          if (status === "CHANNEL_ERROR" && err) {
+          if (status === "SUBSCRIBED") {
+            // Phase 2 보정 refetch (b): 채널 (재)연결 직후 누락분 보정 1회.
+            void refetchJobsFromApi();
+          } else if (status === "CHANNEL_ERROR" && err) {
             console.warn("analysis_jobs Realtime:", err);
             void refetchJobsFromApi();
           }
@@ -769,13 +772,59 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
-  const registerJobStarted = useCallback((job: AnalysisJobListItem) => {
-    prevJobStatusRef.current.set(job.id, job.status);
-    setOptimistic((o) => {
-      const without = o.filter((x) => x.id !== job.id);
-      return [job, ...without];
-    });
+  // Phase 2: registerJobStarted 에서 호출하므로 위로 이동 (forward reference 회피).
+  const refreshAnalysisJobs = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: appRow } = await supabase
+        .from("users")
+        .select("id")
+        .eq("auth_id", user.id)
+        .maybeSingle();
+      if (!appRow) return;
+
+      const res = await fetch("/api/analyze/jobs", { cache: "no-store" });
+      if (!res.ok) return;
+
+      const data = (await res.json()) as { jobs?: AnalysisJobListItem[] };
+      const jobs = data.jobs ?? [];
+
+      setApiJobs(jobs);
+      for (const j of jobs) {
+        prevJobStatusRef.current.set(j.id, j.status);
+      }
+      setOptimistic((opt) =>
+        opt.filter((o) => {
+          const fromApi = jobs.find((j) => j.id === o.id);
+          if (!fromApi) return true;
+          if (fromApi.status === "completed" || fromApi.status === "failed") {
+            return false;
+          }
+          return true;
+        })
+      );
+    } catch {
+      /* ignore */
+    }
   }, []);
+
+  const registerJobStarted = useCallback(
+    (job: AnalysisJobListItem) => {
+      prevJobStatusRef.current.set(job.id, job.status);
+      setOptimistic((o) => {
+        const without = o.filter((x) => x.id !== job.id);
+        return [job, ...without];
+      });
+      // Phase 2 보정 refetch (c): 분석 시작 직후 1회 서버 동기화.
+      void refreshAnalysisJobs();
+    },
+    [refreshAnalysisJobs]
+  );
 
   const notifyAnalysisStarted = useCallback(() => {
     pushToast({ message: "분석이 시작됐습니다 🔔" });
@@ -936,64 +985,19 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     [pushToast]
   );
 
-  const refreshAnalysisJobs = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: appRow } = await supabase
-        .from("users")
-        .select("id")
-        .eq("auth_id", user.id)
-        .maybeSingle();
-      if (!appRow) return;
-
-      const res = await fetch("/api/analyze/jobs", { cache: "no-store" });
-      if (!res.ok) return;
-
-      const data = (await res.json()) as { jobs?: AnalysisJobListItem[] };
-      const jobs = data.jobs ?? [];
-
-      setApiJobs(jobs);
-      for (const j of jobs) {
-        prevJobStatusRef.current.set(j.id, j.status);
-      }
-      setOptimistic((opt) =>
-        opt.filter((o) => {
-          const fromApi = jobs.find((j) => j.id === o.id);
-          if (!fromApi) return true;
-          if (fromApi.status === "completed" || fromApi.status === "failed") {
-            return false;
-          }
-          return true;
-        })
-      );
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
   /**
-   * 진행 중 작업이 있을 때 목록을 주기적으로 다시 불러 pending 재기동(kick)·상태 동기화.
-   * hidden 탭에선 정지, visible 복귀 시 즉시 1회 + interval 재개.
+   * Phase 2: 30s interval 제거 — Realtime 단일 경로화.
+   * 보정 refetch 3종으로 상태 동기화 보장:
+   *   (a) visible 복귀 시 1회 — 이 useEffect.
+   *   (b) 채널 subscribe 콜백 status === 'SUBSCRIBED' 시 1회 (L720-727).
+   *   (c) 분석 시작 직후 1회 — registerJobStarted 안 (L772-779).
+   * 부작용: 폴링 제거로 stale 정리 발화 빈도 감소 — 서버 측 sweep 도입 전까지
+   * 본인 재방문 시에만 정리됨. (백로그 의제)
    */
   useEffect(() => {
     if (!isVisible) return;
-    const hasActive = mergedJobs.some(
-      (j) =>
-        j.parent_job_id == null &&
-        (j.status === "pending" || j.status === "processing")
-    );
-    if (!hasActive) return;
     void refreshAnalysisJobs();
-    const id = window.setInterval(() => {
-      void refreshAnalysisJobs();
-    }, 30_000);
-    return () => window.clearInterval(id);
-  }, [mergedJobs, refreshAnalysisJobs, isVisible]);
+  }, [refreshAnalysisJobs, isVisible]);
 
   const workHasAnalyzingEpisode = useCallback(
     (workId: number) => {
