@@ -850,15 +850,29 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     []
   );
 
+  // 백그라운드 탭 폴링 일시정지 — visibilitychange 추적.
+  // hidden 동안 interval 중단, visible 복귀 시 polling useEffect들이 재실행되며 즉시 1회 + interval 재개.
+  const [isVisible, setIsVisible] = useState(
+    typeof document === "undefined" ? true : document.visibilityState !== "hidden"
+  );
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handler = () => setIsVisible(document.visibilityState !== "hidden");
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, []);
+
   // 통합 알림 마운트 시 1회 + 60초 폴링.
   // (옵션 a: 단순 fetch. 향후 supabase realtime 으로 INSERT 구독 가능 — Phase 2 후보.)
+  // hidden 탭에선 정지, visible 복귀 시 즉시 1회 + interval 재개.
   useEffect(() => {
+    if (!isVisible) return;
     void refreshBellNotifications();
     const id = window.setInterval(() => {
       void refreshBellNotifications();
     }, 60_000);
     return () => window.clearInterval(id);
-  }, [refreshBellNotifications]);
+  }, [refreshBellNotifications, isVisible]);
 
   // 서버가 내려준 job 들 중 read_at 이 세팅된 것을 ingest.
   // apiJobs (주 리스트) / outcomes (알림 패널) 양쪽에서 호출됨.
@@ -962,19 +976,24 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
-  /** 진행 중 작업이 있을 때 목록을 주기적으로 다시 불러 pending 재기동(kick)·상태 동기화 */
+  /**
+   * 진행 중 작업이 있을 때 목록을 주기적으로 다시 불러 pending 재기동(kick)·상태 동기화.
+   * hidden 탭에선 정지, visible 복귀 시 즉시 1회 + interval 재개.
+   */
   useEffect(() => {
+    if (!isVisible) return;
     const hasActive = mergedJobs.some(
       (j) =>
         j.parent_job_id == null &&
         (j.status === "pending" || j.status === "processing")
     );
     if (!hasActive) return;
+    void refreshAnalysisJobs();
     const id = window.setInterval(() => {
       void refreshAnalysisJobs();
     }, 30_000);
     return () => window.clearInterval(id);
-  }, [mergedJobs, refreshAnalysisJobs]);
+  }, [mergedJobs, refreshAnalysisJobs, isVisible]);
 
   const workHasAnalyzingEpisode = useCallback(
     (workId: number) => {
