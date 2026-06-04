@@ -89,13 +89,28 @@ export default async function proxy(request: NextRequest) {
   );
 
   const isAdminPath = path === "/admin" || path.startsWith("/admin/");
+  const isLoginPath = path.startsWith("/login");
+  const isProtectedPath =
+    path.startsWith("/studio") ||
+    path.startsWith("/works") ||
+    path.startsWith("/billing") ||
+    path.startsWith("/notices") ||
+    path.startsWith("/verify-phone");
 
   // 세션 힌트 쿠키가 있고 auth 쿠키도 있으면, 매 네비게이션마다 네트워크 getUser를 하지 않습니다.
-  // (토큰 만료 등은 다음 갱신 시점/보호 API에서 걸립니다)
-  // 단, /admin 경로는 role 조회에 실제 auth_id 가 필요하므로 hint 를 우회합니다.
+  // 단:
+  //  - /admin 경로는 role 조회에 실제 auth_id 가 필요하므로 hint 를 우회합니다.
+  //  - /login 경로는 만료 상태 감지/hint 무효화 진입점으로 강제 getUser 호출
+  //    (server-side requireAppUser 가 RSC 제약으로 hint 를 못 지우는 갭 보완).
   let user: unknown = null;
   let realAuthId: string | null = null;
-  if (!isAdminPath && hint && hasAuthCookie) {
+  const useHintBypass =
+    !isAdminPath &&
+    !isLoginPath &&
+    !isProtectedPath &&
+    hint &&
+    hasAuthCookie;
+  if (useHintBypass) {
     user = { hinted: true };
   } else {
     const {
@@ -155,14 +170,7 @@ export default async function proxy(request: NextRequest) {
     return redirectResponse;
   }
 
-  const isProtected =
-    path.startsWith("/studio") ||
-    path.startsWith("/works") ||
-    path.startsWith("/billing") ||
-    path.startsWith("/notices") ||
-    path === "/verify-phone";
-
-  if (!user && isProtected) {
+  if (!user && isProtectedPath) {
     const redirectResponse = NextResponse.redirect(
       new URL("/login", request.url)
     );
