@@ -717,6 +717,32 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
             );
           }
         )
+        // Phase 3: 동일 채널 재사용 — notifications INSERT 구독 (소유자 컬럼 = user_id).
+        // RLS로 본인 행만 도착하지만 user_id 이중 체크. payload 직접 머지로 쿼리 0회 경로.
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+          },
+          (payload) => {
+            const row = payload.new as Record<string, unknown> & {
+              user_id?: number;
+            };
+            if (
+              realtimeExpectedAppUserIdRef.current != null &&
+              row.user_id !== realtimeExpectedAppUserIdRef.current
+            ) {
+              return;
+            }
+            const notif = row as unknown as NotificationItem;
+            setBellNotifications((prev) => {
+              if (prev.some((n) => n.id === notif.id)) return prev;
+              return [notif, ...prev];
+            });
+          }
+        )
         .subscribe((status, err) => {
           if (status === "SUBSCRIBED") {
             // Phase 2 보정 refetch (b): 채널 (재)연결 직후 누락분 보정 1회.
@@ -911,16 +937,11 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     return () => document.removeEventListener("visibilitychange", handler);
   }, []);
 
-  // 통합 알림 마운트 시 1회 + 60초 폴링.
-  // (옵션 a: 단순 fetch. 향후 supabase realtime 으로 INSERT 구독 가능 — Phase 2 후보.)
-  // hidden 탭에선 정지, visible 복귀 시 즉시 1회 + interval 재개.
+  // Phase 3: 60초 폴링 제거 — Realtime INSERT 구독으로 전환 (채널 구독 안 notifications 리스너 추가).
+  // 마운트 1회 + visible 복귀 시 1회 refetch만 유지 (interval 0).
   useEffect(() => {
     if (!isVisible) return;
     void refreshBellNotifications();
-    const id = window.setInterval(() => {
-      void refreshBellNotifications();
-    }, 60_000);
-    return () => window.clearInterval(id);
   }, [refreshBellNotifications, isVisible]);
 
   // 서버가 내려준 job 들 중 read_at 이 세팅된 것을 ingest.
