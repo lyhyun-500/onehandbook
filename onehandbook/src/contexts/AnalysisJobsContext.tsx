@@ -799,20 +799,11 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
   }, []);
 
   // Phase 2: registerJobStarted 에서 호출하므로 위로 이동 (forward reference 회피).
+  // Phase 4: bootstrap 시 채워진 realtimeExpectedAppUserIdRef 캐시 사용 — 매 tick getUser+users 조회 제거.
+  // 로그아웃·계정 전환 시 clearJobsState(L570)가 ref를 null로 클리어하므로 자동 무효화.
   const refreshAnalysisJobs = useCallback(async () => {
     try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: appRow } = await supabase
-        .from("users")
-        .select("id")
-        .eq("auth_id", user.id)
-        .maybeSingle();
-      if (!appRow) return;
+      if (realtimeExpectedAppUserIdRef.current == null) return;
 
       const res = await fetch("/api/analyze/jobs", { cache: "no-store" });
       if (!res.ok) return;
@@ -1014,9 +1005,17 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
    *   (c) 분석 시작 직후 1회 — registerJobStarted 안 (L772-779).
    * 부작용: 폴링 제거로 stale 정리 발화 빈도 감소 — 서버 측 sweep 도입 전까지
    * 본인 재방문 시에만 정리됨. (백로그 의제)
+   *
+   * Phase 4 dedupe: 마운트 1회는 bootstrap + SUBSCRIBED가 처리 — visible useEffect는
+   * 실제 hidden→visible 전환에만 발화시킴.
    */
+  const visibleFirstRunRef = useRef(true);
   useEffect(() => {
     if (!isVisible) return;
+    if (visibleFirstRunRef.current) {
+      visibleFirstRunRef.current = false;
+      return;
+    }
     void refreshAnalysisJobs();
   }, [refreshAnalysisJobs, isVisible]);
 
