@@ -717,8 +717,37 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
             );
           }
         )
+        // Phase 3: 동일 채널 재사용 — notifications INSERT 구독 (소유자 컬럼 = user_id).
+        // RLS로 본인 행만 도착하지만 user_id 이중 체크. payload 직접 머지로 쿼리 0회 경로.
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+          },
+          (payload) => {
+            const row = payload.new as Record<string, unknown> & {
+              user_id?: number;
+            };
+            if (
+              realtimeExpectedAppUserIdRef.current != null &&
+              row.user_id !== realtimeExpectedAppUserIdRef.current
+            ) {
+              return;
+            }
+            const notif = row as unknown as NotificationItem;
+            setBellNotifications((prev) => {
+              if (prev.some((n) => n.id === notif.id)) return prev;
+              return [notif, ...prev];
+            });
+          }
+        )
         .subscribe((status, err) => {
-          if (status === "CHANNEL_ERROR" && err) {
+          if (status === "SUBSCRIBED") {
+            // Phase 2 보정 refetch (b): 채널 (재)연결 직후 누락분 보정 1회.
+            void refetchJobsFromApi();
+          } else if (status === "CHANNEL_ERROR" && err) {
             console.warn("analysis_jobs Realtime:", err);
             void refetchJobsFromApi();
           }
@@ -769,13 +798,50 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
-  const registerJobStarted = useCallback((job: AnalysisJobListItem) => {
-    prevJobStatusRef.current.set(job.id, job.status);
-    setOptimistic((o) => {
-      const without = o.filter((x) => x.id !== job.id);
-      return [job, ...without];
-    });
+  // Phase 2: registerJobStarted 에서 호출하므로 위로 이동 (forward reference 회피).
+  // Phase 4: bootstrap 시 채워진 realtimeExpectedAppUserIdRef 캐시 사용 — 매 tick getUser+users 조회 제거.
+  // 로그아웃·계정 전환 시 clearJobsState(L570)가 ref를 null로 클리어하므로 자동 무효화.
+  const refreshAnalysisJobs = useCallback(async () => {
+    try {
+      if (realtimeExpectedAppUserIdRef.current == null) return;
+
+      const res = await fetch("/api/analyze/jobs", { cache: "no-store" });
+      if (!res.ok) return;
+
+      const data = (await res.json()) as { jobs?: AnalysisJobListItem[] };
+      const jobs = data.jobs ?? [];
+
+      setApiJobs(jobs);
+      for (const j of jobs) {
+        prevJobStatusRef.current.set(j.id, j.status);
+      }
+      setOptimistic((opt) =>
+        opt.filter((o) => {
+          const fromApi = jobs.find((j) => j.id === o.id);
+          if (!fromApi) return true;
+          if (fromApi.status === "completed" || fromApi.status === "failed") {
+            return false;
+          }
+          return true;
+        })
+      );
+    } catch {
+      /* ignore */
+    }
   }, []);
+
+  const registerJobStarted = useCallback(
+    (job: AnalysisJobListItem) => {
+      prevJobStatusRef.current.set(job.id, job.status);
+      setOptimistic((o) => {
+        const without = o.filter((x) => x.id !== job.id);
+        return [job, ...without];
+      });
+      // Phase 2 보정 refetch (c): 분석 시작 직후 1회 서버 동기화.
+      void refreshAnalysisJobs();
+    },
+    [refreshAnalysisJobs]
+  );
 
   const notifyAnalysisStarted = useCallback(() => {
     pushToast({ message: "분석이 시작됐습니다 🔔" });
@@ -850,15 +916,24 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     []
   );
 
-  // 통합 알림 마운트 시 1회 + 60초 폴링.
-  // (옵션 a: 단순 fetch. 향후 supabase realtime 으로 INSERT 구독 가능 — Phase 2 후보.)
+  // 백그라운드 탭 폴링 일시정지 — visibilitychange 추적.
+  // hidden 동안 interval 중단, visible 복귀 시 polling useEffect들이 재실행되며 즉시 1회 + interval 재개.
+  const [isVisible, setIsVisible] = useState(
+    typeof document === "undefined" ? true : document.visibilityState !== "hidden"
+  );
   useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handler = () => setIsVisible(document.visibilityState !== "hidden");
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
+  }, []);
+
+  // Phase 3: 60초 폴링 제거 — Realtime INSERT 구독으로 전환 (채널 구독 안 notifications 리스너 추가).
+  // 마운트 1회 + visible 복귀 시 1회 refetch만 유지 (interval 0).
+  useEffect(() => {
+    if (!isVisible) return;
     void refreshBellNotifications();
-    const id = window.setInterval(() => {
-      void refreshBellNotifications();
-    }, 60_000);
-    return () => window.clearInterval(id);
-  }, [refreshBellNotifications]);
+  }, [refreshBellNotifications, isVisible]);
 
   // 서버가 내려준 job 들 중 read_at 이 세팅된 것을 ingest.
   // apiJobs (주 리스트) / outcomes (알림 패널) 양쪽에서 호출됨.
@@ -922,59 +997,27 @@ export function AnalysisJobsProvider({ children }: { children: React.ReactNode }
     [pushToast]
   );
 
-  const refreshAnalysisJobs = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: appRow } = await supabase
-        .from("users")
-        .select("id")
-        .eq("auth_id", user.id)
-        .maybeSingle();
-      if (!appRow) return;
-
-      const res = await fetch("/api/analyze/jobs", { cache: "no-store" });
-      if (!res.ok) return;
-
-      const data = (await res.json()) as { jobs?: AnalysisJobListItem[] };
-      const jobs = data.jobs ?? [];
-
-      setApiJobs(jobs);
-      for (const j of jobs) {
-        prevJobStatusRef.current.set(j.id, j.status);
-      }
-      setOptimistic((opt) =>
-        opt.filter((o) => {
-          const fromApi = jobs.find((j) => j.id === o.id);
-          if (!fromApi) return true;
-          if (fromApi.status === "completed" || fromApi.status === "failed") {
-            return false;
-          }
-          return true;
-        })
-      );
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  /** 진행 중 작업이 있을 때 목록을 주기적으로 다시 불러 pending 재기동(kick)·상태 동기화 */
+  /**
+   * Phase 2: 30s interval 제거 — Realtime 단일 경로화.
+   * 보정 refetch 3종으로 상태 동기화 보장:
+   *   (a) visible 복귀 시 1회 — 이 useEffect.
+   *   (b) 채널 subscribe 콜백 status === 'SUBSCRIBED' 시 1회 (L720-727).
+   *   (c) 분석 시작 직후 1회 — registerJobStarted 안 (L772-779).
+   * 부작용: 폴링 제거로 stale 정리 발화 빈도 감소 — 서버 측 sweep 도입 전까지
+   * 본인 재방문 시에만 정리됨. (백로그 의제)
+   *
+   * Phase 4 dedupe: 마운트 1회는 bootstrap + SUBSCRIBED가 처리 — visible useEffect는
+   * 실제 hidden→visible 전환에만 발화시킴.
+   */
+  const visibleFirstRunRef = useRef(true);
   useEffect(() => {
-    const hasActive = mergedJobs.some(
-      (j) =>
-        j.parent_job_id == null &&
-        (j.status === "pending" || j.status === "processing")
-    );
-    if (!hasActive) return;
-    const id = window.setInterval(() => {
-      void refreshAnalysisJobs();
-    }, 30_000);
-    return () => window.clearInterval(id);
-  }, [mergedJobs, refreshAnalysisJobs]);
+    if (!isVisible) return;
+    if (visibleFirstRunRef.current) {
+      visibleFirstRunRef.current = false;
+      return;
+    }
+    void refreshAnalysisJobs();
+  }, [refreshAnalysisJobs, isVisible]);
 
   const workHasAnalyzingEpisode = useCallback(
     (workId: number) => {
@@ -1125,6 +1168,13 @@ export function HeaderAnalysisBell() {
     refreshAnalysisJobs,
   } = useAnalysisJobs();
 
+  // 인라인 함수는 매 render 새 인스턴스 → AnalysisBell:1410-1413 useEffect deps 변경 →
+  // onPanelOpen 재호출 → state 갱신 → re-render → 무한 루프. useCallback으로 identity 안정화.
+  const handlePanelOpen = useCallback(async () => {
+    await refreshAnalysisJobs();
+    await refreshBellNotifications();
+  }, [refreshAnalysisJobs, refreshBellNotifications]);
+
   return (
     <AnalysisBell
       unreadCount={unreadCount}
@@ -1135,10 +1185,7 @@ export function HeaderAnalysisBell() {
       onIngestReadOutcomes={ingestReadOutcomes}
       onMarkBellNotificationRead={markBellNotificationRead}
       onCancelJob={cancelAnalysisJob}
-      onPanelOpen={async () => {
-        await refreshAnalysisJobs();
-        await refreshBellNotifications();
-      }}
+      onPanelOpen={handlePanelOpen}
       onNavigate={(href, jobId, notificationId) => {
         if (notificationId) markNotificationRead(notificationId);
         if (jobId) markJobOutcomeRead(jobId);
