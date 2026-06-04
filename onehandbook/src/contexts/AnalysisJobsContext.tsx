@@ -1168,6 +1168,13 @@ export function HeaderAnalysisBell() {
     refreshAnalysisJobs,
   } = useAnalysisJobs();
 
+  // 인라인 함수는 매 render 새 인스턴스 → AnalysisBell:1410-1413 useEffect deps 변경 →
+  // onPanelOpen 재호출 → state 갱신 → re-render → 무한 루프. useCallback으로 identity 안정화.
+  const handlePanelOpen = useCallback(async () => {
+    await refreshAnalysisJobs();
+    await refreshBellNotifications();
+  }, [refreshAnalysisJobs, refreshBellNotifications]);
+
   return (
     <AnalysisBell
       unreadCount={unreadCount}
@@ -1178,10 +1185,7 @@ export function HeaderAnalysisBell() {
       onIngestReadOutcomes={ingestReadOutcomes}
       onMarkBellNotificationRead={markBellNotificationRead}
       onCancelJob={cancelAnalysisJob}
-      onPanelOpen={async () => {
-        await refreshAnalysisJobs();
-        await refreshBellNotifications();
-      }}
+      onPanelOpen={handlePanelOpen}
       onNavigate={(href, jobId, notificationId) => {
         if (notificationId) markNotificationRead(notificationId);
         if (jobId) markJobOutcomeRead(jobId);
