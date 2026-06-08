@@ -38,6 +38,7 @@ import { AnalysisProviderExhaustedError } from "@/lib/analysis/analysisErrors";
 import { insertTrainingLogPair } from "@/lib/training/trainingLogs";
 import { isWorkBibleExtractionEnabled } from "@/lib/config/workBibleExtraction";
 import { extractAndApplyWorkFacts } from "@/lib/analysis/extractAndApplyWorkFacts";
+import { after } from "next/server";
 
 type ConsumeNatRpcResult = {
   ok?: boolean;
@@ -419,21 +420,24 @@ export async function runEpisodeAnalysisPipeline(
   }
 
   // 작품 바이블 추출 후행 훅 (ADR-0029) — flag 뒤 + 비차단.
+  // after() = 응답 반환 후 background 실행 (응답 latency 영향 0).
   if (isWorkBibleExtractionEnabled()) {
-    try {
-      await extractAndApplyWorkFacts({
-        workId: work.id,
-        workTitle: work.title ?? "",
-        genre: work.genre,
-        episodeId: episode.id,
-        episodeNumber: episode.episode_number,
-        episodeContent: episode.content,
-        episodeContentHash: currentHash,
-        sourceJobId: analysisJobProgress?.jobId ?? null,
-      });
-    } catch (e) {
-      console.warn("[work-bible] fact extraction failed (non-blocking):", e);
-    }
+    after(async () => {
+      try {
+        await extractAndApplyWorkFacts({
+          workId: work.id,
+          workTitle: work.title ?? "",
+          genre: work.genre,
+          episodeId: episode.id,
+          episodeNumber: episode.episode_number,
+          episodeContent: episode.content,
+          episodeContentHash: currentHash,
+          sourceJobId: analysisJobProgress?.jobId ?? null,
+        });
+      } catch (e) {
+        console.warn("[work-bible] fact extraction failed (non-blocking):", e);
+      }
+    });
   }
 
   return {
