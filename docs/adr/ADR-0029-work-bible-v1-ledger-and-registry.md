@@ -165,12 +165,40 @@
 
 ---
 
+## Re-analysis Policy (핫픽스 영속화)
+
+### 결정 — content_hash 기반 idempotent 교체
+- 추출 진입부 `content_hash` 게이트 = `extractAndApplyWorkFacts` 진입 첫 SELECT.
+- 게이트 동작 진리표:
+
+| 사양 | existing | 분기 | 동작 |
+|---|---|---|---|
+| 첫 분석 (fact 0) | `null` | 추출 진행 | Haiku 호출 + 5단계 영속화 |
+| 동일 본문 재분석 | row + 동일 hash | **skip** | Haiku 호출 0, delete 0 |
+| 퇴고 후 재분석 | row + 불일치 hash | 추출 진행 | ④ delete + ⑤ insert (하드 교체) |
+| 백필 (캐시 히트 + fact 0) | `null` | 추출 진행 | 신규 fact 생성 |
+
+### 캐시 히트 path 도 추출 발화
+- `api/analyze/route.ts` 의 `cachedRun && acceptCached` 분기 = 후행 훅 진입.
+- `sourceJobId = null` (캐시 히트 = `analysis_jobs` 신규 진입 0).
+- 게이트 통과 시: 백필 복구 path (이전에 flag off 였던 회차의 fact 누락 복구).
+- 게이트 skip 시: Haiku 토큰 0 = 비용 안전.
+
+### 사양 정합
+- ADR-0029 §결정 3 "백필 없음" 보강 — 백필 자체는 안 함 (자동 fact 생성 안 함), 단 캐시 히트 시 재분석 트리거 = 백필 복구 효과.
+- ADR-0029 §결정 10 "재분석 시 fact 하드 교체" 정합 — 게이트 통과 시 ④ delete + ⑤ insert 인접 path 그대로.
+- 동일 본문 재분석 시 잡음 fact 재생산 0 = 작가 fact 안정성 보장.
+
+---
+
 ## Related Commits
 
 - `7aca0f8`: feat(db): add work_bible entities + facts tables (v1)
 - `20dc3a1`: Merge pull request #28 (schema main 머지)
 - `badc3ce`: feat(infra): work-bible extraction 인프라 (PR-A) — serviceRole server-only, flag helper, seed script
 - `57b447a`: feat(extraction): work-bible fact 추출 본체 (PR-B) — 8 파일
+- `45095cd`: Merge pull request #29 (extraction main 머지)
+- `9041815`: fix(work-bible): 추출 idempotency + 캐시 히트 발화 (Re-analysis Policy 영속화)
 
 ---
 
