@@ -63,6 +63,23 @@ export async function extractAndApplyWorkFacts(
 ): Promise<void> {
   const sb = createSupabaseServiceRole();
 
+  // content_hash 게이트 (ADR-0029 재분석 정책) — 동일 본문 + fact 존재 시 skip.
+  // fact 0 (신규/백필) 또는 hash 불일치 (퇴고) = 추출 진행.
+  const { data: existing } = await sb
+    .from("work_facts")
+    .select("episode_content_hash")
+    .eq("work_id", input.workId)
+    .eq("episode_id", input.episodeId)
+    .limit(1)
+    .maybeSingle();
+
+  if (
+    existing &&
+    existing.episode_content_hash === input.episodeContentHash
+  ) {
+    return;
+  }
+
   // 1. registry fetch
   const { data: regRows, error: regErr } = await sb
     .from("work_entities")
