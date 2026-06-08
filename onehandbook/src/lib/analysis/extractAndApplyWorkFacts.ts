@@ -65,13 +65,21 @@ export async function extractAndApplyWorkFacts(
 
   // content_hash 게이트 (ADR-0029 재분석 정책) — 동일 본문 + fact 존재 시 skip.
   // fact 0 (신규/백필) 또는 hash 불일치 (퇴고) = 추출 진행.
-  const { data: existing } = await sb
+  const { data: existing, error: gateErr } = await sb
     .from("work_facts")
     .select("episode_content_hash")
     .eq("work_id", input.workId)
     .eq("episode_id", input.episodeId)
     .limit(1)
     .maybeSingle();
+
+  if (gateErr) {
+    console.warn(
+      "[work-bible] gate SELECT 실패 — Haiku 헛호출 차단을 위해 skip:",
+      gateErr.message,
+    );
+    return;
+  }
 
   if (
     existing &&
