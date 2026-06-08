@@ -133,9 +133,44 @@
 
 ---
 
+## Entity Resolution Policy (PR-B 영속화)
+
+### 결정적 후보 생성 (Haiku 호출 앞단)
+- 한국 성씨 사전 (~100건, 통계청 2015 인구주택총조사) = 인라인 상수 (`src/lib/analysis/koreanSurnames.ts`).
+- 한글 1글자 단성 ~95건 + 복성 7건 (남궁/황보/제갈/사공/선우/서문/독고).
+- mention 첫 1-2글자 strip 후 registry 의 `canonical_name` + `aliases` 안 given-name suffix 매칭.
+- 유일 후보 (1건) = 강한 힌트로 Haiku user 영역 주입 + 자동 alias 병합.
+- 복수 후보 (2건+) = 전부 후보 제시, Haiku 가 brief 컨텍스트로 선택. 확신 부재 시 low confidence (< 0.5 = 서버 저장 X).
+- 미매칭 (성씨 사전 미커버 / 외국식 이름 / 호칭/별호) = 호칭 path = Haiku 가 brief 컨텍스트 단독 판단.
+
+### 자동 alias 병합 정책
+- **유일 매칭 한정**. 모호 매칭 (2건+) = 병합 금지 = v2 병합 UI 의제.
+- 매 회차 추출 시 신규 mention = 유일 후보 통과 시 entity.aliases 안 중복 제거 누적 (자가 치유).
+- 결과: 추후 추출 라운드 가속 + 대명사/별호 자동 학습.
+
+### confidence 임계값
+- Haiku 출력 `confidence` 0.0 ~ 1.0.
+- 서버 저장 임계값 = **0.5** (`MIN_CONFIDENCE`). 미만 = 저장 X (잡음 차단).
+
+### 트랜잭션 사양
+- 5단계 (entity insert / ref→ID / aliases / fact delete / fact insert) = 앱 레이어 best-effort.
+- ④→⑤ 인접 (사이 호출 0) = facts 일관성 최대화.
+- ⑤ 실패 = `console.error` (best-effort, 분석 결과 영향 0).
+- 부분 실패 시 자가 치유: 재분석 시 ④ delete (idempotent) + ⑤ insert 재시도.
+
+### Flag 가드
+- env `WORK_BIBLE_EXTRACTION_ENABLED=true` (또는 `1`) = on. 기본 off.
+- helper: `src/lib/config/workBibleExtraction.ts` (`isWorkBibleExtractionEnabled()`).
+- 운영 활성화 순서: 시드 실행 (E2E → 운영) → 검증 → flag on.
+
+---
+
 ## Related Commits
 
 - `7aca0f8`: feat(db): add work_bible entities + facts tables (v1)
+- `20dc3a1`: Merge pull request #28 (schema main 머지)
+- `badc3ce`: feat(infra): work-bible extraction 인프라 (PR-A) — serviceRole server-only, flag helper, seed script
+- `57b447a`: feat(extraction): work-bible fact 추출 본체 (PR-B) — 8 파일
 
 ---
 
