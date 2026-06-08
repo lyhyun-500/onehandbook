@@ -31,6 +31,8 @@ import { isMissingAnalysisJobsTableError } from "@/lib/db/analysisJobsTable";
 import { runAnalysisProcessAfterResponse } from "@/lib/analysis/scheduleAnalysisProcess";
 import { conflictingEpisodeIdsForActiveJobs } from "@/lib/analysis/activeAnalysisJobConflict";
 import { ANALYSIS_JOB_FAILURE_SUPERSEDED_BY_FORCE } from "@/lib/analysis/analysisJobFailureCodes";
+import { isWorkBibleExtractionEnabled } from "@/lib/config/workBibleExtraction";
+import { extractAndApplyWorkFacts } from "@/lib/analysis/extractAndApplyWorkFacts";
 
 function parseNatOptions(body: Record<string, unknown>): NatAnalysisOptions {
   // 의제 신규-1+2: includeLore 옵션 폐기 (세계관·인물 = 기본 포함, 가산 0).
@@ -180,6 +182,29 @@ export async function POST(request: Request) {
     }
 
     const cachedOpts = cachedRun.options_json as Record<string, unknown> | null;
+
+    // 작품 바이블 추출 후행 훅 (ADR-0029) — 캐시 히트 path 도 발화.
+    // 백필 + idempotency 정합 (게이트가 hash 일치 시 즉시 skip).
+    if (isWorkBibleExtractionEnabled()) {
+      try {
+        await extractAndApplyWorkFacts({
+          workId: work.id,
+          workTitle: work.title ?? "",
+          genre: work.genre,
+          episodeId: episode.id,
+          episodeNumber: episode.episode_number,
+          episodeContent: episode.content,
+          episodeContentHash: currentHash,
+          sourceJobId: null,
+        });
+      } catch (e) {
+        console.warn(
+          "[work-bible] fact extraction failed (non-blocking, cache hit):",
+          e,
+        );
+      }
+    }
+
     return NextResponse.json({
       analysis: {
         id: cachedRun.id,
