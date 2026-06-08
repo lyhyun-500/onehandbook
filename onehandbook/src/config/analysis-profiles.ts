@@ -3,6 +3,9 @@ import type { LLMProviderId } from "@/lib/ai/types";
 /** 모든 분석은 동일 Claude 모델 — 플랫폼은 `platforms/{id}.md` 프롬프트만 분기 */
 export const ANALYSIS_CLAUDE_MODEL = "claude-sonnet-4-5";
 
+/** 작품 바이블 fact 추출 = Haiku (저비용 후행 패스, ADR-0029) */
+export const ANALYSIS_HAIKU_MODEL = "claude-haiku-4-5";
+
 /**
  * 분석 프로필 — 서비스에서 표시명·프롬프트를 여기서 관리합니다.
  * - provider / model: 전 프로필 동일(Claude).

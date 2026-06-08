@@ -36,6 +36,8 @@ import {
 import type { AppUser } from "@/lib/supabase/appUser";
 import { AnalysisProviderExhaustedError } from "@/lib/analysis/analysisErrors";
 import { insertTrainingLogPair } from "@/lib/training/trainingLogs";
+import { isWorkBibleExtractionEnabled } from "@/lib/config/workBibleExtraction";
+import { extractAndApplyWorkFacts } from "@/lib/analysis/extractAndApplyWorkFacts";
 
 type ConsumeNatRpcResult = {
   ok?: boolean;
@@ -414,6 +416,24 @@ export async function runEpisodeAnalysisPipeline(
     });
   } catch (e) {
     console.warn("training_logs 저장 실패(무시):", e);
+  }
+
+  // 작품 바이블 추출 후행 훅 (ADR-0029) — flag 뒤 + 비차단.
+  if (isWorkBibleExtractionEnabled()) {
+    try {
+      await extractAndApplyWorkFacts({
+        workId: work.id,
+        workTitle: work.title ?? "",
+        genre: work.genre,
+        episodeId: episode.id,
+        episodeNumber: episode.episode_number,
+        episodeContent: episode.content,
+        episodeContentHash: currentHash,
+        sourceJobId: analysisJobProgress?.jobId ?? null,
+      });
+    } catch (e) {
+      console.warn("[work-bible] fact extraction failed (non-blocking):", e);
+    }
   }
 
   return {
