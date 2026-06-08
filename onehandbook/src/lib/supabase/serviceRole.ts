@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 
 /** 서버 전용 — 네이버 OAuth 등 관리자 작업. `SUPABASE_SERVICE_ROLE_KEY` 필수 */
