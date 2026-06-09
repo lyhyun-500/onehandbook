@@ -191,6 +191,56 @@
 
 ---
 
+## Fold Injection Policy (L3 주입 영속화, v1)
+
+### 결정 — content 기반 fold + system prompt 주입
+- 단일 분석 path 단독 (`runAnalysis.ts`). 일괄(holistic) 경로 = v2 의제 (PR-C).
+- 출력 = system prompt 안 추가 텍스트 블록 ("## 작품 바이블 — 이전 회차 누적 fact (read-only)").
+- 빌더 = `src/lib/ai/buildWorkContextBlock.ts` (server-only).
+- 입력 = `(workId, episodeNumber)`. `workId` 출처 = **파이프라인 work.id 단독** (사용자 입력 차단 = service_role RLS 우회 안전 조건).
+
+### 시점 정합 (§결정 4 보강)
+- 쿼리: `WHERE work_id = ? AND episode_number < N` 엄격 부등호.
+- N 화 자체 fact 는 추출 후행 패스에서 생성 — fold 시점에 미존재 사실 = leak 차단.
+- `episodeNumber <= 1` = 빈 블록 early return (이전 fact 0).
+
+### 4그룹 압축 (LLM 토큰 절약 + 신호 보존)
+
+| 그룹 | 사양 |
+|---|---|
+| ① 미회수 복선 | `foreshadow_planted` 의 foreshadow entity 집합 A − `foreshadow_resolved` 의 foreshadow entity 집합 B. 각 미회수 entity 별 가장 최근 planted fact 1건. |
+| ② 인물 마지막 상태 | character entity 별 가장 최근 `state_change` fact 1건 (episode_number DESC, created_at DESC). |
+| ③ 쌍별 마지막 관계 | `relationship_change` fact 의 sorted entity_ids pair 별 가장 최근 1건. |
+| ④ 최근 핵심 사건 | `event` fact, 시간 역순. 남은 capacity 만큼. |
+
+- content 텍스트 사용. `value` JSONB = 미사용 (충돌 검사 = v2 의제).
+- 우선순위 truncate: ① > ② > ③ > ④. ④ event 가 가장 먼저 잘림.
+
+### char budget = 2,000
+- 한국어 ≈ 1.5 토큰/char → 2,000 char ≈ 3,000 토큰.
+- 운영 Haiku usage 실측 후 보정.
+- 우선순위 truncate = 그룹별 라인 누적, char_budget 초과 시 다음 그룹 절단.
+
+### 빈 블록 생략 (system 무변경 보장)
+- `buildSystemPrompt` 4번째 인자 `workContextBlock` = `trends` 와 동일 패턴 (`?.trim() ? ... : ""`).
+- 빈 string / null / undefined = system prompt 변경 0 정합. parse.ts / parseHolistic.ts / 출력 JSON 계약 = 무변경.
+
+### 추출-주입 flag 분리
+- `WORK_BIBLE_EXTRACTION_ENABLED` (추출 후행 훅).
+- `WORK_BIBLE_FOLD_ENABLED` (fold 주입, 신규).
+- 독립 토글 = 추출만 on (fact 누적) 단계 후 fold 진입 path 가능.
+
+### 점수 영향 = 회귀 검증 게이트
+- fold on 후 분석 점수 / dimension comment 변동 = 검증 의제. 동일 작품 동일 회차 fold off 대 on 비교 path 권고.
+- 분석 응답 latency 변동 = 운영 측정 의제 (fold 빌드 + system 토큰 증가).
+
+### 스케일 축 (장기 해법 의제)
+- **현 비용**: fold 비용 = 작품당 fact 수에 선형 (전역 테이블 무관). `idx_work_facts_fold (work_id, episode_number)` 인덱스로 풀스캔 회피.
+- **장기 해법**: SQL 집계 (`DISTINCT ON` 그룹별 1건 PostgreSQL 추출) 또는 작품별 상태 스냅샷 테이블 (회차당 1 row, 상태 누적).
+- **전환 시점**: 작품 장기화 (회차 100+) + 단위 작품 fact 수 폭증 시 = 의제 격상.
+
+---
+
 ## Related Commits
 
 - `7aca0f8`: feat(db): add work_bible entities + facts tables (v1)
@@ -199,6 +249,9 @@
 - `57b447a`: feat(extraction): work-bible fact 추출 본체 (PR-B) — 8 파일
 - `45095cd`: Merge pull request #29 (extraction main 머지)
 - `9041815`: fix(work-bible): 추출 idempotency + 캐시 히트 발화 (Re-analysis Policy 영속화)
+- `d5d740b`: Merge pull request #31 (after() + 게이트 가드 main 머지)
+- `4419411`: fix(work-bible): 과잉 추출 튜닝 — fact 규칙 프롬프트 강화
+- `75d57c8`: feat(work-bible): L3 fold 주입 v1 — 단일 분석 경로 (Fold Injection Policy 영속화)
 
 ---
 
