@@ -202,6 +202,7 @@ export async function runEpisodeAnalysisPipeline(
       {
         manuscript: episode.content,
         episode_number: episode.episode_number,
+        work_id: work.id,
         genre: work.genre,
         work_title: work.title ?? undefined,
         tags: Array.isArray(work.tags) ? work.tags : undefined,

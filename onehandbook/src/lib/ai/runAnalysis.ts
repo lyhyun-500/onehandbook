@@ -30,6 +30,8 @@ import type {
   TrendReferenceItem,
 } from "./types";
 import { isProviderConfigured } from "./availability";
+import { buildWorkContextBlock } from "./buildWorkContextBlock";
+import { isWorkBibleFoldEnabled } from "@/lib/config/workBibleFold";
 
 const JSON_PARSE_RETRY_USER_MESSAGE =
   "너의 이전 답변은 JSON 형식이 유효하지 않아. 다른 잡담은 하지 말고 오직 순수한 JSON 구조로만 다시 답변해줘.";
@@ -254,7 +256,26 @@ export async function runAnalysis(
       input.tags,
       extractThemeHintFromManuscript(input.manuscript) ?? undefined
     );
-  const system = buildSystemPrompt(input.genre, profile, trendsBlock);
+  // L3 fold 주입 (ADR-0029) — flag 뒤 + 비차단.
+  // workId 출처 = 파이프라인 work.id 단독 (사용자 입력 차단 = service_role RLS 우회 안전 조건).
+  let workContextBlock = "";
+  if (
+    isWorkBibleFoldEnabled() &&
+    typeof input.work_id === "number" &&
+    Number.isFinite(input.work_id)
+  ) {
+    try {
+      workContextBlock = await buildWorkContextBlock({
+        workId: input.work_id,
+        episodeNumber: input.episode_number ?? 0,
+      });
+    } catch (e) {
+      console.warn("[work-bible] fold context build failed (non-blocking):", e);
+      workContextBlock = "";
+    }
+  }
+
+  const system = buildSystemPrompt(input.genre, profile, trendsBlock, workContextBlock);
   const user = buildUserPrompt(input);
 
   const parsedOut = await completeAndParseModelJson(profile, system, user, parseAnalysisJson);

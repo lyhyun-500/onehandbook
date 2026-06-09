@@ -23,6 +23,8 @@ export interface AnalysisInput {
   manuscript: string;
   /** 회차 번호 — 연재 구간별 평가 기준 적용 시 유저 메시지에 표시 */
   episode_number?: number;
+  /** works.id — L3 fold 주입 시 work_facts 조회 키 (ADR-0029) */
+  work_id?: number;
   /** works.genre 등과 맞춤 */
   genre: string;
   /** works.title — RAG 트렌드 검색 쿼리에 사용 */
