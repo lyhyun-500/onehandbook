@@ -275,6 +275,38 @@
 
 ---
 
+## PR-C 운영 검증 결과 (2026-06-10)
+
+### 검증 사실 — 일괄 single_call holistic 안 fold 정상 동작
+- 운영 main = `fa37b97` (PR #34 머지) 적용 후 임시 debug 로그 (`9e49473`) 진입 → 회귀 검증 후 revert (`059ebff`) path.
+- 검증 분석 = `workId = 20`, `episodeIds = 38~47` (single_call, 10화).
+
+### 측정 매트릭스
+
+| 항목 | 측정 값 | 사실 결론 |
+|---|---|---|
+| `typeofWorkId` | `"number"` | C1 (`92059ff`) work_id 주입 = runtime 정합. `analysisInputBase.work_id` 정상 인입 사실 |
+| `episodeNumber` (N) | `38` | C2 (`d88c2c1`) `segments.min(episode_number)` 계산 정합. 묶음 첫 회차 사실 |
+| `blockLength` | **1970 char** | char budget 2,000 안 거의 채워짐. 미회수 복선 11화까지 장거리 fold 인입 확인 |
+| 회차별 fact 영속화 | 18~37 누락 0 | C3 (`274a398`) 추출 훅 for-await 순차 동작 정합 |
+
+### dispatch path 사실
+- `analyze-batch-holistic/route.ts:311` 안 `after(runAnalysisProcessAfterResponse)` 의 self-HTTP trigger 실패 사실 발생 → `executeAnalysisJob` direct fallback path 안 진입.
+- direct fallback path 안에서도 fold 정상 작동 사실 확인 = `runAnalysis.ts:332-348` fold 블록 path 단일 (dispatch 방식 무관).
+
+### maxDuration 마진 사실 (실측 통합)
+- base usage = 171~343초 (8~10화 single_call holistic, 운영 측정).
+- 추출 worst = 10화 × Haiku 15초 = 150초.
+- 누적 = **493초 < `maxDuration = 800`초** (`/api/analyze/process/route.ts:17`).
+- 안전 마진 충분, 시간 가드 미진입 사양 정합.
+
+### 결론
+- C1/C2/C3 = 운영 안 정상 동작 확증 사실 영속화 완료.
+- fold 본질 통과 (a) flag + work_id 가드, (b) `work_facts` 누적 + buildWorkContextBlock 정상 반환, (c) system prompt 안 주입 — 3 단계 전부 정합.
+- "일괄 fold 진짜 도는가" 의제 = 본 영속화 안 해소. 후속 회귀 시 본 측정 매트릭스 안 baseline 정합 path.
+
+---
+
 ## Related Commits
 
 - `7aca0f8`: feat(db): add work_bible entities + facts tables (v1)
@@ -289,6 +321,10 @@
 - `92059ff`: feat(work-bible): holistic single-call path work_id 주입 (PR-C C1)
 - `d88c2c1`: feat(work-bible): holistic fold L3 주입 v1 — 단일 호출 path (PR-C C2)
 - `274a398`: feat(work-bible): holistic 추출 훅 — 단일 호출 path 회차별 순차 (PR-C C3)
+- `8af9e90`: docs(adr): ADR-0029 + Fold Injection Policy v2 영속화 (PR-C C4)
+- `fa37b97`: Merge pull request #34 (PR-C main 머지)
+- `9e49473`: chore(work-bible): 임시 fold 런타임 디버그 로그 (PR-C 운영 검증용, revert 예정)
+- `059ebff`: Revert "chore(work-bible): 임시 fold 런타임 디버그 로그" (검증 완료 후 제거)
 
 ---
 
