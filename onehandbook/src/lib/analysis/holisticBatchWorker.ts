@@ -284,6 +284,7 @@ export async function runHolisticBatchPipeline(
       .join("\n\n---\n\n")
       .trim(),
     genre: work.genre ?? "",
+    work_id: work.id,
     work_title: work.title ?? undefined,
     tags: Array.isArray(work.tags) ? work.tags : undefined,
     world_setting,
@@ -654,6 +655,7 @@ async function finalizeSingleHolisticRun(args: {
   analysisInputBase: {
     manuscript: string;
     genre: string;
+    work_id: number;
     work_title: string | undefined;
     world_setting: AnalysisWorldSetting | undefined;
     character_settings: AnalysisCharacterSetting[] | undefined;
