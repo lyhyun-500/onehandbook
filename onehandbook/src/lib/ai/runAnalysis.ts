@@ -324,7 +324,30 @@ export async function runHolisticAnalysis(
       input.tags,
       extractThemeHintFromManuscript(input.manuscript) ?? undefined
     );
-  const system = buildHolisticSystemPrompt(input.genre, profile, trendsBlock);
+  // L3 fold 주입 (ADR-0029, PR-C) — flag 뒤 + 비차단.
+  // N = segments 의 min(episode_number). 단일 호출 path = LLM 1회 = system prompt 1개 = fold 1개.
+  // workId 출처 = analysisInputBase.work_id (호출처 holisticBatchWorker.ts finalizeSingleHolisticRun
+  // 단독 주입, chunk path 안 미주입 → 자동 skip).
+  let workContextBlock = "";
+  if (
+    isWorkBibleFoldEnabled() &&
+    typeof input.work_id === "number" &&
+    Number.isFinite(input.work_id) &&
+    segments.length > 0
+  ) {
+    try {
+      const minEpisodeNumber = Math.min(...segments.map((s) => s.episode_number));
+      workContextBlock = await buildWorkContextBlock({
+        workId: input.work_id,
+        episodeNumber: minEpisodeNumber,
+      });
+    } catch (e) {
+      console.warn("[work-bible] holistic fold context build failed (non-blocking):", e);
+      workContextBlock = "";
+    }
+  }
+
+  const system = buildHolisticSystemPrompt(input.genre, profile, trendsBlock, workContextBlock);
   const user = buildHolisticUserPrompt(input.genre, input, segments);
 
   const parsedOut = await completeAndParseModelJson(

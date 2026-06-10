@@ -32,6 +32,9 @@ import {
   type HolisticPipelineDbLogInput,
 } from "@/lib/analysis/holisticPipelineLog";
 import { insertTrainingLogPair } from "@/lib/training/trainingLogs";
+import { isWorkBibleExtractionEnabled } from "@/lib/config/workBibleExtraction";
+import { extractAndApplyWorkFacts } from "@/lib/analysis/extractAndApplyWorkFacts";
+import { after } from "next/server";
 
 function buildHolisticReportMarkdown(args: {
   workTitle: string | null;
@@ -284,6 +287,7 @@ export async function runHolisticBatchPipeline(
       .join("\n\n---\n\n")
       .trim(),
     genre: work.genre ?? "",
+    work_id: work.id,
     work_title: work.title ?? undefined,
     tags: Array.isArray(work.tags) ? work.tags : undefined,
     world_setting,
@@ -654,6 +658,7 @@ async function finalizeSingleHolisticRun(args: {
   analysisInputBase: {
     manuscript: string;
     genre: string;
+    work_id: number;
     work_title: string | undefined;
     world_setting: AnalysisWorldSetting | undefined;
     character_settings: AnalysisCharacterSetting[] | undefined;
@@ -827,6 +832,36 @@ async function finalizeSingleHolisticRun(args: {
     });
   } catch (e) {
     console.warn("single_call 회차별 동기화 실패(무시):", e);
+  }
+
+  // 작품 바이블 추출 후행 훅 (ADR-0029, PR-C) — flag 뒤 + 비차단.
+  // 회차별 순차 (for-await, 병렬 금지). 회차별 md5Hex(content) 게이트.
+  // after() = process route 응답 반환 후 background 실행 (단일 path 정합).
+  if (isWorkBibleExtractionEnabled()) {
+    after(async () => {
+      for (const ep of ordered) {
+        try {
+          const content = ep.content ?? "";
+          if (!content) continue;
+          const hash = md5Hex(content);
+          await extractAndApplyWorkFacts({
+            workId: work.id,
+            workTitle: work.title ?? "",
+            genre: work.genre ?? "",
+            episodeId: ep.id,
+            episodeNumber: ep.episode_number,
+            episodeContent: content,
+            episodeContentHash: hash,
+            sourceJobId: pipelineDbLog?.analysisJobId ?? null,
+          });
+        } catch (e) {
+          console.warn(
+            `[work-bible] holistic fact extraction failed (ep ${ep.episode_number}, non-blocking):`,
+            e,
+          );
+        }
+      }
+    });
   }
 
   return {

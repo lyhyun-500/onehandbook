@@ -241,6 +241,40 @@
 
 ---
 
+## Fold Injection Policy v2 — holistic 경로 확장 (PR-C 영속화)
+
+### 결정 — single_call holistic path 단독 확장
+- 일괄 분석 single_call path (1~10화) 안 fold 주입 + 회차별 fact 추출 진입.
+- chunk + merge path (11화+) = 본 PR-C 범위 외. 운영 안 503 차단 (`analyze-batch-holistic/route.ts:81-90`) + 코드 안 의도적 미진입 = 이중 가드.
+
+### N 사양 — segments.min(episode_number)
+- 단일 호출 path = LLM 1회 = system prompt 1개 = fold 1개 사실.
+- N = 묶음의 min(episode_number) (이전 회차 fact 단독 인입, leak 차단 정합).
+- `segments.length === 0` 가드 = `Math.min(...[])` = `Infinity` 회피.
+
+### work_id 주입 게이트
+- `analysisInputBase` 안 `work_id: work.id` 주입 (`holisticBatchWorker.ts:283`, finalizeSingleHolisticRun path 단독).
+- `runHolisticAnalysis` 안 fold 게이트 = `typeof input.work_id === "number"` 검사. chunk path (`holisticChunkAnalysis.ts:139`) = `work_id` 의도적 미주입 → 자동 skip.
+- chunk path 활성화 시 = `work_id: work.id` 1줄 추가하면 fold 자동 적용 (코드 변경 0 정합).
+
+### 추출 후행 훅 — 회차별 순차
+- `finalizeSingleHolisticRun` 마지막 (syncPerEpisode 직후, return 직전) 안 `after()` 백그라운드.
+- 회차별 for-await 순차 (병렬 금지 — work_facts 동시 insert race 회피).
+- 회차별 `md5Hex(content)` 단독 해시 — `extractAndApplyWorkFacts` content_hash 게이트 정합.
+- 회차별 try/catch — 1 회차 실패 시 다음 회차 계속 (best-effort).
+- `extractAndApplyWorkFacts` 시그니처 변경 0 (단일 path 재사용).
+
+### maxDuration 마진 사실 (운영 측정)
+- base usage = 171~343초 (8~10화 single_call). 추출 worst = 10화 × Haiku 15초 = 150초.
+- 누적 = 493초 < `maxDuration = 800` (`/api/analyze/process/route.ts:17`). 시간 가드 불필요.
+- content_hash 게이트 히트 시 회차당 < 1초 (Haiku 호출 0).
+
+### merge path 미진입 (PR-C 범위 외)
+- `buildHolisticMergeSystemPrompt` 4번째 인자 추가 = v2 의제 외. merge path 자체 = chunk path 의존 → 본 PR-C 안 미진입.
+- v3 의제 = chunk path 503 해제 + merge path fold/추출 + chunk 결과 → fact 영속화 path.
+
+---
+
 ## Related Commits
 
 - `7aca0f8`: feat(db): add work_bible entities + facts tables (v1)
@@ -252,6 +286,9 @@
 - `d5d740b`: Merge pull request #31 (after() + 게이트 가드 main 머지)
 - `4419411`: fix(work-bible): 과잉 추출 튜닝 — fact 규칙 프롬프트 강화
 - `75d57c8`: feat(work-bible): L3 fold 주입 v1 — 단일 분석 경로 (Fold Injection Policy 영속화)
+- `92059ff`: feat(work-bible): holistic single-call path work_id 주입 (PR-C C1)
+- `d88c2c1`: feat(work-bible): holistic fold L3 주입 v1 — 단일 호출 path (PR-C C2)
+- `274a398`: feat(work-bible): holistic 추출 훅 — 단일 호출 path 회차별 순차 (PR-C C3)
 
 ---
 

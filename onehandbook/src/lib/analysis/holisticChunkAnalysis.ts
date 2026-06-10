@@ -136,6 +136,8 @@ export async function runHolisticChunkAnalysis(
       c.name.trim()
     );
 
+  // chunk path 는 work_id 의도적 미주입 → runHolisticAnalysis 안 fold 자동 skip
+  // (PR-C 범위 외, 503 차단과 이중 가드). chunk 활성화 시 work_id 추가하면 fold 자동 적용.
   const analysisInputBase = {
     manuscript: "",
     genre: work.genre ?? "",
