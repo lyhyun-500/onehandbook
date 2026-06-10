@@ -341,14 +341,6 @@ export async function runHolisticAnalysis(
         workId: input.work_id,
         episodeNumber: minEpisodeNumber,
       });
-      // TEMP DEBUG (commit X): fold 런타임 확증 — block 빈 string 여부 측정. revert 예정.
-      console.info("[work-bible:holistic-fold]", {
-        workId: input.work_id,
-        typeofWorkId: typeof input.work_id,
-        episodeNumber: minEpisodeNumber,
-        blockLength: workContextBlock.length,
-        blockPreview: workContextBlock.slice(0, 120),
-      });
     } catch (e) {
       console.warn("[work-bible] holistic fold context build failed (non-blocking):", e);
       workContextBlock = "";
