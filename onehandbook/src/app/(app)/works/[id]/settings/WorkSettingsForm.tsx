@@ -481,7 +481,7 @@ function CharacterEditCard({
   const isKnownRole = ROLE_OPTIONS.some((r) => r === ch.role);
   return (
     <article className="rounded-lg border border-stone-800/70 bg-stone-900/40 transition-colors hover:border-stone-700/80">
-      <header className="flex items-center gap-3 px-4 py-3">
+      <header className="flex min-w-0 items-center gap-3 px-4 py-3">
         <button
           type="button"
           onClick={onToggle}
@@ -495,13 +495,13 @@ function CharacterEditCard({
           value={ch.name}
           onChange={(e) => onChange({ name: e.target.value })}
           placeholder={`인물 ${index + 1} 이름`}
-          className="flex-1 bg-transparent font-serif text-[14.5px] text-stone-100 placeholder:text-stone-600 focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent font-serif text-[14.5px] text-stone-100 placeholder:text-stone-600 focus:outline-none"
         />
         <span className="font-mono text-[10px] text-stone-600">·</span>
         <select
           value={ch.role}
           onChange={(e) => onChange({ role: e.target.value })}
-          className="appearance-none rounded-sm bg-transparent font-mono text-[10.5px] uppercase tracking-widest text-stone-400 focus:outline-none"
+          className="max-w-[80px] shrink-0 appearance-none rounded-sm bg-transparent font-mono text-[10.5px] uppercase tracking-widest text-stone-400 focus:outline-none"
         >
           {ROLE_OPTIONS.map((r) => (
             <option key={r} value={r} className="bg-stone-900">
@@ -518,7 +518,7 @@ function CharacterEditCard({
         <button
           type="button"
           onClick={onDelete}
-          className="ml-2 inline-flex items-center gap-1 rounded border border-rose-400/30 bg-rose-400/[0.06] px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-rose-300/90 hover:bg-rose-400/[0.14] hover:text-rose-200"
+          className="ml-2 inline-flex shrink-0 items-center gap-1 rounded border border-rose-400/30 bg-rose-400/[0.06] px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-rose-300/90 hover:bg-rose-400/[0.14] hover:text-rose-200"
         >
           <Trash2 size={10} aria-hidden="true" />
           삭제

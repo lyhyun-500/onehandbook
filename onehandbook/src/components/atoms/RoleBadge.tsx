@@ -33,7 +33,7 @@ export function RoleBadge({ role }: { role: string }) {
   const style = ROLE_STYLE[role] ?? ROLE_STYLE["조연"]!;
   return (
     <span
-      className="inline-flex items-center rounded-sm border px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-widest"
+      className="inline-flex shrink-0 items-center whitespace-nowrap rounded-sm border px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-widest"
       style={{
         color: style.color,
         backgroundColor: style.bg,

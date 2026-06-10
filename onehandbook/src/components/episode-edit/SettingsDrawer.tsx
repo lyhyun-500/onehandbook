@@ -475,7 +475,7 @@ function CharactersBody({
                   : "border-stone-800/70 hover:border-stone-700/80"
               }`}
             >
-              <header className="flex items-center gap-2 px-4 py-3">
+              <header className="flex min-w-0 items-center gap-2 px-4 py-3">
                 <button
                   type="button"
                   onClick={() => onToggle(c._key)}
@@ -489,13 +489,13 @@ function CharactersBody({
                   value={c.name}
                   onChange={(e) => onPatch(c._key, { name: e.target.value })}
                   placeholder="이름"
-                  className="flex-1 bg-transparent font-serif text-[14px] text-stone-100 placeholder:text-rose-400/70 focus:outline-none"
+                  className="min-w-0 flex-1 bg-transparent font-serif text-[14px] text-stone-100 placeholder:text-rose-400/70 focus:outline-none"
                 />
                 <RoleBadge role={role} />
                 <select
                   value={role}
                   onChange={(e) => onPatch(c._key, { role: e.target.value })}
-                  className="appearance-none rounded-sm bg-transparent font-mono text-[10px] uppercase tracking-widest text-stone-500 focus:outline-none"
+                  className="max-w-[80px] shrink-0 appearance-none rounded-sm bg-transparent font-mono text-[10px] uppercase tracking-widest text-stone-500 focus:outline-none"
                   aria-label={`${c.name || "인물"} 역할 선택`}
                 >
                   {ROLE_OPTIONS.map((r) => (
@@ -516,7 +516,7 @@ function CharactersBody({
                 <button
                   type="button"
                   onClick={() => onDelete(c._key)}
-                  className="ml-1 inline-flex items-center gap-1 rounded border border-rose-400/30 bg-rose-400/[0.06] px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-rose-300/90 hover:bg-rose-400/[0.14] hover:text-rose-200"
+                  className="ml-1 inline-flex shrink-0 items-center gap-1 rounded border border-rose-400/30 bg-rose-400/[0.06] px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-rose-300/90 hover:bg-rose-400/[0.14] hover:text-rose-200"
                   aria-label="인물 삭제"
                 >
                   <Trash2 size={10} aria-hidden="true" />
