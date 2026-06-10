@@ -69,7 +69,8 @@ const KOREAN_LINEBREAK_RULE = `## 문단·줄바꿈 규칙 (필수)
 export function buildHolisticSystemPrompt(
   genre: string,
   profile: AnalysisProfileConfig,
-  trendsContextBlock?: string | null
+  trendsContextBlock?: string | null,
+  workContextBlock?: string | null
 ): string {
   const base = loadBaseSystem().replace(/\{\{genre\}\}/g, genre);
   const serialization = loadSerializationSegmentGuide();
@@ -87,7 +88,10 @@ export function buildHolisticSystemPrompt(
   const trends = trendsContextBlock?.trim()
     ? `\n\n${trendsContextBlock.trim()}`
     : "";
-  return `${core}${trends}\n\n${HOLISTIC_JSON_SHAPE}`;
+  const workContext = workContextBlock?.trim()
+    ? `\n\n${workContextBlock.trim()}`
+    : "";
+  return `${core}${trends}${workContext}\n\n${HOLISTIC_JSON_SHAPE}`;
 }
 
 export type HolisticEpisodeSegment = {
