@@ -43,12 +43,16 @@ export default async function NewEpisodePage({
     notFound();
   }
 
-  const { data: episodes } = await supabase
+  // ADR-0030 정합: count+1 → MAX+1 전환 (재정렬 후 gap 안전).
+  const { data: maxRow } = await supabase
     .from("episodes")
-    .select("id")
-    .eq("work_id", id);
+    .select("episode_number")
+    .eq("work_id", id)
+    .order("episode_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  const nextEpisodeNumber = (episodes?.length ?? 0) + 1;
+  const nextEpisodeNumber = (maxRow?.episode_number ?? 0) + 1;
 
   const natBalance = appUser.coin_balance ?? 0;
   const worldSetting = parseWorldSetting(work.world_setting);
