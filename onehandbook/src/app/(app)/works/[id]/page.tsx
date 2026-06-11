@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAppUser } from "@/lib/supabase/appUser";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
 import { TopBar } from "@/components/shell/TopBar";
 import {
   agentScoresByWorkFromRuns,
@@ -13,7 +12,7 @@ import {
 import type { WorkOption } from "@/components/atoms/WorkSelector";
 import { DeleteWorkButton } from "./DeleteWorkButton";
 import { WorkDetailHeader } from "./WorkDetailHeader";
-import { EpisodeRows } from "./EpisodeRows";
+import { EpisodeListWithReorder } from "./EpisodeListWithReorder";
 import {
   parseCharacterSettings,
   parseWorldSetting,
@@ -56,6 +55,13 @@ export default async function WorkDetailPage({
     .select("id, episode_id, agent_version, result_json, created_at")
     .eq("work_id", id)
     .order("created_at", { ascending: false });
+
+  // ADR-0030 Q7 UI 가드: 진행 중 분석 잡 사실 시 「순서 편집」 button disable.
+  const { count: busyJobCount } = await supabase
+    .from("analysis_jobs")
+    .select("id", { count: "exact", head: true })
+    .eq("work_id", id)
+    .in("status", ["pending", "processing"]);
 
   const episodeList = (episodes ?? []) as Array<{
     id: number;
@@ -221,55 +227,12 @@ export default async function WorkDetailPage({
           </Link>
         </div>
 
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-baseline gap-2">
-              <h2 className="font-serif text-[16px] font-medium text-stone-100">
-                회차
-              </h2>
-              <span className="font-mono text-[11px] tabular-nums text-stone-500">
-                {totalEpisodesCount}편
-              </span>
-            </div>
-            <button
-              type="button"
-              className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-widest text-stone-400 hover:text-stone-200"
-            >
-              최신순 <ChevronDown size={10} aria-hidden="true" />
-            </button>
-          </div>
-
-          {episodeList.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-stone-700 bg-stone-900/30 px-8 py-14 text-center">
-              <p className="font-serif text-[13px] text-stone-400">
-                등록된 회차가 없습니다.
-              </p>
-              <Link
-                href={`/works/${id}/episodes/new`}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-sky-500 px-4 py-2 font-mono text-[11px] uppercase tracking-widest text-stone-950 hover:bg-sky-400"
-              >
-                첫 회차 등록
-              </Link>
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-lg border border-stone-800/60 bg-stone-900/20">
-              <div className="grid grid-cols-[80px_1fr_90px_80px_70px_70px_40px] items-center gap-4 border-b border-stone-800/60 bg-stone-950/40 px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-stone-500">
-                <div>회차</div>
-                <div>제목</div>
-                <div className="text-right">글자수</div>
-                <div className="text-right">점수</div>
-                <div className="text-right">편집</div>
-                <div className="text-right">분석</div>
-                <div></div>
-              </div>
-              <EpisodeRows
-                episodes={[...episodeList].reverse()}
-                workId={String(id)}
-                latestByEpisode={latestByEpisode}
-              />
-            </div>
-          )}
-        </section>
+        <EpisodeListWithReorder
+          episodes={episodeList}
+          workId={String(id)}
+          latestByEpisode={latestByEpisode}
+          busyJobCount={busyJobCount ?? 0}
+        />
       </main>
     </>
   );
