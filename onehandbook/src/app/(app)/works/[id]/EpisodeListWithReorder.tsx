@@ -52,6 +52,11 @@ export function EpisodeListWithReorder({
   const [items, setItems] = useState<EpisodeRow[]>(episodes);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+  /** 일반 모드 정렬 토글 — desc(최신순) ↔ asc(오래된순). 기본 = desc. */
+  const [sortMode, setSortMode] = useState<"desc" | "asc">("desc");
+  /** 편집 모드 진입 직전 sortMode 보존 (저장/취소 안 종료 시 복원 사양). */
+  const [preEditSortMode, setPreEditSortMode] =
+    useState<"desc" | "asc">("desc");
 
   const isBusy = busyJobCount > 0;
 
@@ -62,14 +67,21 @@ export function EpisodeListWithReorder({
     }),
   );
 
-  const reversedRead = useMemo(
-    () => [...episodes].reverse(),
-    [episodes],
-  );
+  /** server SELECT 안 episode_number ASC 정렬 사실 정합 → asc = 원본, desc = reverse. */
+  const ascList = episodes;
+  const descList = useMemo(() => [...episodes].reverse(), [episodes]);
+  const displayList = sortMode === "desc" ? descList : ascList;
+
+  const toggleSort = () => {
+    if (editMode) return;
+    setSortMode((m) => (m === "desc" ? "asc" : "desc"));
+  };
 
   const enterEditMode = () => {
     if (isBusy) return;
-    // 편집 진입 시 서버 정렬(오름차순) 안 초기화 (드래그 직관 정합)
+    // 편집 진입 시 진입 전 정렬 보존 + asc 강제 (드래그 직관 정합).
+    setPreEditSortMode(sortMode);
+    setSortMode("asc");
     setItems(episodes);
     setEditMode(true);
     setToast(null);
@@ -77,6 +89,7 @@ export function EpisodeListWithReorder({
 
   const cancel = () => {
     setItems(episodes);
+    setSortMode(preEditSortMode);
     setEditMode(false);
     setToast(null);
   };
@@ -112,6 +125,7 @@ export function EpisodeListWithReorder({
         showToast({ kind: "err", message: msg });
         return;
       }
+      setSortMode(preEditSortMode);
       setEditMode(false);
       showToast({
         kind: "ok",
@@ -235,9 +249,16 @@ export function EpisodeListWithReorder({
             </button>
             <button
               type="button"
+              onClick={toggleSort}
+              aria-label={
+                sortMode === "desc"
+                  ? "오래된순으로 정렬"
+                  : "최신순으로 정렬"
+              }
               className="flex items-center gap-1 font-mono text-[10.5px] uppercase tracking-widest text-stone-400 hover:text-stone-200"
             >
-              최신순 <ChevronDown size={10} aria-hidden="true" />
+              {sortMode === "desc" ? "최신순" : "오래된순"}{" "}
+              <ChevronDown size={10} aria-hidden="true" />
             </button>
           </div>
         )}
@@ -246,6 +267,12 @@ export function EpisodeListWithReorder({
       {isBusy && !editMode && (
         <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-900/20 px-3 py-2 font-mono text-[11px] text-amber-200">
           분석 중인 회차가 있어 순서를 변경할 수 없습니다. 완료 후 다시 시도해 주세요.
+        </div>
+      )}
+
+      {editMode && (
+        <div className="mb-3 rounded-md border border-sky-400/30 bg-sky-400/[0.08] px-3 py-2 font-mono text-[11px] text-sky-200">
+          순서 편집 중에는 1화부터 표시됩니다. 저장 또는 취소 시 원래 정렬로 돌아갑니다.
         </div>
       )}
 
@@ -283,7 +310,7 @@ export function EpisodeListWithReorder({
           </DndContext>
         ) : (
           <EpisodeRows
-            episodes={reversedRead}
+            episodes={displayList}
             workId={workId}
             latestByEpisode={latestByEpisode}
           />
