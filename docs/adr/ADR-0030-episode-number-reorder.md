@@ -166,10 +166,11 @@
 
 ## Related Commits
 
-- `5075c04`: feat(db): reorder_episodes RPC migration (C1)
-- `3a6085f`: feat(api): /api/works/[workId]/episodes/reorder 신설 (C2)
-- `1bf22bc`: feat(ui): 회차 순서 편집 모드 + 드래그 (@dnd-kit) (C3)
-- `39763d9`: fix(episodes): 신규 회차 번호 count+1 → MAX+1 (C4)
+- `601e12f`: feat(db): reorder_episodes RPC migration (C1, FOR UPDATE 집계 분리 사실 포함)
+- `52b621c`: feat(api): /api/works/[workId]/episodes/reorder 신설 (C2)
+- `92097ad`: feat(ui): 회차 순서 편집 모드 + 드래그 (@dnd-kit) (C3)
+- `b4f9583`: fix(episodes): 신규 회차 번호 count+1 → MAX+1 (C4)
+- `deb903a`: fix(ui): 회차 정렬 토글 동작 + 편집 모드 asc 강제 복귀 (M1 후속)
 
 ---
 
