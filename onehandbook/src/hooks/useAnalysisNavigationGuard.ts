@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-/** 탭 닫기·새로고침·같은 사이트 링크·뒤로 가기 시 표시 */
+/** 탭 닫기·새로고침·같은 사이트 링크 시 표시 */
 export const ANALYSIS_LEAVE_CONFIRM_MESSAGE =
   "분석이 진행 중입니다. 이미 완료된 회차만 저장됩니다.\n\n그래도 이 페이지를 벗어나시겠습니까?";
 
@@ -10,10 +10,7 @@ export const ANALYSIS_LEAVE_CONFIRM_MESSAGE =
 export const UNSAVED_CHANGES_CONFIRM_MESSAGE =
   "저장하지 않은 변경이 있습니다. 나가시겠습니까?";
 
-const GUARD_STATE_KEY = "__analysisNavGuard";
-
 let guardCount = 0;
-let ignorePopstate = false;
 /** 가드 활성화 시점 안 박힌 메시지. 비활성화 시 기본값 복원 사양. */
 let currentMessage = ANALYSIS_LEAVE_CONFIRM_MESSAGE;
 
@@ -37,7 +34,6 @@ function shouldInterceptAnchor(a: HTMLAnchorElement): boolean {
 
 let beforeUnloadAttached = false;
 let clickAttached = false;
-let popstateAttached = false;
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
   if (guardCount <= 0) return;
@@ -61,33 +57,6 @@ function onDocumentClickCapture(e: MouseEvent) {
   }
 }
 
-function onPopState() {
-  if (ignorePopstate || guardCount <= 0) return;
-
-  if (window.confirm(currentMessage)) {
-    return;
-  }
-
-  ignorePopstate = true;
-  window.history.go(1);
-  window.setTimeout(() => {
-    ignorePopstate = false;
-  }, 0);
-}
-
-/** 뒤로 가기 1단계를 확인 대화상자로 넘기기 위해 같은 URL 엔트리를 하나 쌓음 */
-function pushGuardHistoryEntry() {
-  try {
-    window.history.pushState(
-      { [GUARD_STATE_KEY]: true },
-      "",
-      window.location.href
-    );
-  } catch {
-    /* ignore */
-  }
-}
-
 function attachGlobalListeners() {
   if (!beforeUnloadAttached) {
     window.addEventListener("beforeunload", onBeforeUnload);
@@ -96,10 +65,6 @@ function attachGlobalListeners() {
   if (!clickAttached) {
     document.addEventListener("click", onDocumentClickCapture, true);
     clickAttached = true;
-  }
-  if (!popstateAttached) {
-    window.addEventListener("popstate", onPopState);
-    popstateAttached = true;
   }
 }
 
@@ -112,14 +77,19 @@ function detachGlobalListeners() {
     document.removeEventListener("click", onDocumentClickCapture, true);
     clickAttached = false;
   }
-  if (popstateAttached) {
-    window.removeEventListener("popstate", onPopState);
-    popstateAttached = false;
-  }
 }
 
 /**
- * 분석 요청이 진행 중일 때 이탈(새로고침·탭 닫기·내부 링크·뒤로 가기)을 막거나 확인합니다.
+ * 분석 요청 / 폼 dirty 안 이탈(새로고침·탭 닫기·내부 링크 click)을 막거나 확인합니다.
+ *
+ * 가드 path:
+ *   - beforeunload — 탭 닫기 / 새로고침 (브라우저 표준).
+ *   - click capture — 내부 `<a>` 태그 click (Next.js Link 포함).
+ *
+ * 브라우저 뒤로가기(popstate) 가드 = 본 hook 안 미진입 사실 (ADR-0030 영속화).
+ * App Router 안 history 조작 (router.replace 등) 안 dummy entry 충돌 사실 +
+ * popstate 안 이중 뒤로가기 결함 사실 → 가드 path 폐기 사양.
+ *
  * 여러 컴포넌트에서 동시에 켜져도 리스너는 한 세트만 사용합니다.
  *
  * `message` 미지정 = 기본 `ANALYSIS_LEAVE_CONFIRM_MESSAGE` 단독. 폼 dirty 안
@@ -136,7 +106,6 @@ export function useAnalysisNavigationGuard(
     if (was === 0) {
       currentMessage = message;
       attachGlobalListeners();
-      pushGuardHistoryEntry();
     }
     return () => {
       guardCount = Math.max(0, guardCount - 1);

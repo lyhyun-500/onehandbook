@@ -162,6 +162,12 @@
 - 효과 = 2-pass offset 사양 단순화 (1-pass 진입 path).
 - 트리거 사양 = 본 RPC 안 단순화 의제.
 
+### 에디터 이탈 가드 안 popstate (브라우저 뒤로가기) 미진입 사양
+- `useAnalysisNavigationGuard` 안 popstate 가드 = App Router 안 history 조작 충돌 사실로 폐기 (M3 영속화).
+- 결함 사실: (1) confirm OK 시 dummy entry 안 잔존 → 이중 뒤로가기 필수, (2) `router.replace` 안 dummy entry 단독 교체 → 원본 entry 잔존 = 의도된 history 정합 깨짐.
+- 현 가드 = `beforeunload` + 내부 `<a>` click capture 단독.
+- 뒤로가기 가드 사양 진입 시 = App Router 공식 path (`useRouter().events` 또는 차후 Next.js 안 공식 API) 안 재구현 의제.
+
 ---
 
 ## Related Commits
