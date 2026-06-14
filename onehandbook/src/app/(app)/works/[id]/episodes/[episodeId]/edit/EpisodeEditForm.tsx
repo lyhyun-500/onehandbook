@@ -63,10 +63,17 @@ export function EpisodeEditForm({
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle ?? "");
   const [content, setContent] = useState(initialContent ?? "");
+  // M3 C4 — 저장 baseline. 저장 성공 시 갱신 → bodyDirty=false 떨굼 사양.
+  const [savedTitle, setSavedTitle] = useState(initialTitle ?? "");
+  const [savedContent, setSavedContent] = useState(initialContent ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerUnsaved, setDrawerUnsaved] = useState(false);
+  const [toast, setToast] = useState<{
+    kind: "ok" | "err";
+    message: string;
+  } | null>(null);
 
   const supabase = createClient();
 
@@ -74,9 +81,13 @@ export function EpisodeEditForm({
   const overLimit = !isEpisodeContentWithinLimit(content);
   const nearLimit =
     !overLimit && charCount >= EPISODE_CONTENT_MAX_CHARS * 0.9;
-  const bodyDirty =
-    title !== (initialTitle ?? "") || content !== (initialContent ?? "");
+  const bodyDirty = title !== savedTitle || content !== savedContent;
   const totalUnsaved = bodyDirty || drawerUnsaved;
+
+  function pushToast(kind: "ok" | "err", message: string) {
+    setToast({ kind, message });
+    window.setTimeout(() => setToast(null), 4200);
+  }
 
   // M3 C3 — 폼 dirty 안 이탈 가드 (beforeunload + 내부 link + popstate).
   useAnalysisNavigationGuard(totalUnsaved, UNSAVED_CHANGES_CONFIRM_MESSAGE);
@@ -101,7 +112,10 @@ export function EpisodeEditForm({
           .update({ title, content, content_hash: md5Hex(content) })
           .eq("id", episodeId);
         if (updateError) throw updateError;
-        router.push(`/works/${workId}`);
+        // M3 C4 — 에디터 유지 사양: dirty baseline 갱신 + 저장 토스트.
+        setSavedTitle(title);
+        setSavedContent(content);
+        pushToast("ok", "저장되었습니다");
       } else {
         // 단계 D-fixup-3 (결정 53 옵션 U-1): 새 회차 등록 → episodeId 받음 →
         // /edit page redirect (SettingsDrawer 사용 사양 정합).
@@ -325,6 +339,19 @@ export function EpisodeEditForm({
           </div>
         </footer>
       </form>
+
+      {toast && (
+        <div
+          role="status"
+          className={`fixed bottom-6 left-1/2 z-[80] max-w-[min(calc(100vw-2rem),22rem)] -translate-x-1/2 rounded-xl border px-4 py-3 text-center text-sm font-medium shadow-lg ${
+            toast.kind === "ok"
+              ? "border-emerald-500/30 bg-emerald-950/95 text-emerald-100"
+              : "border-red-500/35 bg-red-950/95 text-red-100"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
 
       {/* 단계 D-fixup-4 (분기 X-5-α+δ 통합):
           새 회차 mode 도 SettingsDrawer mount (세계관 + 인물 = works UPDATE, episodeId 무관).
