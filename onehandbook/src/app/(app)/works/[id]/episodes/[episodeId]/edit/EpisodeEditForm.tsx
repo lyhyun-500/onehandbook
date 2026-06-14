@@ -12,6 +12,10 @@ import {
   countEpisodeContentChars,
   isEpisodeContentWithinLimit,
 } from "@/lib/episodeContentLimit";
+import {
+  UNSAVED_CHANGES_CONFIRM_MESSAGE,
+  useAnalysisNavigationGuard,
+} from "@/hooks/useAnalysisNavigationGuard";
 import { md5Hex } from "@/lib/contentHash";
 import { SettingsDrawer } from "@/components/episode-edit/SettingsDrawer";
 import type {
@@ -73,6 +77,9 @@ export function EpisodeEditForm({
   const bodyDirty =
     title !== (initialTitle ?? "") || content !== (initialContent ?? "");
   const totalUnsaved = bodyDirty || drawerUnsaved;
+
+  // M3 C3 — 폼 dirty 안 이탈 가드 (beforeunload + 내부 link + popstate).
+  useAnalysisNavigationGuard(totalUnsaved, UNSAVED_CHANGES_CONFIRM_MESSAGE);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -284,10 +291,18 @@ export function EpisodeEditForm({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => router.back()}
+              onClick={() => {
+                if (
+                  totalUnsaved &&
+                  !window.confirm(UNSAVED_CHANGES_CONFIRM_MESSAGE)
+                ) {
+                  return;
+                }
+                router.push(`/works/${workId}`);
+              }}
               className="rounded-md border border-stone-800/80 bg-stone-900/40 px-4 py-2 text-[12.5px] text-stone-300 hover:border-stone-700 hover:text-stone-100"
             >
-              취소
+              회차 목록
             </button>
             <button
               type="submit"
