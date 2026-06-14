@@ -121,7 +121,8 @@ export function EpisodeEditForm({
           .from("works")
           .update({ total_episodes: count ?? episodeNumber })
           .eq("id", workId);
-        router.push(
+        // history 안 /new 잔재 제거 사양 (router.replace) — 뒤로가기 시 빈 폼 안 미도달 정합.
+        router.replace(
           `/works/${workId}/episodes/${ins.id as number}/edit`,
         );
       }
