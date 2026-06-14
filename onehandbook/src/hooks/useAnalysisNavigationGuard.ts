@@ -6,10 +6,16 @@ import { useEffect } from "react";
 export const ANALYSIS_LEAVE_CONFIRM_MESSAGE =
   "분석이 진행 중입니다. 이미 완료된 회차만 저장됩니다.\n\n그래도 이 페이지를 벗어나시겠습니까?";
 
+/** 폼 dirty 안 이탈 confirm 문맥 (M3 — 회차 편집 등 폼 안 사용 사양). */
+export const UNSAVED_CHANGES_CONFIRM_MESSAGE =
+  "저장하지 않은 변경이 있습니다. 나가시겠습니까?";
+
 const GUARD_STATE_KEY = "__analysisNavGuard";
 
 let guardCount = 0;
 let ignorePopstate = false;
+/** 가드 활성화 시점 안 박힌 메시지. 비활성화 시 기본값 복원 사양. */
+let currentMessage = ANALYSIS_LEAVE_CONFIRM_MESSAGE;
 
 function shouldInterceptAnchor(a: HTMLAnchorElement): boolean {
   if (a.target === "_blank" || a.download) return false;
@@ -46,7 +52,7 @@ function onDocumentClickCapture(e: MouseEvent) {
   const a = el.closest("a");
   if (!a || !(a instanceof HTMLAnchorElement)) return;
   if (!shouldInterceptAnchor(a)) return;
-  if (!window.confirm(ANALYSIS_LEAVE_CONFIRM_MESSAGE)) {
+  if (!window.confirm(currentMessage)) {
     e.preventDefault();
     e.stopPropagation();
     if (typeof e.stopImmediatePropagation === "function") {
@@ -58,7 +64,7 @@ function onDocumentClickCapture(e: MouseEvent) {
 function onPopState() {
   if (ignorePopstate || guardCount <= 0) return;
 
-  if (window.confirm(ANALYSIS_LEAVE_CONFIRM_MESSAGE)) {
+  if (window.confirm(currentMessage)) {
     return;
   }
 
@@ -115,13 +121,20 @@ function detachGlobalListeners() {
 /**
  * 분석 요청이 진행 중일 때 이탈(새로고침·탭 닫기·내부 링크·뒤로 가기)을 막거나 확인합니다.
  * 여러 컴포넌트에서 동시에 켜져도 리스너는 한 세트만 사용합니다.
+ *
+ * `message` 미지정 = 기본 `ANALYSIS_LEAVE_CONFIRM_MESSAGE` 단독. 폼 dirty 안
+ * 사용 시 `UNSAVED_CHANGES_CONFIRM_MESSAGE` 인입 사양 정합.
  */
-export function useAnalysisNavigationGuard(active: boolean) {
+export function useAnalysisNavigationGuard(
+  active: boolean,
+  message: string = ANALYSIS_LEAVE_CONFIRM_MESSAGE,
+) {
   useEffect(() => {
     if (!active) return;
     const was = guardCount;
     guardCount += 1;
     if (was === 0) {
+      currentMessage = message;
       attachGlobalListeners();
       pushGuardHistoryEntry();
     }
@@ -129,7 +142,8 @@ export function useAnalysisNavigationGuard(active: boolean) {
       guardCount = Math.max(0, guardCount - 1);
       if (guardCount === 0) {
         detachGlobalListeners();
+        currentMessage = ANALYSIS_LEAVE_CONFIRM_MESSAGE;
       }
     };
-  }, [active]);
+  }, [active, message]);
 }
