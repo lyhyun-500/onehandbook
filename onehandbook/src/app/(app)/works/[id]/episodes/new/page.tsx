@@ -23,10 +23,14 @@ import { EpisodeEditForm } from "../[episodeId]/edit/EpisodeEditForm";
  */
 export default async function NewEpisodePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ type?: string }>;
 }) {
   const { id } = await params;
+  const { type: typeParam } = await searchParams;
+  const isPrologue = typeParam === "prologue";
   const supabase = await createClient();
   const appUser = await requireAppUser(supabase);
 
@@ -43,16 +47,20 @@ export default async function NewEpisodePage({
     notFound();
   }
 
-  // ADR-0030 정합: count+1 → MAX+1 전환 (재정렬 후 gap 안전).
+  // ADR-0030 + 0031 정합: 본편 단독 MAX+1 (프롤로그 = 0 단독, 본편 안 영향 0).
   const { data: maxRow } = await supabase
     .from("episodes")
     .select("episode_number")
     .eq("work_id", id)
+    .eq("episode_type", "episode")
     .order("episode_number", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const nextEpisodeNumber = (maxRow?.episode_number ?? 0) + 1;
+  // 프롤로그 = 0 단독, 본편 = MAX+1 사양 영속화.
+  const nextEpisodeNumber = isPrologue
+    ? 0
+    : (maxRow?.episode_number ?? 0) + 1;
 
   const natBalance = appUser.coin_balance ?? 0;
   const worldSetting = parseWorldSetting(work.world_setting);
@@ -76,6 +84,7 @@ export default async function NewEpisodePage({
 
       <EpisodeEditForm
         mode="new"
+        type={isPrologue ? "prologue" : "episode"}
         workId={work.id as number}
         workTitle={work.title as string}
         episodeNumber={nextEpisodeNumber}

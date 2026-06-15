@@ -185,6 +185,9 @@ export default async function WorkDetailPage({
             worldSetting={worldSetting}
             characterSettings={characterSettings}
             recentMemos={recentMemos}
+            hasPrologue={episodeList.some(
+              (ep) => ep.episode_type === "prologue",
+            )}
           />
           <DeleteWorkButton workId={Number(work.id)} />
         </div>

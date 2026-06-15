@@ -26,6 +26,8 @@ import type {
 interface EpisodeEditFormProps {
   /** 단계 D-fixup-3 (결정 53 옵션 U-1): mode 분기 — 편집 / 새 회차 등록. */
   mode: "new" | "edit";
+  /** ADR-0031: 'prologue' 시 episode_type 인입 사양 (mode === 'new' 단독 의미). */
+  type?: "episode" | "prologue";
   workId: number;
   workTitle: string;
   episodeNumber: number;
@@ -50,6 +52,7 @@ interface EpisodeEditFormProps {
  */
 export function EpisodeEditForm({
   mode,
+  type = "episode",
   workId,
   workTitle,
   episodeId,
@@ -60,6 +63,7 @@ export function EpisodeEditForm({
   initialCharacters,
 }: EpisodeEditFormProps) {
   const isEdit = mode === "edit";
+  const isPrologue = type === "prologue";
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle ?? "");
   const [content, setContent] = useState(initialContent ?? "");
@@ -124,6 +128,7 @@ export function EpisodeEditForm({
           .insert({
             work_id: workId,
             episode_number: episodeNumber,
+            episode_type: isPrologue ? "prologue" : "episode",
             title,
             content,
             content_hash: md5Hex(content),
@@ -148,6 +153,13 @@ export function EpisodeEditForm({
         );
       }
     } catch (err: unknown) {
+      // ADR-0031 — partial unique index (one_prologue_per_work) 안 23505 catch 사양.
+      const code = (err as { code?: string })?.code;
+      if (code === "23505" && isPrologue) {
+        setError("이미 프롤로그가 있습니다. 작품당 1개만 등록할 수 있습니다.");
+        setLoading(false);
+        return;
+      }
       const message =
         err && typeof err === "object" && "message" in err
           ? String((err as { message: string }).message)

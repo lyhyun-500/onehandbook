@@ -34,6 +34,8 @@ interface WorkDetailHeaderProps {
   worldSetting: WorldSetting;
   characterSettings: CharacterSettings;
   recentMemos: WorkNoteMemo[];
+  /** ADR-0031: 본 작품 안 프롤로그 사실 — 「프롤로그 추가」 button disable 사양. */
+  hasPrologue?: boolean;
 }
 
 /**
@@ -55,6 +57,7 @@ export function WorkDetailHeader({
   worldSetting,
   characterSettings,
   recentMemos,
+  hasPrologue = false,
 }: WorkDetailHeaderProps) {
   const router = useRouter();
   const [batchOpen, setBatchOpen] = useState(false);
@@ -100,6 +103,20 @@ export function WorkDetailHeader({
           >
             <Plus size={13} aria-hidden="true" />
             새 회차
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              router.push(`/works/${workId}/episodes/new?type=prologue`)
+            }
+            disabled={hasPrologue}
+            title={
+              hasPrologue ? "이미 프롤로그가 있습니다" : undefined
+            }
+            className="flex items-center gap-1.5 rounded-md border border-stone-800/80 bg-stone-900/40 px-3.5 py-2 text-[12.5px] text-stone-300 hover:border-stone-700 hover:text-stone-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-stone-800/80 disabled:hover:text-stone-300"
+          >
+            <Plus size={13} aria-hidden="true" />
+            프롤로그 추가
           </button>
           <button
             type="button"
