@@ -186,7 +186,9 @@ function assembleWithBudget(groups: { title: string; lines: string[] }[]): strin
 export async function buildWorkContextBlock(
   input: BuildWorkContextBlockInput,
 ): Promise<string> {
-  if (!Number.isFinite(input.episodeNumber) || input.episodeNumber <= 1) {
+  // ADR-0031: 프롤로그 (episode_number = 0) 안 fact 안 1화 분석 시점 안 인입 사양 정합.
+  // <= 0 안 early return = 프롤로그 자체 분석 시점 안 fold 0 (이전 회차 0 사실 정합).
+  if (!Number.isFinite(input.episodeNumber) || input.episodeNumber <= 0) {
     return "";
   }
 
