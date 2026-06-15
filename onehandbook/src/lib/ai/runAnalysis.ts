@@ -353,7 +353,14 @@ export async function runHolisticAnalysis(
     }
   }
 
-  const system = buildHolisticSystemPrompt(input.genre, profile, trendsBlock, workContextBlock);
+  const hasPrologue = segments.some((s) => s.episode_number === 0);
+  const system = buildHolisticSystemPrompt(
+    input.genre,
+    profile,
+    trendsBlock,
+    workContextBlock,
+    hasPrologue,
+  );
   const user = buildHolisticUserPrompt(input.genre, input, segments);
 
   const parsedOut = await completeAndParseModelJson(
@@ -405,7 +412,13 @@ export async function runHolisticMergeAnalysis(
 
   const { block: trendsBlock, references: trendRefs } =
     await fetchTrendsContextForAnalysisMaybe(genre, workTitle ?? "", tags);
-  const system = buildHolisticMergeSystemPrompt(genre, profile, trendsBlock);
+  const hasPrologue = episodeWeights.some((w) => w.episode_number === 0);
+  const system = buildHolisticMergeSystemPrompt(
+    genre,
+    profile,
+    trendsBlock,
+    hasPrologue,
+  );
   const user = buildHolisticMergeUserPrompt(genre, chunks, episodeWeights);
 
   const parsedOut = await completeAndParseModelJson(

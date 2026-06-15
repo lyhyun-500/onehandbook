@@ -368,7 +368,7 @@ export async function POST(request: Request) {
 
   const { data: epRows } = await supabase
     .from("episodes")
-    .select("id, episode_number, title, content")
+    .select("id, episode_number, title, content, episode_type")
     .eq("work_id", work.id)
     .in("id", orderedEpisodeIds);
 
@@ -503,6 +503,8 @@ export async function POST(request: Request) {
       episode_number: e.episode_number,
       title: e.title ?? "",
       charCount: countManuscriptChars(e.content ?? ""),
+      episode_type: (e as { episode_type?: "episode" | "prologue" })
+        .episode_type,
     }));
 
     const { weightedOverall } = buildHolisticDisplay(rawMerged, orderedForWeight);

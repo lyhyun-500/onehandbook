@@ -40,6 +40,7 @@ type EpRow = {
   episode_number: number;
   title: string | null;
   content: string | null;
+  episode_type: "episode" | "prologue";
 };
 
 /**
@@ -91,7 +92,7 @@ export async function runHolisticChunkAnalysis(
 
   const { data: epRows, error: epErr } = await supabase
     .from("episodes")
-    .select("id, episode_number, title, content")
+    .select("id, episode_number, title, content, episode_type")
     .eq("work_id", work.id)
     .in("id", chunkEpisodeIds);
 
@@ -185,6 +186,7 @@ export async function runHolisticChunkAnalysis(
         episode_number: e.episode_number,
         title: e.title ?? "",
         charCount: countManuscriptChars(e.content ?? ""),
+        episode_type: e.episode_type,
       }));
 
       const { weightedOverall } = buildHolisticDisplay(rawResult, orderedForWeight);

@@ -25,6 +25,7 @@ export type HolisticSyncEpisodeRow = {
   id: number;
   episode_number: number;
   content: string | null;
+  episode_type?: "episode" | "prologue";
 };
 
 /** NAT 차감 실패 등으로 통합 동기화만 되돌릴 때 사용 */
@@ -110,6 +111,7 @@ export async function syncPerEpisodeAnalysisFromHolisticRun(
     episode_number: e.episode_number,
     title: "",
     charCount: countManuscriptChars(e.content ?? ""),
+    episode_type: e.episode_type,
   }));
   const { weightedOverall } = buildHolisticDisplay(
     holisticResult,

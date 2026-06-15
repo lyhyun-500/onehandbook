@@ -17,6 +17,8 @@ export function buildHolisticDisplay(
     episode_number: number;
     title: string;
     charCount: number;
+    /** ADR-0031 — 'prologue' 시 통합 weightedOverall 합산 제외 사양. 미지정 = 'episode' 정합. */
+    episode_type?: "episode" | "prologue";
   }>
 ): {
   weightedOverall: number;
@@ -34,13 +36,17 @@ export function buildHolisticDisplay(
   for (const ep of orderedEpisodes) {
     const sc = scoreByEp.get(ep.episode_number);
     if (sc == null) continue;
+    const isPrologue = ep.episode_type === "prologue";
     /** UI에서 charCount가 0으로만 넘어와도 LLM 점수는 있을 수 있어 최소 가중 1 */
     const weight = ep.charCount > 0 ? ep.charCount : 1;
-    num += sc * weight;
-    den += weight;
+    // ADR-0031 — 프롤로그 = 통합 점수 합산 제외, chartPoints 안 포함 단독 사양.
+    if (!isPrologue) {
+      num += sc * weight;
+      den += weight;
+    }
     chartPoints.push({
       episode_number: ep.episode_number,
-      label: `${ep.episode_number}화`,
+      label: isPrologue ? "프롤로그" : `${ep.episode_number}화`,
       score: sc,
       charCount: ep.charCount,
     });

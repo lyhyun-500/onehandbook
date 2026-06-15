@@ -61,6 +61,19 @@ const HOLISTIC_TASK = `## 통합 분석 임무
 **작품 전체 서사·톤·인물 호흡이 회차 간에 어떻게 이어지는지**를 중심으로 평가하세요. 단일 회차 품질만 보지 말고, 연속된 흐름·아크·복선이 구간 전체에서 어떻게 작동하는지 봅니다.
 선택된 분석 프로필(플랫폼 가이드)이 있으면 해당 플랫폼 독자 기대를 가중해 판단하고, 범용 모드일 때는 일반 웹소설 독자 기대에의 적합도로 해석하세요.`;
 
+// ADR-0031 정합: 묶음에 프롤로그 (episode_number = 0) 포함 시 분기 사양.
+const HOLISTIC_PROLOGUE_RULE = `## 묶음 안 프롤로그 포함 시 평가 사양 (필수)
+
+본 묶음 안 \`episode_number: 0\` 회차 = **프롤로그** (작품 시작 전 도입부)입니다.
+
+- **프롤로그 안 episode_scores 점수 매김**: 일반 회차와 동일하게 6 축 dimensions + improvements + comment를 채우세요. 단, 평가 관점은 프롤로그 사양 단독:
+  - 첫 훅·세계관·인물 첫 등장·후속 회차 견인 단독 가중.
+  - 본 회차 내 갈등 해소·인물 성장·중반 호흡 = 평가 대상 아님.
+- **프롤로그 → 첫 본편 안 연결성 평가**: executive_summary 안 프롤로그 도입 톤 ↔ 첫 본편 본격 진입의 정합 사실을 명시하세요. 프롤로그가 후속 회차로 자연스럽게 이어지는지 단독 평가.
+- **★ 통합 overall_score 안 프롤로그 제외 사양**: 본 묶음 안 통합 점수 (overall_score) = **본편 단독** 가중 평균 사실. 프롤로그 점수는 episode_scores 안 별도 표시 단독, 통합 점수 합산 제외.
+
+위 사양 안 프롤로그를 본편과 동일 평가 관점에 묶지 마세요 — 평가 관점 단독 갱신.`;
+
 const KOREAN_LINEBREAK_RULE = `## 문단·줄바꿈 규칙 (필수)
 - 쉼표(,) 뒤에서 줄바꿈/문단 분리를 하지 마세요. (예: "A,\\nB" 금지)
 - 줄바꿈은 문단을 나눌 때만 사용하고, 한 문장 안에서는 줄을 끊지 마세요.
@@ -70,7 +83,8 @@ export function buildHolisticSystemPrompt(
   genre: string,
   profile: AnalysisProfileConfig,
   trendsContextBlock?: string | null,
-  workContextBlock?: string | null
+  workContextBlock?: string | null,
+  hasPrologue?: boolean,
 ): string {
   const base = loadBaseSystem().replace(/\{\{genre\}\}/g, genre);
   const serialization = loadSerializationSegmentGuide();
@@ -79,6 +93,7 @@ export function buildHolisticSystemPrompt(
   const parts = [
     base,
     HOLISTIC_TASK,
+    hasPrologue ? HOLISTIC_PROLOGUE_RULE : null,
     serialization,
     genreAxes,
     platform,
