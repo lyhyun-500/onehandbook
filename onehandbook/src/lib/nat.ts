@@ -30,11 +30,20 @@ export function natLengthTierLabel(charCount: number): string {
   return "6,001~10,000자";
 }
 
+/** ADR-0031: 프롤로그 NAT 사양 — 3천자 미만 = 0, 이상 = 1. */
+export function prologueNatCost(charCount: number): number {
+  return charCount < 3000 ? 0 : 1;
+}
+
 export function computeNatCost(
   charCount: number,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  opts: NatAnalysisOptions
+  opts: NatAnalysisOptions,
+  episodeType?: "episode" | "prologue",
 ): number {
+  if (episodeType === "prologue") {
+    return prologueNatCost(charCount);
+  }
   return natBaseCostByLength(charCount);
 }
 
@@ -43,8 +52,18 @@ export type NatBreakdownLine = { label: string; nat: number };
 export function buildNatBreakdown(
   charCount: number,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  opts: NatAnalysisOptions
+  opts: NatAnalysisOptions,
+  episodeType?: "episode" | "prologue",
 ): { lines: NatBreakdownLine[]; total: number } {
+  if (episodeType === "prologue") {
+    const base = prologueNatCost(charCount);
+    const label =
+      charCount < 3000
+        ? "프롤로그 (3,000자 미만 · 무료)"
+        : "프롤로그 (3,000자 이상)";
+    const lines: NatBreakdownLine[] = [{ label, nat: base }];
+    return { lines, total: base };
+  }
   const base = natBaseCostByLength(charCount);
   const lines: NatBreakdownLine[] = [
     { label: `기본 (${natLengthTierLabel(charCount)})`, nat: base },
@@ -97,49 +116,75 @@ export function buildBatchNatBreakdown(
   return { lines, total, episodeCount };
 }
 
-/**
- * 통합 일괄 분석 1회(선택 회차 한 번에 묶음): **회차당 1 NAT** + 플랫폼 통합 1회 가산.
- * (단일 회차·통합 모두 글자 구간이 아닌 회차 수 기준)
- */
-export function computeHolisticNatCost(
-  episodeCount: number,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  opts: NatAnalysisOptions
-): number {
-  return Math.max(0, episodeCount);
+/** ADR-0031: 회차 단위 일괄 NAT — 본편 = 1, 프롤로그 = prologueNatCost(charCount). */
+export type HolisticEpisodeNatInput = {
+  charCount: number;
+  episode_type?: "episode" | "prologue";
+};
+
+export function holisticEpisodeNat(ep: HolisticEpisodeNatInput): number {
+  if (ep.episode_type === "prologue") {
+    return prologueNatCost(ep.charCount);
+  }
+  return 1;
 }
 
 /**
- * 다청크 통합(10화 초과): 각 청크 기본 = **해당 청크 회차 수만큼 1 NAT/회차**,
+ * 통합 일괄 분석 1회(선택 회차 한 번에 묶음): 본편 = 회차당 1 NAT,
+ * 프롤로그 (ADR-0031) = 3천 미만 0 / 이상 1.
+ */
+export function computeHolisticNatCost(
+  episodes: HolisticEpisodeNatInput[],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  opts: NatAnalysisOptions,
+): number {
+  let total = 0;
+  for (const ep of episodes) total += holisticEpisodeNat(ep);
+  return Math.max(0, total);
+}
+
+/**
+ * 다청크 통합(10화 초과): 각 청크 기본 = 본편 회차당 1 NAT/프롤로그 = 별도 사양.
  * 플랫폼은 **전체 작업당 1회**로 첫 청크에만 가산.
  */
 export function computeHolisticChunkNatCost(
-  episodeCountInChunk: number,
+  chunkEpisodes: HolisticEpisodeNatInput[],
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   chunkIndexZeroBased: number,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  opts: NatAnalysisOptions
+  opts: NatAnalysisOptions,
 ): number {
-  return Math.max(0, episodeCountInChunk);
+  let total = 0;
+  for (const ep of chunkEpisodes) total += holisticEpisodeNat(ep);
+  return Math.max(0, total);
 }
 
 export function buildHolisticNatBreakdown(
-  episodeCount: number,
+  episodes: HolisticEpisodeNatInput[],
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  opts: NatAnalysisOptions
+  opts: NatAnalysisOptions,
 ): { lines: NatBreakdownLine[]; total: number } {
-  const base = Math.max(0, episodeCount);
-  const lines: NatBreakdownLine[] = [
-    {
-      label:
-        episodeCount > 0
-          ? `기본 (회차당 1 NAT × ${episodeCount}화)`
-          : "기본",
-      nat: base,
-    },
-  ];
-  const total = lines.reduce((s, l) => s + l.nat, 0);
-  return { lines, total };
+  const regularCount = episodes.filter((e) => e.episode_type !== "prologue").length;
+  const prologueEps = episodes.filter((e) => e.episode_type === "prologue");
+  const prologueNat = prologueEps.reduce((s, e) => s + prologueNatCost(e.charCount), 0);
+  const base = regularCount + prologueNat;
+  const lines: NatBreakdownLine[] = [];
+  if (regularCount > 0) {
+    lines.push({
+      label: `기본 (회차당 1 NAT × ${regularCount}화)`,
+      nat: regularCount,
+    });
+  }
+  if (prologueEps.length > 0) {
+    lines.push({
+      label: `프롤로그 ${prologueEps.length}건 (3,000자 미만 무료)`,
+      nat: prologueNat,
+    });
+  }
+  if (lines.length === 0) {
+    lines.push({ label: "기본", nat: 0 });
+  }
+  return { lines, total: base };
 }
 
 /** 배치 병합(분석 JSON만으로 최종 통합 리포트) */
@@ -149,9 +194,9 @@ export function computeHolisticMergeNatCost(): number {
 
 /** 10화 단위 배치 + 병합 예상 NAT (선택 회차 전체) */
 export function estimateHolisticBatchTotalNat(
-  episodes: { id: number; charCount: number }[],
+  episodes: { id: number; charCount: number; episode_type?: "episode" | "prologue" }[],
   orderedEpisodeIds: number[],
-  opts: NatAnalysisOptions
+  opts: NatAnalysisOptions,
 ): {
   chunkCount: number;
   batchNat: number;
@@ -160,12 +205,20 @@ export function estimateHolisticBatchTotalNat(
 } {
   const chunkSize = HOLISTIC_CLIENT_CHUNK_SIZE;
   const ids = orderedEpisodeIds;
+  const epById = new Map(episodes.map((e) => [e.id, e]));
   const chunkCount = Math.ceil(ids.length / chunkSize) || 0;
   let batchNat = 0;
   let chunkIdx = 0;
   for (let i = 0; i < ids.length; i += chunkSize) {
     const slice = ids.slice(i, i + chunkSize);
-    batchNat += computeHolisticChunkNatCost(slice.length, chunkIdx, opts);
+    const sliceEps: HolisticEpisodeNatInput[] = slice.map((id) => {
+      const ep = epById.get(id);
+      return {
+        charCount: ep?.charCount ?? 0,
+        episode_type: ep?.episode_type,
+      };
+    });
+    batchNat += computeHolisticChunkNatCost(sliceEps, chunkIdx, opts);
     chunkIdx += 1;
   }
   const mergeNat = chunkCount > 1 ? computeHolisticMergeNatCost() : 0;

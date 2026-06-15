@@ -240,6 +240,8 @@ export async function runHolisticBatchPipeline(
   });
 
   for (const e of ordered) {
+    // ADR-0031 — 프롤로그 안 MIN_ANALYSIS_CHARS 차단 면제 사양.
+    if (e.episode_type === "prologue") continue;
     const n = countManuscriptChars(e.content ?? "");
     if (n < MIN_ANALYSIS_CHARS) {
       throw new Error(MANUSCRIPT_TOO_SHORT_MESSAGE);
@@ -336,9 +338,12 @@ export async function runHolisticBatchPipeline(
         }));
 
         const cost = computeHolisticChunkNatCost(
-          chunkEps.length,
+          chunkEps.map((e) => ({
+            charCount: countManuscriptChars(e.content ?? ""),
+            episode_type: e.episode_type,
+          })),
           serverChunkIdx,
-          opts
+          opts,
         );
         const balance = refreshed.coin_balance ?? 0;
         if (balance < cost) {
@@ -618,7 +623,14 @@ export async function runHolisticBatchPipeline(
 
   let totalNatSpent = mergeCost;
   chunkResults.forEach((ch, idx) => {
-    const c = computeHolisticChunkNatCost(ch.episodeIds.length, idx, opts);
+    const sliceEps = ch.episodeIds.map((id) => {
+      const ep = byId.get(id);
+      return {
+        charCount: countManuscriptChars(ep?.content ?? ""),
+        episode_type: ep?.episode_type,
+      };
+    });
+    const c = computeHolisticChunkNatCost(sliceEps, idx, opts);
     totalNatSpent += c;
   });
 
@@ -725,7 +737,13 @@ async function finalizeSingleHolisticRun(args: {
     (s, e) => s + countManuscriptChars(e.content ?? ""),
     0
   );
-  const cost = computeHolisticNatCost(ordered.length, opts);
+  const cost = computeHolisticNatCost(
+    ordered.map((e) => ({
+      charCount: countManuscriptChars(e.content ?? ""),
+      episode_type: e.episode_type,
+    })),
+    opts,
+  );
   const contents = ordered.map((e) => e.content ?? "");
   const contentHash = holisticContentHash(
     orderedEpisodeIds,

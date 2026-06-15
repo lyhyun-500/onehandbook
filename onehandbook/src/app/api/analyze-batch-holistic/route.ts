@@ -134,7 +134,7 @@ export async function POST(request: Request) {
 
   const { data: epRows, error: epErr } = await supabase
     .from("episodes")
-    .select("id, episode_number, title, content")
+    .select("id, episode_number, title, content, episode_type")
     .eq("work_id", work.id)
     .in("id", episodeIds);
 
@@ -183,6 +183,8 @@ export async function POST(request: Request) {
   }
 
   for (const e of ordered) {
+    // ADR-0031 — 프롤로그 안 MIN_ANALYSIS_CHARS 차단 면제 사양 (3천 미만 = 0 NAT 무료 분석 정합).
+    if (e.episode_type === "prologue") continue;
     const n = countManuscriptChars(e.content ?? "");
     if (n < MIN_ANALYSIS_CHARS) {
       return NextResponse.json(
@@ -195,12 +197,12 @@ export async function POST(request: Request) {
     }
   }
 
-  const breakdown = buildHolisticNatBreakdown(ordered.length, opts);
-
   const episodeMeta = ordered.map((e) => ({
     id: e.id,
     charCount: countManuscriptChars(e.content ?? ""),
+    episode_type: e.episode_type as "episode" | "prologue" | undefined,
   }));
+  const breakdown = buildHolisticNatBreakdown(episodeMeta, opts);
   const estNat = estimateHolisticBatchTotalNat(episodeMeta, episodeIds, opts);
 
   if (!isProviderConfigured(profile.provider)) {

@@ -46,7 +46,7 @@ export default async function WorkDetailPage({
   // content 까지 가져와서 4-stat 글자수 합산 (episodes.content_length 컬럼 부재).
   const { data: episodes } = await supabase
     .from("episodes")
-    .select("id, episode_number, title, content, created_at")
+    .select("id, episode_number, title, content, created_at, episode_type")
     .eq("work_id", id)
     .order("episode_number", { ascending: true });
 
@@ -66,6 +66,7 @@ export default async function WorkDetailPage({
   const episodeList = (episodes ?? []) as Array<{
     id: number;
     episode_number: number;
+    episode_type?: "episode" | "prologue";
     title: string;
     content: string;
     created_at: string;
@@ -177,6 +178,7 @@ export default async function WorkDetailPage({
               title: ep.title,
               charCount: ep.content?.length ?? 0,
               analyzed: latestByEpisode.has(ep.id),
+              episode_type: ep.episode_type,
             }))}
             natBalance={natBalance}
             agentVersion={ANALYSIS_PROFILES[0]?.id ?? "kakao-page"}

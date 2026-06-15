@@ -40,6 +40,7 @@ export interface BatchAnalyzeEpisode {
   title: string;
   charCount: number;
   analyzed: boolean;
+  episode_type?: "episode" | "prologue";
 }
 
 type Filter = "all" | "unanalyzed" | "analyzed";
@@ -207,7 +208,11 @@ export function BatchAnalyzeModal({
   const natEst = useMemo(
     () =>
       estimateHolisticBatchTotalNat(
-        selectedList.map((e) => ({ id: e.id, charCount: e.charCount })),
+        selectedList.map((e) => ({
+          id: e.id,
+          charCount: e.charCount,
+          episode_type: e.episode_type,
+        })),
         selectedEpisodeIds,
         natOpts,
       ),
@@ -215,7 +220,14 @@ export function BatchAnalyzeModal({
     [selectedEpisodeIds, platform],
   );
   const natBreakdown = useMemo(
-    () => buildHolisticNatBreakdown(selectedList.length, natOpts),
+    () =>
+      buildHolisticNatBreakdown(
+        selectedList.map((e) => ({
+          charCount: e.charCount,
+          episode_type: e.episode_type,
+        })),
+        natOpts,
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedList.length, platform],
   );

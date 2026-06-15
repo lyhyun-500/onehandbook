@@ -111,13 +111,15 @@ export async function runEpisodeAnalysisPipeline(
     throw new Error("이 작품을 수정할 권한이 없습니다.");
   }
 
+  const isPrologue = episode.episode_type === "prologue";
   const charCount = countManuscriptChars(episode.content);
-  if (charCount < MIN_ANALYSIS_CHARS) {
+  // ADR-0031 — 프롤로그 안 MIN_ANALYSIS_CHARS 차단 면제 사양.
+  if (!isPrologue && charCount < MIN_ANALYSIS_CHARS) {
     throw new Error(MANUSCRIPT_TOO_SHORT_MESSAGE);
   }
 
-  const cost = computeNatCost(charCount, opts);
-  const breakdown = buildNatBreakdown(charCount, opts);
+  const cost = computeNatCost(charCount, opts, episode.episode_type);
+  const breakdown = buildNatBreakdown(charCount, opts, episode.episode_type);
   const currentHash = md5Hex(episode.content);
   // 분기 γ-1: hash 함수 시그니처 보존, 호출처 항상 true 고정 (의제 신규-1+2 정합).
   const workContextHash = computeWorkAnalysisContextHash(work, true);

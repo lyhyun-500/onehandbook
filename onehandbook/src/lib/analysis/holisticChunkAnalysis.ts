@@ -115,6 +115,8 @@ export async function runHolisticChunkAnalysis(
   });
 
   for (const e of ordered) {
+    // ADR-0031 — 프롤로그 안 MIN_ANALYSIS_CHARS 차단 면제 사양.
+    if (e.episode_type === "prologue") continue;
     const n = countManuscriptChars(e.content ?? "");
     if (n < MIN_ANALYSIS_CHARS) {
       throw new Error(MANUSCRIPT_TOO_SHORT_MESSAGE);
@@ -157,9 +159,12 @@ export async function runHolisticChunkAnalysis(
   }));
 
   const cost = computeHolisticChunkNatCost(
-    ordered.length,
+    ordered.map((e) => ({
+      charCount: countManuscriptChars(e.content ?? ""),
+      episode_type: e.episode_type,
+    })),
     Math.max(0, Math.floor(chunkIndex)),
-    opts
+    opts,
   );
 
   const refreshed = await syncAppUser(supabase);
