@@ -93,7 +93,7 @@ export async function runEpisodeAnalysisPipeline(
 
   const { data: episode, error: epErr } = await supabase
     .from("episodes")
-    .select("id, content, work_id, episode_number")
+    .select("id, content, work_id, episode_number, episode_type")
     .eq("id", episodeId)
     .single();
 
@@ -202,6 +202,7 @@ export async function runEpisodeAnalysisPipeline(
       {
         manuscript: episode.content,
         episode_number: episode.episode_number,
+        episode_type: episode.episode_type,
         work_id: work.id,
         genre: work.genre,
         work_title: work.title ?? undefined,

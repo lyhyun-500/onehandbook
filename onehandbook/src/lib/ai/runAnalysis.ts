@@ -275,7 +275,13 @@ export async function runAnalysis(
     }
   }
 
-  const system = buildSystemPrompt(input.genre, profile, trendsBlock, workContextBlock);
+  const system = buildSystemPrompt(
+    input.genre,
+    profile,
+    trendsBlock,
+    workContextBlock,
+    input.episode_type,
+  );
   const user = buildUserPrompt(input);
 
   const parsedOut = await completeAndParseModelJson(profile, system, user, parseAnalysisJson);

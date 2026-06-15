@@ -105,7 +105,7 @@ export async function POST(request: Request) {
 
   const { data: episode, error: epErr } = await supabase
     .from("episodes")
-    .select("id, content, work_id, episode_number")
+    .select("id, content, work_id, episode_number, episode_type")
     .eq("id", episodeId)
     .single();
 
