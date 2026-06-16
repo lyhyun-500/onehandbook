@@ -195,7 +195,9 @@ export function EpisodeEditForm({
                 aria-hidden="true"
                 className="text-stone-600"
               />
-              <span className="font-mono tabular-nums">{episodeNumber}화</span>
+              <span className="font-mono tabular-nums">
+                {episodeNumber === 0 ? "프롤로그" : `${episodeNumber}화`}
+              </span>
             </div>
           </div>
           <button
