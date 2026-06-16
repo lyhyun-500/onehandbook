@@ -222,29 +222,32 @@ export async function runHolisticChunkAnalysis(
           : undefined
       );
 
-      const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
-        p_amount: cost,
-        p_ref_type: "holistic_batch_chunk",
-        p_ref_id: null,
-        p_metadata: {
-          work_id: work.id,
-          episode_ids: chunkEpisodeIds,
-          agent_version: version.id,
-        },
-      });
+      // ADR-0031: cost === 0 (프롤로그 단독 묶음 안 3,000자 미만) 안 consume_nat skip.
+      if (cost > 0) {
+        const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
+          p_amount: cost,
+          p_ref_type: "holistic_batch_chunk",
+          p_ref_id: null,
+          p_metadata: {
+            work_id: work.id,
+            episode_ids: chunkEpisodeIds,
+            agent_version: version.id,
+          },
+        });
 
-      if (rpcErr) {
-        console.error(rpcErr);
-        throw new Error("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
-      }
+        if (rpcErr) {
+          console.error(rpcErr);
+          throw new Error("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        }
 
-      const rpc = rpcData as ConsumeNatRpcResult;
-      if (!rpc?.ok) {
-        const err = new Error(
-          `NAT가 부족합니다. 이번 배치에는 ${cost} NAT가 필요합니다.`
-        );
-        (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
-        throw err;
+        const rpc = rpcData as ConsumeNatRpcResult;
+        if (!rpc?.ok) {
+          const err = new Error(
+            `NAT가 부족합니다. 이번 배치에는 ${cost} NAT가 필요합니다.`
+          );
+          (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
+          throw err;
+        }
       }
 
       return { episodeIds: chunkEpisodeIds, result };

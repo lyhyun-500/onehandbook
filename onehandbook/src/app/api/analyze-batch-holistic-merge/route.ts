@@ -561,42 +561,46 @@ export async function POST(request: Request) {
       await markSessionJobFailed(message);
     };
 
-    const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
-      p_amount: mergeCost,
-      p_ref_type: "holistic_analysis_run",
-      p_ref_id: row.id,
-      p_metadata: {
-        work_id: work.id,
-        merged: true,
-        episode_ids: orderedEpisodeIds,
-      },
-    });
-
-    if (rpcErr) {
-      console.error(rpcErr);
-      await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
-      await markMergeJobFailed("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
-      return NextResponse.json(
-        { error: "NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요." },
-        { status: 500 }
-      );
-    }
-
-    const rpc = rpcData as ConsumeNatRpcResult;
-    if (!rpc?.ok) {
-      await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
-      await markMergeJobFailed(
-        `NAT가 부족합니다. 병합에는 ${mergeCost} NAT가 필요합니다.`
-      );
-      return NextResponse.json(
-        {
-          error: `NAT가 부족합니다. 병합에는 ${mergeCost} NAT가 필요합니다.`,
-          code: "INSUFFICIENT_NAT" as const,
-          required: mergeCost,
-          balance: rpc?.balance ?? balance,
+    // ADR-0031: mergeCost 안 상수 2 사실 정합 안 0 도달 0 사실. 단 일관 사양 안 cost > 0 가드 영속화.
+    let rpc: ConsumeNatRpcResult | null = null;
+    if (mergeCost > 0) {
+      const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
+        p_amount: mergeCost,
+        p_ref_type: "holistic_analysis_run",
+        p_ref_id: row.id,
+        p_metadata: {
+          work_id: work.id,
+          merged: true,
+          episode_ids: orderedEpisodeIds,
         },
-        { status: 402 }
-      );
+      });
+
+      if (rpcErr) {
+        console.error(rpcErr);
+        await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
+        await markMergeJobFailed("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        return NextResponse.json(
+          { error: "NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요." },
+          { status: 500 }
+        );
+      }
+
+      rpc = rpcData as ConsumeNatRpcResult;
+      if (!rpc?.ok) {
+        await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
+        await markMergeJobFailed(
+          `NAT가 부족합니다. 병합에는 ${mergeCost} NAT가 필요합니다.`
+        );
+        return NextResponse.json(
+          {
+            error: `NAT가 부족합니다. 병합에는 ${mergeCost} NAT가 필요합니다.`,
+            code: "INSUFFICIENT_NAT" as const,
+            required: mergeCost,
+            balance: rpc?.balance ?? balance,
+          },
+          { status: 402 }
+        );
+      }
     }
 
     if (
@@ -656,7 +660,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       holistic: row,
-      nat: { spent: mergeCost, balance: rpc.balance },
+      nat: { spent: mergeCost, balance: rpc?.balance ?? balance },
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "병합 분석에 실패했습니다.";

@@ -346,7 +346,10 @@ export async function runEpisodeAnalysisPipeline(
   }
 
   let rpc: ConsumeNatRpcResult | null = null;
-  if (!shouldSkipNatConsume) {
+  // ADR-0031: cost === 0 (프롤로그 3,000자 미만) 안 consume_nat 호출 skip 사양.
+  // consume_nat RPC 안 p_amount < 1 안 invalid_amount 거부 사실 → 호출 0 path 단독.
+  // audit (coin_logs) 안 0 amount row 의미 0 사실 정합.
+  if (!shouldSkipNatConsume && cost > 0) {
     const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
       p_amount: cost,
       p_ref_type: "analysis_run",
@@ -449,7 +452,8 @@ export async function runEpisodeAnalysisPipeline(
     previousResult,
     nat: {
       spent: shouldSkipNatConsume ? 0 : cost,
-      balance: shouldSkipNatConsume ? balance : rpc?.balance,
+      // ADR-0031: cost === 0 안 rpc skip path 안 balance 변동 0 사실 → 사전 balance 단독 영속화.
+      balance: shouldSkipNatConsume ? balance : (rpc?.balance ?? balance),
     },
     breakdown,
     cached: false,

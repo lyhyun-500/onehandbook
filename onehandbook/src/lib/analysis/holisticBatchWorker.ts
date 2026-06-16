@@ -388,29 +388,32 @@ export async function runHolisticBatchPipeline(
           holisticPipelineDbCtx(pipelineDbLog, work.id)
         );
 
-        const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
-          p_amount: cost,
-          p_ref_type: "holistic_batch_chunk",
-          p_ref_id: null,
-          p_metadata: {
-            work_id: work.id,
-            episode_ids: chunkIds,
-            agent_version: version.id,
-          },
-        });
+        // ADR-0031: cost === 0 (프롤로그 단독 묶음 안 3,000자 미만) 안 consume_nat skip.
+        if (cost > 0) {
+          const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
+            p_amount: cost,
+            p_ref_type: "holistic_batch_chunk",
+            p_ref_id: null,
+            p_metadata: {
+              work_id: work.id,
+              episode_ids: chunkIds,
+              agent_version: version.id,
+            },
+          });
 
-        if (rpcErr) {
-          console.error(rpcErr);
-          throw new Error("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
-        }
+          if (rpcErr) {
+            console.error(rpcErr);
+            throw new Error("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+          }
 
-        const rpc = rpcData as ConsumeNatRpcResult;
-        if (!rpc?.ok) {
-          const err = new Error(
-            `NAT가 부족합니다. 이번 배치에는 ${cost} NAT가 필요합니다.`
-          );
-          (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
-          throw err;
+          const rpc = rpcData as ConsumeNatRpcResult;
+          if (!rpc?.ok) {
+            const err = new Error(
+              `NAT가 부족합니다. 이번 배치에는 ${cost} NAT가 필요합니다.`
+            );
+            (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
+            throw err;
+          }
         }
 
         chunkResults.push({ episodeIds: chunkIds, result });
@@ -537,29 +540,32 @@ export async function runHolisticBatchPipeline(
     throw new Error(insErr.message ?? "저장에 실패했습니다.");
   }
 
-  const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
-    p_amount: mergeCost,
-    p_ref_type: "holistic_analysis_run",
-    p_ref_id: row.id,
-    p_metadata: {
-      work_id: work.id,
-      merged: true,
-      episode_ids: orderedEpisodeIds,
-    },
-  });
+  // ADR-0031: mergeCost 안 상수 2 사실 정합 안 0 도달 0 사실. 단 일관 사양 안 cost > 0 가드 영속화.
+  if (mergeCost > 0) {
+    const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
+      p_amount: mergeCost,
+      p_ref_type: "holistic_analysis_run",
+      p_ref_id: row.id,
+      p_metadata: {
+        work_id: work.id,
+        merged: true,
+        episode_ids: orderedEpisodeIds,
+      },
+    });
 
-  if (rpcErr) {
-    console.error(rpcErr);
-    await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
-    throw new Error("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
-  }
+    if (rpcErr) {
+      console.error(rpcErr);
+      await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
+      throw new Error("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    }
 
-  const rpc = rpcData as ConsumeNatRpcResult;
-  if (!rpc?.ok) {
-    await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
-    const err = new Error(`NAT가 부족합니다. 병합에는 ${mergeCost} NAT가 필요합니다.`);
-    (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
-    throw err;
+    const rpc = rpcData as ConsumeNatRpcResult;
+    if (!rpc?.ok) {
+      await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
+      const err = new Error(`NAT가 부족합니다. 병합에는 ${mergeCost} NAT가 필요합니다.`);
+      (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
+      throw err;
+    }
   }
 
   // 최종 통합 리포트 저장(best-effort): reports 테이블
@@ -790,31 +796,34 @@ async function finalizeSingleHolisticRun(args: {
     throw new Error(insErr.message ?? "저장에 실패했습니다.");
   }
 
-  const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
-    p_amount: cost,
-    p_ref_type: "holistic_analysis_run",
-    p_ref_id: row.id,
-    p_metadata: {
-      work_id: work.id,
-      episode_ids: orderedEpisodeIds,
-      agent_version: version.id,
-    },
-  });
+  // ADR-0031: cost === 0 (프롤로그 단독 묶음 안 3,000자 미만) 안 consume_nat skip.
+  if (cost > 0) {
+    const { data: rpcData, error: rpcErr } = await supabase.rpc("consume_nat", {
+      p_amount: cost,
+      p_ref_type: "holistic_analysis_run",
+      p_ref_id: row.id,
+      p_metadata: {
+        work_id: work.id,
+        episode_ids: orderedEpisodeIds,
+        agent_version: version.id,
+      },
+    });
 
-  if (rpcErr) {
-    console.error(rpcErr);
-    await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
-    throw new Error("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
-  }
+    if (rpcErr) {
+      console.error(rpcErr);
+      await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
+      throw new Error("NAT 차감에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    }
 
-  const rpc = rpcData as ConsumeNatRpcResult;
-  if (!rpc?.ok) {
-    await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
-    const err = new Error(
-      `NAT가 부족합니다. 이번 통합 분석에는 ${cost} NAT가 필요합니다.`
-    );
-    (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
-    throw err;
+    const rpc = rpcData as ConsumeNatRpcResult;
+    if (!rpc?.ok) {
+      await supabase.from("holistic_analysis_runs").delete().eq("id", row.id);
+      const err = new Error(
+        `NAT가 부족합니다. 이번 통합 분석에는 ${cost} NAT가 필요합니다.`
+      );
+      (err as Error & { code?: string }).code = "INSUFFICIENT_NAT";
+      throw err;
+    }
   }
 
   // 파인튜닝/학습 데이터용 로그(best-effort): [원고 + RAG + 최종 답변]
