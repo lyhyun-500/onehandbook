@@ -49,7 +49,7 @@ export default async function EpisodeViewPage({
 
   const { data: episode } = await supabase
     .from("episodes")
-    .select("id, episode_number, title, content, created_at")
+    .select("id, episode_number, title, content, created_at, episode_type")
     .eq("id", episodeId)
     .eq("work_id", id)
     .single();
@@ -226,6 +226,10 @@ export default async function EpisodeViewPage({
         workTitle={work.title as string}
         episodeId={episode.id as number}
         episodeNumber={episode.episode_number as number}
+        episodeType={
+          (episode.episode_type as "episode" | "prologue" | undefined) ??
+          "episode"
+        }
         episodeTitle={episode.title as string}
         body={(episode.content as string | null) ?? ""}
         charCount={charCount}

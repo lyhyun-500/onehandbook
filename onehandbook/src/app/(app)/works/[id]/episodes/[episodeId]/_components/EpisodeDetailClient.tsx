@@ -27,6 +27,8 @@ interface EpisodeDetailClientProps {
   workTitle: string;
   episodeId: number;
   episodeNumber: number;
+  /** ADR-0031: 'prologue' 시 분석 진입 500 면제 + NAT 0 분기 정합. */
+  episodeType?: "episode" | "prologue";
   episodeTitle: string;
   body: string;
   charCount: number;
@@ -48,6 +50,7 @@ export function EpisodeDetailClient({
   workTitle,
   episodeId,
   episodeNumber,
+  episodeType = "episode",
   episodeTitle,
   body,
   charCount,
@@ -92,6 +95,7 @@ export function EpisodeDetailClient({
           })}
           episodeTitle={episodeTitle}
           episodeNumber={episodeNumber}
+          episodeType={episodeType}
           workTitle={workTitle}
           versions={versions}
           initialAnalyses={initialAnalyses}

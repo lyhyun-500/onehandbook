@@ -159,6 +159,7 @@ export function AnalyzePanel({
   episodeLabel,
   episodeTitle,
   episodeNumber,
+  episodeType = "episode",
   workTitle,
   versions,
   initialAnalyses,
@@ -175,6 +176,8 @@ export function AnalyzePanel({
   episodeTitle?: string;
   /** 알림 패널 제목용 — `episodes.episode_number` */
   episodeNumber?: number;
+  /** ADR-0031: 'prologue' 시 분석 진입 500 면제 + NAT 0 분기 (M4 hotfix C10). */
+  episodeType?: "episode" | "prologue";
   workTitle?: string;
   versions: VersionOption[];
   initialAnalyses: AnalysisRow[];
@@ -185,6 +188,7 @@ export function AnalyzePanel({
   worldSetting: WorldSetting;
   characterSettings: CharacterSettings;
 }) {
+  const isPrologue = episodeType === "prologue";
   const router = useRouter();
   const {
     registerJobStarted,
@@ -232,8 +236,13 @@ export function AnalyzePanel({
   const charCountKnown = charCount > 0;
   const charCountFailed = charCount < 0;
   const tier = useMemo(
-    () => (charCountKnown ? getManuscriptAnalysisTier(charCount) : "ok"),
-    [charCount, charCountKnown]
+    () =>
+      isPrologue
+        ? "ok"
+        : charCountKnown
+          ? getManuscriptAnalysisTier(charCount)
+          : "ok",
+    [charCount, charCountKnown, isPrologue]
   );
 
   useEffect(() => {
@@ -500,10 +509,14 @@ export function AnalyzePanel({
 
   const { lines: natLines, total: natTotal } = useMemo(
     () =>
-      buildNatBreakdown(charCount, {
-        includePlatformOptimization: agentVersion !== "generic",
-      }),
-    [charCount, agentVersion]
+      buildNatBreakdown(
+        charCount,
+        {
+          includePlatformOptimization: agentVersion !== "generic",
+        },
+        episodeType,
+      ),
+    [charCount, agentVersion, episodeType]
   );
 
   const requestAnalyze = async (opts?: {
