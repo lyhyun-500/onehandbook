@@ -225,7 +225,12 @@ export function AnalysisAsyncUnchangedModal({
         </p>
         {episodeNumbers && episodeNumbers.length > 0 ? (
           <p className="mt-3 text-sm font-medium text-amber-200/90">
-            변경 없음: {episodeNumbers.slice().sort((a, b) => a - b).join(", ")}화
+            변경 없음:{" "}
+            {episodeNumbers
+              .slice()
+              .sort((a, b) => a - b)
+              .map((n) => (n === 0 ? "프롤로그" : `${n}화`))
+              .join(", ")}
           </p>
         ) : null}
         {detail ? (

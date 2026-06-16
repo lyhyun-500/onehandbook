@@ -303,7 +303,11 @@ function MemoBody({ memos }: { memos: WorkNoteMemo[] }) {
             className="rounded-lg border border-stone-800/70 bg-stone-900/50 p-4"
           >
             <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-widest text-stone-500">
-              <span>{m.episodeNumber}화 메모</span>
+              <span>
+                {m.episodeNumber === 0
+                  ? "프롤로그 메모"
+                  : `${m.episodeNumber}화 메모`}
+              </span>
               <span>{m.updatedAt}</span>
             </div>
             <p className="mt-2 whitespace-pre-wrap font-serif text-[12.5px] leading-relaxed text-stone-300">

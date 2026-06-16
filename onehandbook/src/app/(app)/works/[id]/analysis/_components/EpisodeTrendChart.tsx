@@ -101,7 +101,9 @@ export function EpisodeTrendChart({
           fontSize="12"
           fontFamily="ui-monospace, monospace"
         >
-          {data[i].episode_number}화
+          {data[i].episode_number === 0
+            ? "프롤로그"
+            : `${data[i].episode_number}화`}
         </text>
       ))}
 

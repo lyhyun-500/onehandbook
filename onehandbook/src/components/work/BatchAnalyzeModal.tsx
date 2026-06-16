@@ -720,10 +720,16 @@ function EpisodeListPanel({
                   checked={checked}
                   onChange={() => onToggle(ep.id)}
                   className="h-4 w-4 cursor-pointer accent-sky-400"
-                  aria-label={`${ep.episode_number}화 선택`}
+                  aria-label={
+                    ep.episode_number === 0
+                      ? "프롤로그 선택"
+                      : `${ep.episode_number}화 선택`
+                  }
                 />
                 <span className="w-14 shrink-0 font-mono text-[11.5px] tabular-nums text-stone-500">
-                  EP.{String(ep.episode_number).padStart(2, "0")}
+                  {ep.episode_number === 0
+                    ? "프롤로그"
+                    : `EP.${String(ep.episode_number).padStart(2, "0")}`}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-serif text-stone-100">
                   {ep.title}

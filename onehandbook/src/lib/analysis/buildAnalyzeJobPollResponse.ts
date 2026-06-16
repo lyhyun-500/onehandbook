@@ -261,7 +261,7 @@ export async function buildAnalyzeJobPollResponse(
 
   const { data: episode } = await supabase
     .from("episodes")
-    .select("content")
+    .select("content, episode_type")
     .eq("id", job.episode_id)
     .single();
 
@@ -275,7 +275,11 @@ export async function buildAnalyzeJobPollResponse(
     includePlatformOptimization: optJson?.includePlatformOptimization !== false,
   };
 
-  const breakdown = buildNatBreakdown(charCount, opts);
+  const breakdown = buildNatBreakdown(
+    charCount,
+    opts,
+    episode?.episode_type as "episode" | "prologue" | undefined,
+  );
 
   const { data: lastTwo } = await supabase
     .from("analysis_results")

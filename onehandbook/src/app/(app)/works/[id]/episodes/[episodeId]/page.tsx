@@ -190,12 +190,14 @@ export default async function EpisodeViewPage({
       .map((eid) => allEpisodes.find((e) => e.id === eid)?.episode_number as number | undefined)
       .filter((n): n is number => typeof n === "number")
       .sort((a, b) => a - b);
+    // ADR-0031: 프롤로그 (ep=0) 포함 시 라벨 분기.
+    const loLabel = epNums[0] === 0 ? "프롤로그" : `${epNums[0]}화`;
     const rangeLabel =
       epNums.length === 0
         ? `${epIds.length}회차`
         : epNums.length === 1
-          ? `${epNums[0]}화`
-          : `${epNums[0]}~${epNums[epNums.length - 1]}화`;
+          ? loLabel
+          : `${loLabel}~${epNums[epNums.length - 1]}화`;
     const overall = (holisticRunRow.result_json as { overall_score?: unknown })?.overall_score;
     const runScore = typeof overall === "number" ? overall : null;
     const created = new Date(holisticRunRow.created_at as string);

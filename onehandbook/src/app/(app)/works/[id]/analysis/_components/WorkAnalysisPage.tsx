@@ -56,11 +56,13 @@ function buildHolisticRunView(
     .sort((a, b) => a - b);
   const minEp = epNums.length > 0 ? epNums[0] : null;
   const maxEp = epNums.length > 0 ? epNums[epNums.length - 1] : null;
+  // ADR-0031: 프롤로그 (ep=0) 포함 시 라벨 분기.
+  const minLabel = minEp === 0 ? "프롤로그" : `${minEp}화`;
   const label =
     minEp != null && maxEp != null
       ? minEp === maxEp
-        ? `${minEp}화`
-        : `${minEp}~${maxEp}화 (${epNums.length}개 회차)`
+        ? minLabel
+        : `${minLabel}~${maxEp}화 (${epNums.length}개 회차)`
       : "선택 회차 통합";
 
   type RawEpisodeScore = { episode_number: number; score: number };

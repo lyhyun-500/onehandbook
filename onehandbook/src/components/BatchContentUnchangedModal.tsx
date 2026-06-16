@@ -21,7 +21,11 @@ export function BatchContentUnchangedModal({
 
   const label =
     episodeNumbers.length > 0
-      ? episodeNumbers.slice().sort((a, b) => a - b).join(", ")
+      ? episodeNumbers
+          .slice()
+          .sort((a, b) => a - b)
+          .map((n) => (n === 0 ? "프롤로그" : `${n}화`))
+          .join(", ")
       : "";
 
   return (
@@ -45,7 +49,7 @@ export function BatchContentUnchangedModal({
         </p>
         {label ? (
           <p className="mt-3 text-sm font-medium text-amber-200/90">
-            변경 없음: {label}화
+            변경 없음: {label}
           </p>
         ) : null}
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">

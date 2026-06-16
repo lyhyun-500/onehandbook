@@ -708,7 +708,7 @@ function MemoBody({
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex items-center justify-between">
         <h3 className="font-serif text-[14px] text-stone-300">
-          {episodeNumber}화 메모
+          {episodeNumber === 0 ? "프롤로그 메모" : `${episodeNumber}화 메모`}
         </h3>
         <span className="font-mono text-[10px] uppercase tracking-widest text-stone-500">
           자동 저장

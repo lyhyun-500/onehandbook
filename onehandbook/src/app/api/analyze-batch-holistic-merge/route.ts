@@ -455,7 +455,10 @@ export async function POST(request: Request) {
       .filter((n): n is number => typeof n === "number");
     const lo = Math.min(...nums);
     const hi = Math.max(...nums);
-    const rangeLabel = lo === hi ? `${lo}화` : `${lo}~${hi}화`;
+    // ADR-0031: 프롤로그 (ep=0) 포함 시 라벨 정합 (merge JSON 안 frozen 박힘).
+    const loLabel = lo === 0 ? "프롤로그" : `${lo}화`;
+    const rangeLabel =
+      lo === hi ? loLabel : `${loLabel}~${hi}화`;
     return {
       chunkIndex: i,
       rangeLabel,
