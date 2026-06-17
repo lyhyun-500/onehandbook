@@ -84,13 +84,12 @@ export function EpisodeListWithReorder({
 
   /**
    * server SELECT 안 episode_number ASC 정렬 사실 정합 → asc = 원본, desc = reverse.
-   * ADR-0031 정합: 프롤로그 안 sortMode 무관 맨 앞 고정 (별도 렌더 path).
+   * ADR-0031 정합:
+   *   - 일반 모드 = 프롤로그 (ep=0) 안 정렬 참여 사실 (asc 시 맨 위 / desc 시 맨 아래).
+   *   - 편집 모드 = 프롤로그 안 별도 렌더 (sortable 제외, 맨 앞 고정 단독).
    */
-  const ascList = regularEpisodes;
-  const descList = useMemo(
-    () => [...regularEpisodes].reverse(),
-    [regularEpisodes],
-  );
+  const ascList = episodes;
+  const descList = useMemo(() => [...episodes].reverse(), [episodes]);
   const displayList = sortMode === "desc" ? descList : ascList;
 
   const toggleSort = () => {
@@ -312,34 +311,37 @@ export function EpisodeListWithReorder({
           <div></div>
         </div>
 
-        {/* ADR-0031: 프롤로그 = 맨 앞 고정 (편집/일반 모드 양쪽 단독). */}
-        {prologueEpisode && (
-          <EpisodeRows
-            episodes={[prologueEpisode]}
-            workId={workId}
-            latestByEpisode={latestByEpisode}
-            editMode={editMode}
-          />
-        )}
         {editMode ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={items.map((e) => e.id)}
-              strategy={verticalListSortingStrategy}
-            >
+          <>
+            {/* ADR-0031: 편집 모드 단독 — 프롤로그 = 맨 앞 고정 (sortable 제외). */}
+            {prologueEpisode && (
               <EpisodeRows
-                episodes={items}
+                episodes={[prologueEpisode]}
                 workId={workId}
                 latestByEpisode={latestByEpisode}
                 editMode
               />
-            </SortableContext>
-          </DndContext>
+            )}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={items.map((e) => e.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <EpisodeRows
+                  episodes={items}
+                  workId={workId}
+                  latestByEpisode={latestByEpisode}
+                  editMode
+                />
+              </SortableContext>
+            </DndContext>
+          </>
         ) : (
+          /* ADR-0031: 일반 모드 = 프롤로그 (ep=0) 안 정렬 참여 단독 (별도 고정 path 0). */
           <EpisodeRows
             episodes={displayList}
             workId={workId}
