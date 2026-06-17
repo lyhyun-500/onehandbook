@@ -48,8 +48,23 @@ export function EpisodeListWithReorder({
   busyJobCount: number;
 }) {
   const router = useRouter();
+  // ADR-0031: 프롤로그 분리 — 재정렬 대상 0 + 맨 앞 고정 렌더 사양.
+  const prologueEpisode = useMemo(
+    () =>
+      episodes.find(
+        (e) => e.episode_type === "prologue" || e.episode_number === 0,
+      ) ?? null,
+    [episodes],
+  );
+  const regularEpisodes = useMemo(
+    () =>
+      episodes.filter(
+        (e) => !(e.episode_type === "prologue" || e.episode_number === 0),
+      ),
+    [episodes],
+  );
   const [editMode, setEditMode] = useState(false);
-  const [items, setItems] = useState<EpisodeRow[]>(episodes);
+  const [items, setItems] = useState<EpisodeRow[]>(regularEpisodes);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   /** 일반 모드 정렬 토글 — desc(최신순) ↔ asc(오래된순). 기본 = desc. */
@@ -67,9 +82,15 @@ export function EpisodeListWithReorder({
     }),
   );
 
-  /** server SELECT 안 episode_number ASC 정렬 사실 정합 → asc = 원본, desc = reverse. */
-  const ascList = episodes;
-  const descList = useMemo(() => [...episodes].reverse(), [episodes]);
+  /**
+   * server SELECT 안 episode_number ASC 정렬 사실 정합 → asc = 원본, desc = reverse.
+   * ADR-0031 정합: 프롤로그 안 sortMode 무관 맨 앞 고정 (별도 렌더 path).
+   */
+  const ascList = regularEpisodes;
+  const descList = useMemo(
+    () => [...regularEpisodes].reverse(),
+    [regularEpisodes],
+  );
   const displayList = sortMode === "desc" ? descList : ascList;
 
   const toggleSort = () => {
@@ -80,15 +101,16 @@ export function EpisodeListWithReorder({
   const enterEditMode = () => {
     if (isBusy) return;
     // 편집 진입 시 진입 전 정렬 보존 + asc 강제 (드래그 직관 정합).
+    // ADR-0031: items = 본편 단독 (프롤로그 = 별도 렌더, 재정렬 대상 0).
     setPreEditSortMode(sortMode);
     setSortMode("asc");
-    setItems(episodes);
+    setItems(regularEpisodes);
     setEditMode(true);
     setToast(null);
   };
 
   const cancel = () => {
-    setItems(episodes);
+    setItems(regularEpisodes);
     setSortMode(preEditSortMode);
     setEditMode(false);
     setToast(null);
@@ -290,6 +312,15 @@ export function EpisodeListWithReorder({
           <div></div>
         </div>
 
+        {/* ADR-0031: 프롤로그 = 맨 앞 고정 (편집/일반 모드 양쪽 단독). */}
+        {prologueEpisode && (
+          <EpisodeRows
+            episodes={[prologueEpisode]}
+            workId={workId}
+            latestByEpisode={latestByEpisode}
+            editMode={editMode}
+          />
+        )}
         {editMode ? (
           <DndContext
             sensors={sensors}

@@ -11,6 +11,7 @@ import type { AnalysisRunRow } from "@/lib/analysisSummary";
 export interface EpisodeRow {
   id: number;
   episode_number: number;
+  episode_type?: "episode" | "prologue";
   title: string;
   content: string;
   created_at: string;
@@ -72,7 +73,13 @@ function EpisodeRowItem({
   editMode: boolean;
 }) {
   const router = useRouter();
-  const sortable = useSortable({ id: ep.id, disabled: !editMode });
+  // ADR-0031: 프롤로그 = 재정렬 제외 + 맨 앞 고정 (드래그 핸들 미노출 + sortable disabled).
+  const isPrologue =
+    ep.episode_type === "prologue" || ep.episode_number === 0;
+  const sortable = useSortable({
+    id: ep.id,
+    disabled: !editMode || isPrologue,
+  });
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     sortable;
 
@@ -117,16 +124,24 @@ function EpisodeRowItem({
       }
       className={`grid ${editMode ? EDIT_GRID : READ_GRID} ${editMode ? "" : "cursor-pointer"} items-center gap-4 border-b border-stone-800/40 px-4 py-3.5 text-[13px] last:border-b-0 ${editMode ? "" : "focus:outline-none focus:ring-1 focus:ring-inset focus:ring-sky-400/40"} ${isDragging ? "bg-stone-900/60" : ""}`}
     >
-      {editMode && (
-        <div
-          {...attributes}
-          {...listeners}
-          className="flex cursor-grab justify-center text-stone-500 hover:text-sky-300 active:cursor-grabbing"
-          aria-label={`${epLabel} 순서 변경 핸들`}
-        >
-          <GripVertical size={14} aria-hidden="true" />
-        </div>
-      )}
+      {editMode &&
+        (isPrologue ? (
+          // 프롤로그 = 재정렬 제외 사양 영속화. handle 영역 안 빈 cell 단독 (grid 정합).
+          <div
+            className="flex justify-center text-stone-700"
+            title="프롤로그는 맨 앞에 고정됩니다"
+            aria-label="프롤로그 고정"
+          />
+        ) : (
+          <div
+            {...attributes}
+            {...listeners}
+            className="flex cursor-grab justify-center text-stone-500 hover:text-sky-300 active:cursor-grabbing"
+            aria-label={`${epLabel} 순서 변경 핸들`}
+          >
+            <GripVertical size={14} aria-hidden="true" />
+          </div>
+        ))}
       <div className="font-mono text-[12px] tabular-nums text-stone-500">
         {epLabel}
       </div>
