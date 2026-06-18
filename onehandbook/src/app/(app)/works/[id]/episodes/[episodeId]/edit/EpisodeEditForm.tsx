@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, ChevronRight, PanelRight } from "lucide-react";
+import { Check, ChevronRight, PanelRight, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { DeleteEpisodeModal } from "@/components/DeleteEpisodeModal";
 import {
   EPISODE_CONTENT_MAX_CHARS,
   EPISODE_CONTENT_MAX_LABEL,
@@ -78,6 +79,11 @@ export function EpisodeEditForm({
     kind: "ok" | "err";
     message: string;
   } | null>(null);
+  // ADR-0032: 에디터 푸터 안 삭제 — modal + dirty 가드 bypass 사양 영속화.
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const supabase = createClient();
 
@@ -94,7 +100,11 @@ export function EpisodeEditForm({
   }
 
   // M3 C3 — 폼 dirty 안 이탈 가드 (beforeunload + 내부 link + popstate).
-  useAnalysisNavigationGuard(totalUnsaved, UNSAVED_CHANGES_CONFIRM_MESSAGE);
+  // ADR-0032: 삭제 진입 시 dirty 가드 bypass 단독 사양 (isDeleting flag 안 active=false).
+  useAnalysisNavigationGuard(
+    totalUnsaved && !isDeleting,
+    UNSAVED_CHANGES_CONFIRM_MESSAGE,
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,6 +179,48 @@ export function EpisodeEditForm({
       setError(message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ADR-0032: 에디터 푸터 삭제 진입 / 확인 / 취소 사양.
+  const handleDeleteOpen = () => {
+    setDeleteError(null);
+    setDeleteOpen(true);
+  };
+
+  const handleDeleteCancel = () => {
+    if (deleting) return;
+    setDeleteOpen(false);
+    setDeleteError(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (episodeId == null || deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(
+        `/api/works/${workId}/episodes/${episodeId}/delete`,
+        { method: "POST" },
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        code?: string;
+      };
+      if (!res.ok || !data.ok) {
+        setDeleteError(data.error ?? "삭제에 실패했습니다.");
+        return;
+      }
+      // dirty 가드 bypass 안 isDeleting flag 안 박음 (navigation 안 confirm 0 사양).
+      setIsDeleting(true);
+      setDeleteOpen(false);
+      router.replace(`/works/${workId}`);
+    } catch (e) {
+      console.error("[delete_episode] fetch error:", e);
+      setDeleteError("네트워크 오류가 발생했습니다. 다시 시도해 주세요.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -350,9 +402,36 @@ export function EpisodeEditForm({
                   ? "저장"
                   : "등록"}
             </button>
+            {/* ADR-0032: 에디터 푸터 안 삭제 button — isEdit 단독, 우측 분리 + 위험톤. */}
+            {isEdit && (
+              <button
+                type="button"
+                onClick={handleDeleteOpen}
+                className="ml-3 inline-flex items-center gap-1.5 rounded-md border border-rose-500/40 bg-rose-950/20 px-4 py-2 text-[12.5px] text-rose-300 hover:border-rose-500/60 hover:bg-rose-950/35"
+              >
+                <Trash2 size={12} aria-hidden="true" />
+                삭제
+              </button>
+            )}
           </div>
         </footer>
       </form>
+
+      {isEdit && episodeId != null && deleteOpen && (
+        <DeleteEpisodeModal
+          open
+          workId={workId}
+          episodeId={episodeId}
+          episodeNumber={episodeNumber}
+          isPrologue={isPrologue}
+          // 본편 단독 안 재배치 안내 사양 (프롤로그 / 본편 N=1 = 재배치 0 사실).
+          willReorder={!isPrologue}
+          loading={deleting}
+          error={deleteError}
+          onCancel={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+        />
+      )}
 
       {toast && (
         <div
