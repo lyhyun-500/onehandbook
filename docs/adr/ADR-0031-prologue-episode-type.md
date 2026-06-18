@@ -189,6 +189,55 @@ CREATE UNIQUE INDEX one_prologue_per_work
 
 ---
 
+## Lessons — 말단 누락 체크리스트 (M4 후행 영속화)
+
+### 발견 경위
+- M4 안 STEP 0 / STEP 1 / STEP 2 (8 commit) 충실 진입 후 운영 검증 안 **hotfix 6회 (C9~C14) 사실 발생**.
+- 단일 뿌리 = `episode_type` / 프롤로그 / 0 NAT 분기 사실 안 **서버 핵심 경로 (분석 pipeline / NAT 계산 / fold) 단독 박힘 + 말단 사이트 안 미반영 사실 영속화**.
+
+### M4 안 발견된 말단 누락 6 카테고리
+
+#### (1) 라벨 표시 — `formatEpisodeLabel` 미경유 안 `${n}화` 직접 보간 사이트
+- **C9**: `EpisodeEditForm.tsx:198` 안 form 안 자체 헤더 "0화" 표시 사실.
+- **C11 (b-g, k)**: `EpisodeTrendChart.tsx:104` (x축 tick), `BatchAnalyzeModal.tsx:723, 726` (aria-label + EP.NN prefix), `WorkNotesDrawer.tsx:306` + `SettingsDrawer.tsx:711` (메모 라벨), `BatchContentUnchangedModal.tsx:48` + `AnalysisAsyncUnchangedModal.tsx:228` (`변경 없음: N화` 단독).
+- 검증 사양 = `grep -rn '}화\|]화\|화\`' src` 단독 + per-episode 라벨 vs count 단독 분류 path.
+
+#### (2) NAT 표시 / 계산 — `buildNatBreakdown` / `computeNatCost` 호출처 안 `episode_type` 인입
+- **C10**: `AnalyzePanel.tsx:512` 안 3번째 인자 미인입 → 프롤로그 안 1 NAT 잘못 표시 사실.
+- **C11 (a)**: `buildAnalyzeJobPollResponse.ts:278` 안 polling response 안 동일 사실.
+- 검증 사양 = `grep -rn 'buildNatBreakdown\|computeNatCost\|getManuscriptAnalysisTier' src --include="*.ts*"` 전수.
+
+#### (3) 차감 실행 — RPC 안 0 / 특수값 거부 사실
+- **C12**: `consume_nat` RPC 안 `p_amount < 1` 거부 사양 안 호출자 안 "NAT 부족" 매핑 단독 + `analysis_runs` DELETE 사실 → 0 NAT 분석 결과 손실 + 에러 표시 사실.
+- 검증 사양 = **사전 balance check 단독 검증 path 0**. 실제 차감 RPC / DB CHECK 안 0 / 음수 / NULL 거부 사실 안 호출자 안 매핑 path 추적 필수.
+
+#### (4) 정렬 / 재정렬 — sortable items + 저장 입력 + 정렬 방향별 위치
+- **C13**: `EpisodeListWithReorder.tsx` 안 sortable items 안 프롤로그 ID 포함 + `save()` orderedEpisodeIds 안 프롤로그 ID 포함 → reorder RPC 안 `ordered_ids_mismatch` 사실 (C2 안 본편 단독 expected_count 정합 안 미정합).
+- **C14**: 일반 보기 안 sortMode 무관 프롤로그 상단 고정 사실 → desc (최신순) 시 프롤로그 = 맨 아래 사양 안 미정합.
+- 검증 사양 = sortable 컴포넌트 안 (a) items array (b) save payload (c) 정렬 방향별 자연 위치 3 path 전수 추적.
+
+#### (5) frozen JSON — server-side 라벨 안 merge 결과 안 박힘 사실
+- **C11 (j)**: `analyze-batch-holistic-merge/route.ts:458` + `holisticBatchWorker.ts:453` 안 chunk `rangeLabel` 안 `${lo}화` 직접 보간 사실 — merge JSON 안 frozen 영속화.
+- 검증 사양 = 서버 path 안 사용자 안 보이는 텍스트 안 frozen JSON 안 박힘 사실 추적 (라벨 / 메시지 / 요약 anything).
+
+#### (6) 클라 인입 path 안 4 사이트 단계 검증 (C10 path 영속화)
+- server SELECT → page.tsx props → 중간 컴포넌트 props → 말단 컴포넌트 props 안 4 단계 안 전수 인입 사실.
+- 검증 사양 = page.tsx 안 episode SELECT 안 컬럼 인입 + props 매핑 chain 전수 grep path 단독.
+
+### verify 교훈
+
+**"돈 안 쓰는 경로 (0 NAT / 무료 path) = 사전 체크 통과 단독 검증 path 안 불충분 사실"**.
+
+- M4 C5 verify (Q3/Q7) 안 = "balance < cost" 사전 check 단독 검증 path → 통과 정합 (cost=0 안 balance < 0 사실 = false).
+- 운영 실제 사실 = consume_nat RPC 안 `p_amount < 1` 거부 사실 단독 → 본 verify path 안 미진입 사양.
+- → **검증 사양 = 실제 실행 경로 (LLM 호출 → row INSERT → 차감 RPC → 결과 유지) 안 끝까지 따라가 사실 검증 단독**.
+
+### 신규 사양 (Episode 파생 필드 / 특수 타입 추가 시 STEP 0 안 필수 진입 path)
+
+본 6 카테고리 안 grep + trace 단독 path 안 STEP 0 안 별도 단계 영속화 사양. **`episode_type` / 신규 enum / 특수값 (`0` / `null` / `negative`) 추가 진입 시 본 체크리스트 안 단독 활용 사양**.
+
+---
+
 ## Related Commits
 
 - `e837b78`: feat(db): episodes.episode_type + 프롤로그 schema 사양 (C1)
@@ -198,6 +247,13 @@ CREATE UNIQUE INDEX one_prologue_per_work
 - `a6c99b0`: feat(nat): 프롤로그 NAT 분기 (단일 + 일괄) (C5)
 - `1c1fbe9`: feat(episodes): fold <=0 완화 + episodeLabel 프롤로그 분기 (C6)
 - `45acac7`: feat(episodes): 프롤로그 추가 버튼 + 생성 흐름 (C7)
+- `873dd17`: docs(adr): ADR-0031 영속화 (C8)
+- `b9716f8`: fix(episodes): 프롤로그 헤더 라벨 0화 → 프롤로그 (C9, hotfix line 1 — label)
+- `9c38109`: fix(episodes): 프롤로그 분석 진입 500 면제 + NAT 0 표시 (C10, hotfix line 2 — NAT 표시)
+- `f56de7f`: fix(episodes): 프롤로그 라벨/NAT 클라 표시 누락 일괄 보정 (C11, hotfix 11 사이트 전수)
+- `49350c1`: fix(nat): 0 NAT 분석 시 consume_nat 호출 skip (C12, hotfix line 3 — 실행 path)
+- `049811e`: fix(episodes): 순서 편집 시 프롤로그 드래그 제외 + 맨 앞 고정 (C13, hotfix line 4)
+- `73c3f66`: fix(episodes): 일반 보기에서 프롤로그 정렬 참여 (C14, hotfix line 4 후속)
 
 ---
 
