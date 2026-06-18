@@ -100,7 +100,7 @@ export function DeleteEpisodeModal({
             </p>
           )}
           <p className="text-[12.5px] text-red-200/80">
-            관련 메모와 작품 바이블 fact도 함께 삭제됩니다.
+            관련 메모와 작품 분석 정보가 함께 사라집니다.
           </p>
           {willReorder && !isPrologue && (
             <p className="text-[12.5px] text-amber-200/85">
