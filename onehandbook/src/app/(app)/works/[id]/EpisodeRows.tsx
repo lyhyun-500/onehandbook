@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ChevronRight, GripVertical } from "lucide-react";
+import { ChevronRight, GripVertical, Trash2 } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { formatEpisodeLabel } from "@/lib/episodeLabel";
@@ -23,6 +23,10 @@ interface EpisodeRowsProps {
   latestByEpisode: Map<number, AnalysisRunRow>;
   /** 편집(드래그) 모드 — true 시 행 click 차단 + drag handle 좌측 prefix 노출 */
   editMode?: boolean;
+  /** ADR-0032: 편집 모드 안 row 삭제 요청 callback. editMode 단독 의미. */
+  onDeleteRequest?: (ep: EpisodeRow) => void;
+  /** ADR-0032: busyJobCount > 0 시 삭제 button disable 사양. */
+  deleteDisabled?: boolean;
 }
 
 const READ_GRID = "grid-cols-[80px_1fr_90px_80px_70px_70px_40px]";
@@ -45,6 +49,8 @@ export function EpisodeRows({
   workId,
   latestByEpisode,
   editMode = false,
+  onDeleteRequest,
+  deleteDisabled = false,
 }: EpisodeRowsProps) {
   return (
     <>
@@ -55,6 +61,8 @@ export function EpisodeRows({
           workId={workId}
           latestRun={latestByEpisode.get(ep.id)}
           editMode={editMode}
+          onDeleteRequest={onDeleteRequest}
+          deleteDisabled={deleteDisabled}
         />
       ))}
     </>
@@ -66,11 +74,15 @@ function EpisodeRowItem({
   workId,
   latestRun,
   editMode,
+  onDeleteRequest,
+  deleteDisabled,
 }: {
   ep: EpisodeRow;
   workId: string;
   latestRun: AnalysisRunRow | undefined;
   editMode: boolean;
+  onDeleteRequest?: (ep: EpisodeRow) => void;
+  deleteDisabled?: boolean;
 }) {
   const router = useRouter();
   // ADR-0031: 프롤로그 = 재정렬 제외 + 맨 앞 고정 (드래그 핸들 미노출 + sortable disabled).
@@ -164,14 +176,34 @@ function EpisodeRowItem({
         )}
       </div>
       <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={editMode ? undefined : goEdit}
-          disabled={editMode}
-          className="inline-flex items-center rounded-md border border-stone-700 bg-stone-900/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-stone-300 transition-colors hover:border-sky-400/40 hover:text-sky-200 disabled:opacity-40 disabled:hover:border-stone-700 disabled:hover:text-stone-300"
-        >
-          편집
-        </button>
+        {editMode ? (
+          // ADR-0032: 편집 모드 안 「편집」 slot 안 휴지통 button 단독 교체 (위험톤).
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteRequest?.(ep);
+            }}
+            disabled={deleteDisabled}
+            aria-label={`${epLabel} 삭제`}
+            title={
+              deleteDisabled
+                ? "분석 중에는 삭제할 수 없습니다"
+                : `${epLabel} 삭제`
+            }
+            className="inline-flex items-center rounded-md border border-rose-500/30 bg-rose-950/30 px-2 py-1 text-rose-300 transition-colors hover:border-rose-500/60 hover:bg-rose-950/50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-rose-500/30 disabled:hover:bg-rose-950/30"
+          >
+            <Trash2 size={11} aria-hidden="true" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={goEdit}
+            className="inline-flex items-center rounded-md border border-stone-700 bg-stone-900/40 px-2 py-1 font-mono text-[10px] uppercase tracking-widest text-stone-300 transition-colors hover:border-sky-400/40 hover:text-sky-200"
+          >
+            편집
+          </button>
+        )}
       </div>
       <div className="flex justify-end">
         <button

@@ -20,6 +20,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { EpisodeRows, type EpisodeRow } from "./EpisodeRows";
+import { DeleteEpisodeModal } from "@/components/DeleteEpisodeModal";
 import type { AnalysisRunRow } from "@/lib/analysisSummary";
 
 /**
@@ -67,6 +68,10 @@ export function EpisodeListWithReorder({
   const [items, setItems] = useState<EpisodeRow[]>(regularEpisodes);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+  // ADR-0032: 편집 모드 안 삭제 — pendingDelete + modal state 사양 영속화.
+  const [pendingDelete, setPendingDelete] = useState<EpisodeRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   /** 일반 모드 정렬 토글 — desc(최신순) ↔ asc(오래된순). 기본 = desc. */
   const [sortMode, setSortMode] = useState<"desc" | "asc">("desc");
   /** 편집 모드 진입 직전 sortMode 보존 (저장/취소 안 종료 시 복원 사양). */
@@ -163,6 +168,50 @@ export function EpisodeListWithReorder({
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ADR-0032: 편집 모드 삭제 진입 / 확인 / 취소 사양.
+  const handleDeleteRequest = (ep: EpisodeRow) => {
+    if (isBusy) return;
+    setDeleteError(null);
+    setPendingDelete(ep);
+  };
+
+  const handleDeleteCancel = () => {
+    if (deleting) return;
+    setPendingDelete(null);
+    setDeleteError(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!pendingDelete || deleting) return;
+    const ep = pendingDelete;
+    const epLabel = ep.episode_number === 0 ? "프롤로그" : `${ep.episode_number}화`;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(
+        `/api/works/${workId}/episodes/${ep.id}/delete`,
+        { method: "POST" },
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        code?: string;
+      };
+      if (!res.ok || !data.ok) {
+        setDeleteError(data.error ?? "삭제에 실패했습니다.");
+        return;
+      }
+      setPendingDelete(null);
+      showToast({ kind: "ok", message: `${epLabel} 회차를 삭제했습니다.` });
+      router.refresh();
+    } catch (e) {
+      console.error("[delete_episode] fetch error:", e);
+      setDeleteError("네트워크 오류가 발생했습니다. 다시 시도해 주세요.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -320,6 +369,8 @@ export function EpisodeListWithReorder({
                 workId={workId}
                 latestByEpisode={latestByEpisode}
                 editMode
+                onDeleteRequest={handleDeleteRequest}
+                deleteDisabled={isBusy || deleting}
               />
             )}
             <DndContext
@@ -336,6 +387,8 @@ export function EpisodeListWithReorder({
                   workId={workId}
                   latestByEpisode={latestByEpisode}
                   editMode
+                  onDeleteRequest={handleDeleteRequest}
+                  deleteDisabled={isBusy || deleting}
                 />
               </SortableContext>
             </DndContext>
@@ -349,6 +402,29 @@ export function EpisodeListWithReorder({
           />
         )}
       </div>
+
+      {pendingDelete && (
+        <DeleteEpisodeModal
+          open
+          workId={Number(workId)}
+          episodeId={pendingDelete.id}
+          episodeNumber={pendingDelete.episode_number}
+          isPrologue={
+            pendingDelete.episode_type === "prologue" ||
+            pendingDelete.episode_number === 0
+          }
+          // 본편 + 본편 외 나머지 회차 1건 이상 사실 = 재배치 진입 단독 사양.
+          willReorder={
+            pendingDelete.episode_type !== "prologue" &&
+            pendingDelete.episode_number !== 0 &&
+            regularEpisodes.length > 1
+          }
+          loading={deleting}
+          error={deleteError}
+          onCancel={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+        />
+      )}
     </section>
   );
 }
